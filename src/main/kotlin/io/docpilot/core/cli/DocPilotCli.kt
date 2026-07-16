@@ -31,14 +31,31 @@ fun runCli(
     args: Array<String>,
     out: PrintStream = System.out,
     err: PrintStream = System.err,
-): Int {
-    if (args.size != 2 || args[0] != "analyze") {
-        printUsage(err)
-        return 2
+): Int =
+    when {
+        args.contentEquals(arrayOf("plugins")) ->
+            runPluginsCommand(out)
+
+        args.size == 2 && args[0] == "analyze" ->
+            runAnalyzeCommand(
+                projectArgument = args[1],
+                out = out,
+                err = err,
+            )
+
+        else -> {
+            printUsage(err)
+            2
+        }
     }
 
-    return try {
-        val projectPath = Path.of(args[1])
+private fun runAnalyzeCommand(
+    projectArgument: String,
+    out: PrintStream,
+    err: PrintStream,
+): Int =
+    try {
+        val projectPath = Path.of(projectArgument)
             .toAbsolutePath()
             .normalize()
 
@@ -95,7 +112,6 @@ fun runCli(
         )
         1
     }
-}
 
 private fun writeArtifact(
     projectPath: Path,
@@ -120,7 +136,7 @@ private fun writeArtifact(
 private fun printUsage(
     stream: PrintStream,
 ) {
-    stream.println(
-        "Usage: docpilot analyze <project-path>",
-    )
+    // Keep the original usage line for backward-compatible tests and scripts.
+    stream.println("Usage: docpilot analyze <project-path>")
+    stream.println("       docpilot plugins")
 }
