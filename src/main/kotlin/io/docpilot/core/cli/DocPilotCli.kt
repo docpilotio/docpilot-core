@@ -6,6 +6,11 @@ import io.docpilot.core.knowledge.DefaultKnowledgeGraphBuilder
 import io.docpilot.core.lexer.SimpleKotlinLexer
 import io.docpilot.core.loader.LocalProjectLoader
 import io.docpilot.core.model.RenderedArtifact
+import io.docpilot.core.model.plugin.PluginCategory
+import io.docpilot.core.model.plugin.PluginContext
+import io.docpilot.core.model.plugin.PluginMessageLevel
+import io.docpilot.core.model.plugin.PluginStatus
+import io.docpilot.core.plugin.DefaultPluginRuntime
 import io.docpilot.core.prompt.DefaultPromptPackageBuilder
 import io.docpilot.core.render.KnowledgeGraphJsonRenderer
 import io.docpilot.core.render.ProjectSummaryMarkdownRenderer
@@ -49,10 +54,12 @@ fun runCli(
         }
     }
 
-private fun runAnalyzeCommand(
+internal fun runAnalyzeCommand(
     projectArgument: String,
     out: PrintStream,
     err: PrintStream,
+    pluginRuntime: DefaultPluginRuntime =
+        DefaultPluginRuntime.discover(),
 ): Int =
     try {
         val projectPath = Path.of(projectArgument)
@@ -78,6 +85,15 @@ private fun runAnalyzeCommand(
         val promptPackage =
             DefaultPromptPackageBuilder().build(knowledge)
 
+        val pluginResult = pluginRuntime.pipeline.execute(
+            category = PluginCategory.OUTPUT,
+            context = PluginContext(
+                sourceIndex = sourceIndex,
+                knowledge = knowledge,
+                promptPackage = promptPackage,
+            ),
+        )
+
         val artifacts = buildList {
             add(
                 ProjectSummaryMarkdownRenderer()
@@ -92,6 +108,7 @@ private fun runAnalyzeCommand(
                     .render(knowledge.graph),
             )
             addAll(promptPackage.artifacts)
+            addAll(pluginResult.artifacts)
         }
 
         artifacts.forEach { artifact ->
@@ -103,7 +120,31 @@ private fun runAnalyzeCommand(
             out.println("Generated: $outputPath")
         }
 
-        0
+        pluginResult.executions.forEach { execution ->
+            out.println(
+                "Plugin: ${execution.pluginId} " +
+                    "[${execution.result.status}]",
+            )
+        }
+
+        pluginResult.messages.forEach { message ->
+            val stream =
+                if (message.level == PluginMessageLevel.ERROR) {
+                    err
+                } else {
+                    out
+                }
+
+            stream.println(
+                "Plugin ${message.level}: ${message.text}",
+            )
+        }
+
+        if (pluginResult.status == PluginStatus.FAILED) {
+            1
+        } else {
+            0
+        }
     } catch (exception: Exception) {
         err.println(
             "Analysis failed: ${
@@ -136,7 +177,6 @@ private fun writeArtifact(
 private fun printUsage(
     stream: PrintStream,
 ) {
-    // Keep the original usage line for backward-compatible tests and scripts.
     stream.println("Usage: docpilot analyze <project-path>")
     stream.println("       docpilot plugins")
 }
