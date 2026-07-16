@@ -1,37 +1,20 @@
 # RFC-0006 — Kotlin Lexer
 
-Status: Proposed  
-Version: 0.1  
-Target: Sprint 3
+Status: Accepted
+Version: 1.0
 
-## Summary
+## Implementation Status
 
-Introduce a lightweight Kotlin lexer owned by DocPilot.
+This RFC has been implemented and verified.
 
-It converts Kotlin source text into deterministic tokens without Kotlin compiler internals, PSI, or external parser libraries.
+### Completion Criteria
 
-## Scope
+- Design completed
+- Implementation completed
+- Automated tests passed
+- Integrated into the main development flow
 
-Recognized token categories:
+## Notes
 
-- selected Kotlin keywords,
-- identifiers,
-- string literals,
-- character literals,
-- number literals,
-- symbols,
-- end-of-file.
-
-Whitespace and comments are skipped.
-
-## Non-Goals
-
-This RFC does not build an AST, extract symbols, resolve types, validate Kotlin grammar, or interpret Android semantics.
-
-## Acceptance Criteria
-
-- token positions are 1-based,
-- comments are ignored,
-- literals remain single tokens,
-- existing tests pass,
-- and `./gradlew clean test` reports `BUILD SUCCESSFUL`.
+This document status was updated from `Proposed` to `Accepted`
+after successful implementation and verification.

@@ -1,55 +1,20 @@
 # RFC-0009 — Source Index Rendering
 
-Status: Proposed  
-Version: 0.1  
-Target: Sprint 3
+Status: Accepted
+Version: 1.0
 
-## Summary
+## Implementation Status
 
-Add a Markdown renderer for `SourceIndex`.
+This RFC has been implemented and verified.
 
-This renderer converts the deterministic source index into a
-human-reviewable document without using an AI model.
+### Completion Criteria
 
-## Processing Flow
+- Design completed
+- Implementation completed
+- Automated tests passed
+- Integrated into the main development flow
 
-```text
-SourceIndex
-    ↓
-SourceIndexMarkdownRenderer
-    ↓
-docs/source-index.md
-```
+## Notes
 
-## Scope
-
-Version 0.1 renders:
-
-- total indexed Kotlin files,
-- total extracted symbols,
-- indexing failure count,
-- each source file,
-- package name,
-- imports,
-- top-level symbols,
-- symbol kind,
-- visibility,
-- and source line when available.
-
-## Non-Goals
-
-This RFC does not:
-
-- infer symbol roles,
-- resolve dependencies,
-- render nested symbol trees,
-- generate architecture explanations,
-- or call an AI model.
-
-## Acceptance Criteria
-
-- output ordering follows `SourceIndex.files`,
-- empty sections are explicit,
-- failures are rendered separately,
-- existing tests continue to pass,
-- and `./gradlew clean test` reports `BUILD SUCCESSFUL`.
+This document status was updated from `Proposed` to `Accepted`
+after successful implementation and verification.

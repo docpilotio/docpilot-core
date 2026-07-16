@@ -1,48 +1,20 @@
 # RFC-0007 — Kotlin Symbol Extractor
 
-Status: Proposed  
-Version: 0.1  
-Target: Sprint 3
+Status: Accepted
+Version: 1.0
 
-## Summary
+## Implementation Status
 
-Introduce a lightweight Kotlin symbol extractor that consumes tokens
-produced by `KotlinLexer` and builds DocPilot-owned source models.
+This RFC has been implemented and verified.
 
-## Scope
+### Completion Criteria
 
-Version 0.1 extracts:
+- Design completed
+- Implementation completed
+- Automated tests passed
+- Integrated into the main development flow
 
-- package names,
-- imports,
-- import aliases,
-- wildcard imports,
-- classes,
-- interfaces,
-- objects,
-- functions,
-- properties,
-- type aliases,
-- enum classes,
-- annotation classes,
-- explicit visibility,
-- basic source locations.
+## Notes
 
-## Non-Goals
-
-This RFC does not:
-
-- validate the complete Kotlin grammar,
-- resolve symbols or types,
-- extract nested declarations by brace scope,
-- build dependency or call graphs,
-- or infer Android component roles.
-
-## Acceptance Criteria
-
-- supported declarations are recognized,
-- package and imports are extracted,
-- explicit visibility is preserved,
-- source locations are 1-based,
-- existing tests continue to pass,
-- and `./gradlew clean test` reports `BUILD SUCCESSFUL`.
+This document status was updated from `Proposed` to `Accepted`
+after successful implementation and verification.
