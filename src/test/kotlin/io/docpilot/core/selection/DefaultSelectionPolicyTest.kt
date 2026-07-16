@@ -10,125 +10,60 @@ import kotlin.test.assertIs
 class DefaultSelectionPolicyTest {
 
     private val policy =
-        DefaultSelectionPolicy<Candidate> { it.id }
+        DefaultSelectionPolicy<Candidate, CandidateId>(
+            candidateId = { candidate ->
+                candidate.id
+            },
+        )
 
     @Test
-    fun `explicit selection has highest priority`() {
-        val result = policy.select(
-            candidates = candidates(),
-            context = SelectionContext(
-                explicitCandidateId = "openai",
-                preferredCandidateIds = listOf("ollama"),
-                priorities = mapOf(
-                    "ollama" to 100,
-                    "openai" to 90,
-                ),
-            ),
-        )
-
-        val selected =
-            assertIs<SelectionResult.Selected<Candidate>>(
-                result,
-            )
-
-        assertEquals("openai", selected.candidate.id)
-        assertEquals(
-            SelectionReason.EXPLICIT,
-            selected.reason,
-        )
-    }
-
-    @Test
-    fun `preferred candidate is used before priorities`() {
-        val result = policy.select(
-            candidates = candidates(),
-            context = SelectionContext(
-                preferredCandidateIds = listOf(
-                    "gemini",
-                    "ollama",
-                ),
-                priorities = mapOf(
-                    "ollama" to 100,
-                    "gemini" to 80,
-                ),
-            ),
-        )
-
-        val selected =
-            assertIs<SelectionResult.Selected<Candidate>>(
-                result,
-            )
-
-        assertEquals("gemini", selected.candidate.id)
-        assertEquals(
-            SelectionReason.PREFERRED,
-            selected.reason,
-        )
-    }
-
-    @Test
-    fun `priority selects highest value with ID tie break`() {
+    fun `selects by typed priority`() {
         val result = policy.select(
             candidates = candidates(),
             context = SelectionContext(
                 priorities = mapOf(
-                    "ollama" to 100,
-                    "openai" to 100,
-                    "gemini" to 80,
+                    CandidateId("ollama") to 100,
+                    CandidateId("openai") to 90,
                 ),
             ),
         )
 
         val selected =
-            assertIs<SelectionResult.Selected<Candidate>>(
-                result,
-            )
+            assertIs<
+                SelectionResult.Selected<Candidate, CandidateId>
+            >(result)
 
-        assertEquals("ollama", selected.candidate.id)
-        assertEquals(
-            SelectionReason.PRIORITY,
-            selected.reason,
-        )
+        assertEquals(CandidateId("ollama"), selected.candidateId)
+        assertEquals(SelectionReason.PRIORITY, selected.reason)
     }
 
     @Test
-    fun `fallback is deterministic by candidate ID`() {
-        val result = policy.select(
-            candidates = candidates(),
-        )
+    fun `fallback is deterministic`() {
+        val result = policy.select(candidates())
 
         val selected =
-            assertIs<SelectionResult.Selected<Candidate>>(
-                result,
-            )
+            assertIs<
+                SelectionResult.Selected<Candidate, CandidateId>
+            >(result)
 
-        assertEquals("gemini", selected.candidate.id)
-        assertEquals(
-            SelectionReason.DETERMINISTIC_FALLBACK,
-            selected.reason,
-        )
+        assertEquals(CandidateId("gemini"), selected.candidateId)
     }
 
-    @Test
-    fun `missing explicit candidate does not silently fallback`() {
-        val result = policy.select(
-            candidates = candidates(),
-            context = SelectionContext(
-                explicitCandidateId = "missing",
-            ),
-        )
+    private fun candidates() = listOf(
+        Candidate(CandidateId("openai")),
+        Candidate(CandidateId("ollama")),
+        Candidate(CandidateId("gemini")),
+    )
 
-        assertIs<SelectionResult.Unavailable>(result)
+    @JvmInline
+    private value class CandidateId(
+        val value: String,
+    ) : Comparable<CandidateId> {
+        override fun compareTo(other: CandidateId): Int =
+            value.compareTo(other.value)
     }
-
-    private fun candidates(): List<Candidate> =
-        listOf(
-            Candidate("openai"),
-            Candidate("ollama"),
-            Candidate("gemini"),
-        )
 
     private data class Candidate(
-        val id: String,
+        val id: CandidateId,
     )
 }

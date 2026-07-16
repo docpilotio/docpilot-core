@@ -5,66 +5,50 @@ import io.docpilot.core.model.selection.SelectionContext
 import io.docpilot.core.model.selection.SelectionReason
 import io.docpilot.core.model.selection.SelectionResult
 
-/**
- * Reusable deterministic candidate-selection policy.
- */
-class DefaultSelectionPolicy<T>(
-    private val candidateId: (T) -> String,
-) : SelectionPolicy<T> {
+class DefaultSelectionPolicy<T, ID : Comparable<ID>>(
+    private val candidateId: (T) -> ID,
+) : SelectionPolicy<T, ID> {
 
     override fun select(
         candidates: List<T>,
-        context: SelectionContext,
-    ): SelectionResult<T> {
+        context: SelectionContext<ID>,
+    ): SelectionResult<T, ID> {
         if (candidates.isEmpty()) {
             return SelectionResult.Unavailable(
-                reasons = listOf("No candidates are available."),
+                listOf("No candidates are available."),
             )
         }
 
-        val candidatesById = candidates
-            .associateBy(candidateId)
-
+        val candidatesById = candidates.associateBy(candidateId)
         require(candidatesById.size == candidates.size) {
             "Candidate IDs must be unique."
         }
-        require(candidatesById.keys.none(String::isBlank)) {
-            "Candidate IDs must not be blank."
-        }
 
-        context.explicitCandidateId?.let { explicitId ->
-            val explicit = candidatesById[explicitId]
-
-            return if (explicit != null) {
-                selected(
-                    candidate = explicit,
-                    id = explicitId,
-                    reason = SelectionReason.EXPLICIT,
-                )
+        context.explicitCandidateId?.let { id ->
+            val candidate = candidatesById[id]
+            return if (candidate != null) {
+                selected(candidate, id, SelectionReason.EXPLICIT)
             } else {
                 SelectionResult.Unavailable(
-                    reasons = listOf(
-                        "Explicit candidate is unavailable: " +
-                            explicitId,
-                    ),
+                    listOf("Explicit candidate is unavailable: $id"),
                 )
             }
         }
 
-        context.preferredCandidateIds.forEach { preferredId ->
-            candidatesById[preferredId]?.let { candidate ->
+        context.preferredCandidateIds.forEach { id ->
+            candidatesById[id]?.let {
                 return selected(
-                    candidate = candidate,
-                    id = preferredId,
-                    reason = SelectionReason.PREFERRED,
+                    it,
+                    id,
+                    SelectionReason.PREFERRED,
                 )
             }
         }
 
         val prioritized = candidatesById.entries
-            .filter { (id, _) -> id in context.priorities }
+            .filter { it.key in context.priorities }
             .sortedWith(
-                compareByDescending<Map.Entry<String, T>> {
+                compareByDescending<Map.Entry<ID, T>> {
                     context.priorities.getValue(it.key)
                 }.thenBy { it.key },
             )
@@ -72,30 +56,27 @@ class DefaultSelectionPolicy<T>(
 
         if (prioritized != null) {
             return selected(
-                candidate = prioritized.value,
-                id = prioritized.key,
-                reason = SelectionReason.PRIORITY,
+                prioritized.value,
+                prioritized.key,
+                SelectionReason.PRIORITY,
             )
         }
 
-        val fallback = candidatesById.entries
-            .minBy { it.key }
-
+        val fallback = candidatesById.entries.minBy { it.key }
         return selected(
-            candidate = fallback.value,
-            id = fallback.key,
-            reason = SelectionReason.DETERMINISTIC_FALLBACK,
+            fallback.value,
+            fallback.key,
+            SelectionReason.DETERMINISTIC_FALLBACK,
         )
     }
 
     private fun selected(
         candidate: T,
-        id: String,
+        id: ID,
         reason: SelectionReason,
-    ): SelectionResult.Selected<T> =
-        SelectionResult.Selected(
-            candidate = candidate,
-            candidateId = id,
-            reason = reason,
-        )
+    ) = SelectionResult.Selected(
+        candidate = candidate,
+        candidateId = id,
+        reason = reason,
+    )
 }
