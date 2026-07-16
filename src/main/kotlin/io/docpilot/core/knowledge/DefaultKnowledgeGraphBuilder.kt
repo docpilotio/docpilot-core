@@ -1,6 +1,12 @@
 package io.docpilot.core.knowledge
 
 import io.docpilot.core.api.KnowledgeGraphBuilder
+import io.docpilot.core.model.evidence.Evidence
+import io.docpilot.core.model.evidence.EvidenceCollection
+import io.docpilot.core.model.evidence.EvidenceId
+import io.docpilot.core.model.evidence.EvidenceLocation
+import io.docpilot.core.model.evidence.EvidenceType
+import io.docpilot.core.model.knowledge.KnowledgeBuildResult
 import io.docpilot.core.model.knowledge.KnowledgeEdge
 import io.docpilot.core.model.knowledge.KnowledgeGraph
 import io.docpilot.core.model.knowledge.KnowledgeNode
@@ -12,152 +18,198 @@ import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
 
-/**
- * Converts deterministic source facts into a language-neutral graph.
- *
- * Version 0.1 creates package, file, symbol, and imported external-type nodes.
- */
 class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
 
-    override fun build(sourceIndex: SourceIndex): KnowledgeGraph {
-        val nodesById = linkedMapOf<String, KnowledgeNode>()
-        val edgesById = linkedMapOf<String, KnowledgeEdge>()
+    override fun buildWithEvidence(
+        sourceIndex: SourceIndex,
+    ): KnowledgeBuildResult {
+        val nodes = linkedMapOf<String, KnowledgeNode>()
+        val edges = linkedMapOf<String, KnowledgeEdge>()
+        val evidence = linkedMapOf<EvidenceId, Evidence>()
 
         sourceIndex.files
             .sortedBy { it.relativePath }
             .forEach { file ->
-                addFileKnowledge(
+                addFile(
                     file = file,
-                    nodesById = nodesById,
-                    edgesById = edgesById,
+                    nodes = nodes,
+                    edges = edges,
+                    evidence = evidence,
                 )
             }
 
-        return KnowledgeGraph(
-            nodes = nodesById.values.sortedBy { it.id },
-            edges = edgesById.values.sortedBy { it.id },
+        return KnowledgeBuildResult(
+            graph = KnowledgeGraph(
+                nodes = nodes.values.sortedBy { it.id },
+                edges = edges.values.sortedBy { it.id },
+            ),
+            evidence = EvidenceCollection(
+                items = evidence.values
+                    .sortedBy { it.id.value },
+            ),
         )
     }
 
-    private fun addFileKnowledge(
+    private fun addFile(
         file: SourceFile,
-        nodesById: MutableMap<String, KnowledgeNode>,
-        edgesById: MutableMap<String, KnowledgeEdge>,
+        nodes: MutableMap<String, KnowledgeNode>,
+        edges: MutableMap<String, KnowledgeEdge>,
+        evidence: MutableMap<EvidenceId, Evidence>,
     ) {
+        val fileEvidence = addEvidence(
+            evidence = evidence,
+            type = EvidenceType.SOURCE_FILE,
+            relativePath = file.relativePath,
+            summary = "Source file ${file.relativePath} was indexed.",
+        )
+
         val fileNode = KnowledgeNode(
-            id = fileNodeId(file.relativePath),
+            id = "file:${file.relativePath}",
             name = file.relativePath.substringAfterLast('/'),
             kind = KnowledgeNodeKind.FILE,
             attributes = mapOf(
                 "relativePath" to file.relativePath,
                 "language" to file.language.name,
             ),
-            evidenceRefs = setOf(sourceEvidenceId(file.relativePath)),
+            evidenceRefs = setOf(fileEvidence.value),
         )
-        nodesById.putIfAbsent(fileNode.id, fileNode)
+        nodes.putIfAbsent(fileNode.id, fileNode)
 
         file.packageName?.let { packageName ->
+            val packageEvidence = addEvidence(
+                evidence = evidence,
+                type = EvidenceType.PACKAGE_DECLARATION,
+                relativePath = file.relativePath,
+                summary = "Package $packageName is declared.",
+                attributes = mapOf(
+                    "packageName" to packageName,
+                ),
+            )
+
             val packageNode = KnowledgeNode(
-                id = packageNodeId(packageName),
+                id = "package:$packageName",
                 name = packageName,
                 kind = KnowledgeNodeKind.PACKAGE,
                 attributes = mapOf(
                     "qualifiedName" to packageName,
                 ),
+                evidenceRefs = setOf(packageEvidence.value),
             )
-            nodesById.putIfAbsent(packageNode.id, packageNode)
+            nodes.putIfAbsent(packageNode.id, packageNode)
 
             addEdge(
-                edgesById = edgesById,
+                edges = edges,
                 sourceNodeId = packageNode.id,
                 targetNodeId = fileNode.id,
                 relationship = RelationshipType.CONTAINS,
-                evidenceRefs = setOf(
-                    sourceEvidenceId(file.relativePath),
-                ),
+                evidenceRefs = setOf(packageEvidence.value),
             )
         }
 
-        file.imports.forEach { sourceImport ->
-            addImportKnowledge(
+        file.imports.forEachIndexed { index, sourceImport ->
+            addImport(
                 file = file,
+                index = index,
                 fileNode = fileNode,
                 sourceImport = sourceImport,
-                nodesById = nodesById,
-                edgesById = edgesById,
+                nodes = nodes,
+                edges = edges,
+                evidence = evidence,
             )
         }
 
         file.symbols.forEachIndexed { index, symbol ->
-            addSymbolKnowledge(
+            addSymbol(
                 file = file,
                 ownerNodeId = fileNode.id,
                 symbol = symbol,
                 siblingIndex = index,
-                nodesById = nodesById,
-                edgesById = edgesById,
+                nodes = nodes,
+                edges = edges,
+                evidence = evidence,
             )
         }
     }
 
-    private fun addImportKnowledge(
+    private fun addImport(
         file: SourceFile,
+        index: Int,
         fileNode: KnowledgeNode,
         sourceImport: SourceImport,
-        nodesById: MutableMap<String, KnowledgeNode>,
-        edgesById: MutableMap<String, KnowledgeEdge>,
+        nodes: MutableMap<String, KnowledgeNode>,
+        edges: MutableMap<String, KnowledgeEdge>,
+        evidence: MutableMap<EvidenceId, Evidence>,
     ) {
         val importedName = buildString {
             append(sourceImport.qualifiedName)
-            if (sourceImport.wildcard) {
-                append(".*")
-            }
+            if (sourceImport.wildcard) append(".*")
         }
 
+        val importEvidence = addEvidence(
+            evidence = evidence,
+            type = EvidenceType.IMPORT_DECLARATION,
+            relativePath = file.relativePath,
+            summary = "Import $importedName is declared.",
+            attributes = buildMap {
+                put("qualifiedName", sourceImport.qualifiedName)
+                put("wildcard", sourceImport.wildcard.toString())
+                put("index", index.toString())
+                sourceImport.alias?.let { put("alias", it) }
+            },
+        )
+
         val externalNode = KnowledgeNode(
-            id = externalTypeNodeId(importedName),
+            id = "external:$importedName",
             name = importedName,
             kind = KnowledgeNodeKind.EXTERNAL_TYPE,
             attributes = buildMap {
-                put(
-                    "qualifiedName",
-                    sourceImport.qualifiedName,
-                )
-                put(
-                    "wildcard",
-                    sourceImport.wildcard.toString(),
-                )
-                sourceImport.alias?.let {
-                    put("alias", it)
-                }
+                put("qualifiedName", sourceImport.qualifiedName)
+                put("wildcard", sourceImport.wildcard.toString())
+                sourceImport.alias?.let { put("alias", it) }
             },
+            evidenceRefs = setOf(importEvidence.value),
         )
-        nodesById.putIfAbsent(externalNode.id, externalNode)
+        nodes.putIfAbsent(externalNode.id, externalNode)
 
         addEdge(
-            edgesById = edgesById,
+            edges = edges,
             sourceNodeId = fileNode.id,
             targetNodeId = externalNode.id,
             relationship = RelationshipType.IMPORTS,
-            evidenceRefs = setOf(
-                sourceEvidenceId(file.relativePath),
-            ),
+            evidenceRefs = setOf(importEvidence.value),
         )
     }
 
-    private fun addSymbolKnowledge(
+    private fun addSymbol(
         file: SourceFile,
         ownerNodeId: String,
         symbol: SourceSymbol,
         siblingIndex: Int,
-        nodesById: MutableMap<String, KnowledgeNode>,
-        edgesById: MutableMap<String, KnowledgeEdge>,
+        nodes: MutableMap<String, KnowledgeNode>,
+        edges: MutableMap<String, KnowledgeEdge>,
+        evidence: MutableMap<EvidenceId, Evidence>,
     ) {
+        val symbolEvidence = addEvidence(
+            evidence = evidence,
+            type = EvidenceType.SYMBOL_DECLARATION,
+            relativePath = file.relativePath,
+            lineStart = symbol.location?.lineStart,
+            columnStart = symbol.location?.columnStart,
+            lineEnd = symbol.location?.lineEnd,
+            columnEnd = symbol.location?.columnEnd,
+            summary = "${symbol.kind.name} ${symbol.name} is declared.",
+            attributes = mapOf(
+                "symbolName" to symbol.name,
+                "symbolKind" to symbol.kind.name,
+                "visibility" to symbol.visibility.name,
+            ),
+        )
+
         val symbolNode = KnowledgeNode(
             id = symbolNodeId(
-                relativePath = file.relativePath,
-                symbol = symbol,
-                siblingIndex = siblingIndex,
+                file.relativePath,
+                symbol,
+                siblingIndex,
             ),
             name = symbol.name,
             kind = symbol.kind.toKnowledgeNodeKind(),
@@ -169,62 +221,107 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                 symbol.location?.columnStart?.let {
                     put("columnStart", it.toString())
                 }
-                if (symbol.annotations.isNotEmpty()) {
-                    put(
-                        "annotations",
-                        symbol.annotations.joinToString(","),
-                    )
-                }
             },
-            evidenceRefs = setOf(
-                sourceEvidenceId(file.relativePath),
-            ),
+            evidenceRefs = setOf(symbolEvidence.value),
         )
-        nodesById.putIfAbsent(symbolNode.id, symbolNode)
+        nodes.putIfAbsent(symbolNode.id, symbolNode)
 
         addEdge(
-            edgesById = edgesById,
+            edges = edges,
             sourceNodeId = ownerNodeId,
             targetNodeId = symbolNode.id,
             relationship = RelationshipType.DECLARES,
-            evidenceRefs = setOf(
-                sourceEvidenceId(file.relativePath),
-            ),
+            evidenceRefs = setOf(symbolEvidence.value),
         )
 
         symbol.children.forEachIndexed { index, child ->
-            addSymbolKnowledge(
+            addSymbol(
                 file = file,
                 ownerNodeId = symbolNode.id,
                 symbol = child,
                 siblingIndex = index,
-                nodesById = nodesById,
-                edgesById = edgesById,
+                nodes = nodes,
+                edges = edges,
+                evidence = evidence,
             )
         }
     }
 
+    private fun addEvidence(
+        evidence: MutableMap<EvidenceId, Evidence>,
+        type: EvidenceType,
+        relativePath: String,
+        summary: String,
+        lineStart: Int? = null,
+        columnStart: Int? = null,
+        lineEnd: Int? = null,
+        columnEnd: Int? = null,
+        attributes: Map<String, String> = emptyMap(),
+    ): EvidenceId {
+        val id = EvidenceId(
+            buildString {
+                append("evidence:")
+                append(type.name)
+                append(':')
+                append(relativePath)
+                append(':')
+                append(lineStart ?: "unknown")
+                append(':')
+                append(attributes.entries
+                    .sortedBy { it.key }
+                    .joinToString("|") { "${it.key}=${it.value}" })
+            },
+        )
+
+        evidence.putIfAbsent(
+            id,
+            Evidence(
+                id = id,
+                type = type,
+                location = EvidenceLocation(
+                    relativePath = relativePath,
+                    lineStart = lineStart,
+                    columnStart = columnStart,
+                    lineEnd = lineEnd,
+                    columnEnd = columnEnd,
+                ),
+                summary = summary,
+                attributes = attributes,
+            ),
+        )
+
+        return id
+    }
+
     private fun addEdge(
-        edgesById: MutableMap<String, KnowledgeEdge>,
+        edges: MutableMap<String, KnowledgeEdge>,
         sourceNodeId: String,
         targetNodeId: String,
         relationship: RelationshipType,
         evidenceRefs: Set<String>,
     ) {
-        val edge = KnowledgeEdge(
-            id = edgeId(
+        val id =
+            "edge:${relationship.name}:$sourceNodeId->$targetNodeId"
+
+        edges.putIfAbsent(
+            id,
+            KnowledgeEdge(
+                id = id,
                 sourceNodeId = sourceNodeId,
                 targetNodeId = targetNodeId,
                 relationship = relationship,
+                evidenceRefs = evidenceRefs,
             ),
-            sourceNodeId = sourceNodeId,
-            targetNodeId = targetNodeId,
-            relationship = relationship,
-            evidenceRefs = evidenceRefs,
         )
-
-        edgesById.putIfAbsent(edge.id, edge)
     }
+
+    private fun symbolNodeId(
+        relativePath: String,
+        symbol: SourceSymbol,
+        siblingIndex: Int,
+    ): String =
+        "symbol:$relativePath:${symbol.kind.name}:${symbol.name}:" +
+            "${symbol.location?.lineStart ?: "unknown"}:$siblingIndex"
 
     private fun SourceSymbolKind.toKnowledgeNodeKind():
         KnowledgeNodeKind =
@@ -248,46 +345,4 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
             SourceSymbolKind.UNKNOWN ->
                 KnowledgeNodeKind.UNKNOWN
         }
-
-    private fun packageNodeId(packageName: String): String =
-        "package:$packageName"
-
-    private fun fileNodeId(relativePath: String): String =
-        "file:$relativePath"
-
-    private fun externalTypeNodeId(qualifiedName: String): String =
-        "external:$qualifiedName"
-
-    private fun symbolNodeId(
-        relativePath: String,
-        symbol: SourceSymbol,
-        siblingIndex: Int,
-    ): String {
-        val line = symbol.location?.lineStart
-            ?.toString()
-            ?: "unknown"
-
-        return buildString {
-            append("symbol:")
-            append(relativePath)
-            append(':')
-            append(symbol.kind.name)
-            append(':')
-            append(symbol.name)
-            append(':')
-            append(line)
-            append(':')
-            append(siblingIndex)
-        }
-    }
-
-    private fun edgeId(
-        sourceNodeId: String,
-        targetNodeId: String,
-        relationship: RelationshipType,
-    ): String =
-        "edge:${relationship.name}:$sourceNodeId->$targetNodeId"
-
-    private fun sourceEvidenceId(relativePath: String): String =
-        "source:$relativePath"
 }
