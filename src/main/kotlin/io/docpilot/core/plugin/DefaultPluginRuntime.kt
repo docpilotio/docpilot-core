@@ -1,0 +1,31 @@
+package io.docpilot.core.plugin
+
+import io.docpilot.core.api.PluginLoader
+import io.docpilot.core.api.PluginPipeline
+import io.docpilot.core.api.PluginRegistry
+
+/**
+ * Ready-to-use runtime composition for discovered plugins.
+ */
+data class DefaultPluginRuntime(
+    val registry: PluginRegistry,
+    val pipeline: PluginPipeline,
+) {
+    companion object {
+        fun discover(
+            loader: PluginLoader =
+                ServiceLoaderPluginLoader(),
+        ): DefaultPluginRuntime {
+            val registry = InMemoryPluginRegistry(
+                plugins = loader.load(),
+            )
+
+            return DefaultPluginRuntime(
+                registry = registry,
+                pipeline = DefaultPluginPipeline(
+                    registry = registry,
+                ),
+            )
+        }
+    }
+}
