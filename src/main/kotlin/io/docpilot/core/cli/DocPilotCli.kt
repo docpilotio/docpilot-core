@@ -2,9 +2,11 @@ package io.docpilot.core.cli
 
 import io.docpilot.core.extractor.SimpleKotlinSymbolExtractor
 import io.docpilot.core.indexer.DefaultProjectSourceIndexer
+import io.docpilot.core.knowledge.DefaultKnowledgeGraphBuilder
 import io.docpilot.core.lexer.SimpleKotlinLexer
 import io.docpilot.core.loader.LocalProjectLoader
 import io.docpilot.core.model.RenderedArtifact
+import io.docpilot.core.render.KnowledgeGraphJsonRenderer
 import io.docpilot.core.render.ProjectSummaryMarkdownRenderer
 import io.docpilot.core.render.SourceIndexMarkdownRenderer
 import io.docpilot.core.scanner.LocalSourceScanner
@@ -51,11 +53,16 @@ fun runCli(
                 extractor = SimpleKotlinSymbolExtractor(),
             ).index(inventory)
 
+        val knowledgeGraph =
+            DefaultKnowledgeGraphBuilder().build(sourceIndex)
+
         val artifacts = listOf(
             ProjectSummaryMarkdownRenderer()
                 .render(projectSummary),
             SourceIndexMarkdownRenderer()
                 .render(sourceIndex),
+            KnowledgeGraphJsonRenderer()
+                .render(knowledgeGraph),
         )
 
         artifacts.forEach { artifact ->
