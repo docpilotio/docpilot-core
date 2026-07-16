@@ -1,29 +1,17 @@
 package io.docpilot.core.api
 
+import io.docpilot.core.model.plugin.PluginContext
+import io.docpilot.core.model.plugin.PluginDescriptor
+import io.docpilot.core.model.plugin.PluginResult
+
 /**
- * Base contract for pluggable DocPilot capabilities.
+ * Stable extension contract implemented by DocPilot plugins.
  */
-public interface DocPilotPlugin {
-    public val id: String
-    public val displayName: String
-    public val version: String
+interface DocPilotPlugin {
 
-    /**
-     * Performs lightweight validation before the plugin is used.
-     */
-    public fun validate(): PluginValidationResult = PluginValidationResult.Valid
-}
+    val descriptor: PluginDescriptor
 
-public sealed interface PluginValidationResult {
-    public data object Valid : PluginValidationResult
-
-    public data class Invalid(
-        public val reasons: List<String>,
-    ) : PluginValidationResult {
-        init {
-            require(reasons.isNotEmpty()) {
-                "Invalid plugin validation must include at least one reason."
-            }
-        }
-    }
+    fun execute(
+        context: PluginContext,
+    ): PluginResult
 }
