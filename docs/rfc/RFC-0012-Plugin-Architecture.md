@@ -50,3 +50,18 @@ This commit does not:
 - analysis and output categories are explicit,
 - no external dependency is added,
 - and `./gradlew clean test` reports `BUILD SUCCESSFUL`.
+
+## Capability Selection Policy
+
+When multiple plugins provide the same capability, selection follows:
+
+1. Explicit user selection
+2. Ordered project or user preferences
+3. Configured numeric priorities
+4. Deterministic plugin-ID fallback
+
+A missing explicitly requested plugin is an error and must not silently
+fall back to another provider.
+
+The generic `SelectionPolicy<T>` contract is reusable by future AI
+providers, renderers, and other candidate-selection mechanisms.
