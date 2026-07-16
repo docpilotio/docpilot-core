@@ -9,6 +9,7 @@ import io.docpilot.core.model.RenderedArtifact
 import io.docpilot.core.model.plugin.PluginCategory
 import io.docpilot.core.model.plugin.PluginContext
 import io.docpilot.core.model.plugin.PluginMessageLevel
+import io.docpilot.core.model.plugin.PluginPipelineResult
 import io.docpilot.core.model.plugin.PluginStatus
 import io.docpilot.core.plugin.DefaultPluginRuntime
 import io.docpilot.core.prompt.DefaultPromptPackageBuilder
@@ -78,6 +79,23 @@ internal fun runAnalyzeCommand(
                 extractor = SimpleKotlinSymbolExtractor(),
             ).index(inventory)
 
+        val analysisPlugins = pluginRuntime.pipeline.execute(
+            category = PluginCategory.ANALYSIS,
+            context = PluginContext(
+                sourceIndex = sourceIndex,
+            ),
+        )
+
+        printPluginResult(
+            result = analysisPlugins,
+            out = out,
+            err = err,
+        )
+
+        if (analysisPlugins.status == PluginStatus.FAILED) {
+            return 1
+        }
+
         val knowledge =
             DefaultKnowledgeGraphBuilder()
                 .buildWithEvidence(sourceIndex)
@@ -85,7 +103,7 @@ internal fun runAnalyzeCommand(
         val promptPackage =
             DefaultPromptPackageBuilder().build(knowledge)
 
-        val pluginResult = pluginRuntime.pipeline.execute(
+        val outputPlugins = pluginRuntime.pipeline.execute(
             category = PluginCategory.OUTPUT,
             context = PluginContext(
                 sourceIndex = sourceIndex,
@@ -108,7 +126,8 @@ internal fun runAnalyzeCommand(
                     .render(knowledge.graph),
             )
             addAll(promptPackage.artifacts)
-            addAll(pluginResult.artifacts)
+            addAll(analysisPlugins.artifacts)
+            addAll(outputPlugins.artifacts)
         }
 
         artifacts.forEach { artifact ->
@@ -120,27 +139,13 @@ internal fun runAnalyzeCommand(
             out.println("Generated: $outputPath")
         }
 
-        pluginResult.executions.forEach { execution ->
-            out.println(
-                "Plugin: ${execution.pluginId} " +
-                    "[${execution.result.status}]",
-            )
-        }
+        printPluginResult(
+            result = outputPlugins,
+            out = out,
+            err = err,
+        )
 
-        pluginResult.messages.forEach { message ->
-            val stream =
-                if (message.level == PluginMessageLevel.ERROR) {
-                    err
-                } else {
-                    out
-                }
-
-            stream.println(
-                "Plugin ${message.level}: ${message.text}",
-            )
-        }
-
-        if (pluginResult.status == PluginStatus.FAILED) {
+        if (outputPlugins.status == PluginStatus.FAILED) {
             1
         } else {
             0
@@ -153,6 +158,32 @@ internal fun runAnalyzeCommand(
         )
         1
     }
+
+private fun printPluginResult(
+    result: PluginPipelineResult,
+    out: PrintStream,
+    err: PrintStream,
+) {
+    result.executions.forEach { execution ->
+        out.println(
+            "Plugin: ${execution.pluginId} " +
+                "[${execution.result.status}]",
+        )
+    }
+
+    result.messages.forEach { message ->
+        val stream =
+            if (message.level == PluginMessageLevel.ERROR) {
+                err
+            } else {
+                out
+            }
+
+        stream.println(
+            "Plugin ${message.level}: ${message.text}",
+        )
+    }
+}
 
 private fun writeArtifact(
     projectPath: Path,
