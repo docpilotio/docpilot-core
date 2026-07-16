@@ -6,6 +6,7 @@ import io.docpilot.core.knowledge.DefaultKnowledgeGraphBuilder
 import io.docpilot.core.lexer.SimpleKotlinLexer
 import io.docpilot.core.loader.LocalProjectLoader
 import io.docpilot.core.model.RenderedArtifact
+import io.docpilot.core.prompt.DefaultPromptPackageBuilder
 import io.docpilot.core.render.KnowledgeGraphJsonRenderer
 import io.docpilot.core.render.ProjectSummaryMarkdownRenderer
 import io.docpilot.core.render.SourceIndexMarkdownRenderer
@@ -53,17 +54,28 @@ fun runCli(
                 extractor = SimpleKotlinSymbolExtractor(),
             ).index(inventory)
 
-        val knowledgeGraph =
-            DefaultKnowledgeGraphBuilder().build(sourceIndex)
+        val knowledge =
+            DefaultKnowledgeGraphBuilder()
+                .buildWithEvidence(sourceIndex)
 
-        val artifacts = listOf(
-            ProjectSummaryMarkdownRenderer()
-                .render(projectSummary),
-            SourceIndexMarkdownRenderer()
-                .render(sourceIndex),
-            KnowledgeGraphJsonRenderer()
-                .render(knowledgeGraph),
-        )
+        val promptPackage =
+            DefaultPromptPackageBuilder().build(knowledge)
+
+        val artifacts = buildList {
+            add(
+                ProjectSummaryMarkdownRenderer()
+                    .render(projectSummary),
+            )
+            add(
+                SourceIndexMarkdownRenderer()
+                    .render(sourceIndex),
+            )
+            add(
+                KnowledgeGraphJsonRenderer()
+                    .render(knowledge.graph),
+            )
+            addAll(promptPackage.artifacts)
+        }
 
         artifacts.forEach { artifact ->
             val outputPath = writeArtifact(
