@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.summary.DefaultProjectSummaryBuilderTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:15:38.871Z" hostname="BOOK-QK1LID6B41" time="0.018">
-  <properties/>
-  <testcase name="does not claim languages or build systems without evidence()" classname="io.docpilot.core.summary.DefaultProjectSummaryBuilderTest" time="0.001"/>
-  <testcase name="builds summary from inventory facts()" classname="io.docpilot.core.summary.DefaultProjectSummaryBuilderTest" time="0.015"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

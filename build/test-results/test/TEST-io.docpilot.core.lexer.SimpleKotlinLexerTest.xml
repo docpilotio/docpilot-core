@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.lexer.SimpleKotlinLexerTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:15:38.823Z" hostname="BOOK-QK1LID6B41" time="0.003">
-  <properties/>
-  <testcase name="tokenizes declarations and literals()" classname="io.docpilot.core.lexer.SimpleKotlinLexerTest" time="0.0"/>
-  <testcase name="reports one based positions()" classname="io.docpilot.core.lexer.SimpleKotlinLexerTest" time="0.0"/>
-  <testcase name="ignores comments()" classname="io.docpilot.core.lexer.SimpleKotlinLexerTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
