@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.render.ProjectSummaryMarkdownRendererTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.836Z" hostname="BOOK-QK1LID6B41" time="0.004">
-  <properties/>
-  <testcase name="renders explicit empty sections()" classname="io.docpilot.core.render.ProjectSummaryMarkdownRendererTest" time="0.002"/>
-  <testcase name="renders a reviewable project summary()" classname="io.docpilot.core.render.ProjectSummaryMarkdownRendererTest" time="0.001"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

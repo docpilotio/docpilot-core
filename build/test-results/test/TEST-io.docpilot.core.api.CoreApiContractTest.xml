@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.api.CoreApiContractTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.743Z" hostname="BOOK-QK1LID6B41" time="0.016">
-  <properties/>
-  <testcase name="plugin validation can report an invalid plugin()" classname="io.docpilot.core.api.CoreApiContractTest" time="0.009"/>
-  <testcase name="renderer produces a reviewable artifact()" classname="io.docpilot.core.api.CoreApiContractTest" time="0.004"/>
-  <testcase name="analysis engine returns a project specification()" classname="io.docpilot.core.api.CoreApiContractTest" time="0.002"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

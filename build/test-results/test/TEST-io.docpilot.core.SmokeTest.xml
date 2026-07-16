@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.SmokeTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.699Z" hostname="BOOK-QK1LID6B41" time="0.042">
-  <properties/>
-  <testcase name="pipeline works()" classname="io.docpilot.core.SmokeTest" time="0.042"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

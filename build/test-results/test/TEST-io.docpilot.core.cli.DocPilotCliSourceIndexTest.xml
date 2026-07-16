@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.cli.DocPilotCliSourceIndexTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.760Z" hostname="BOOK-QK1LID6B41" time="0.048">
-  <properties/>
-  <testcase name="analyze generates project summary and source index()" classname="io.docpilot.core.cli.DocPilotCliSourceIndexTest" time="0.046"/>
-  <testcase name="invalid arguments return usage error()" classname="io.docpilot.core.cli.DocPilotCliSourceIndexTest" time="0.001"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

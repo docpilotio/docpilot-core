@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="io.docpilot.core.indexer.DefaultProjectSourceIndexerTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.816Z" hostname="BOOK-QK1LID6B41" time="0.014">
-  <properties/>
-  <testcase name="reports missing Kotlin file()" classname="io.docpilot.core.indexer.DefaultProjectSourceIndexerTest" time="0.002"/>
-  <testcase name="indexes Kotlin files in deterministic order()" classname="io.docpilot.core.indexer.DefaultProjectSourceIndexerTest" time="0.01"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
