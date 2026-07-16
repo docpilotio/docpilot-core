@@ -1,5 +1,6 @@
 package io.docpilot.core.api
 
+import io.docpilot.core.model.plugin.PluginCapabilityId
 import io.docpilot.core.model.plugin.PluginCategory
 import io.docpilot.core.model.plugin.PluginId
 
@@ -14,5 +15,9 @@ interface PluginRegistry {
 
     fun byCategory(
         category: PluginCategory,
+    ): List<DocPilotPlugin>
+
+    fun byCapability(
+        capabilityId: PluginCapabilityId,
     ): List<DocPilotPlugin>
 }

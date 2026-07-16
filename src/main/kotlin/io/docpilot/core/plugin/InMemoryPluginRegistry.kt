@@ -4,6 +4,7 @@ import io.docpilot.core.api.DocPilotPlugin
 import io.docpilot.core.api.PluginRegistry
 import io.docpilot.core.api.PluginValidationResult
 import io.docpilot.core.api.PluginValidator
+import io.docpilot.core.model.plugin.PluginCapabilityId
 import io.docpilot.core.model.plugin.PluginCategory
 import io.docpilot.core.model.plugin.PluginId
 
@@ -72,5 +73,14 @@ class InMemoryPluginRegistry(
     ): List<DocPilotPlugin> =
         pluginsById.values.filter {
             it.descriptor.category == category
+        }
+
+    override fun byCapability(
+        capabilityId: PluginCapabilityId,
+    ): List<DocPilotPlugin> =
+        pluginsById.values.filter { plugin ->
+            plugin.descriptor.capabilities.any {
+                it.id == capabilityId
+            }
         }
 }

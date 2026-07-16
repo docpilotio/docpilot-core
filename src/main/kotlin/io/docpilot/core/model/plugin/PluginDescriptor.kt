@@ -29,6 +29,7 @@ data class PluginDescriptor(
     val category: PluginCategory,
     val version: String,
     val description: String,
+    val capabilities: Set<PluginCapability> = emptySet(),
 ) {
     init {
         require(displayName.isNotBlank()) {
@@ -39,6 +40,13 @@ data class PluginDescriptor(
         }
         require(description.isNotBlank()) {
             "Plugin description must not be blank."
+        }
+        require(
+            capabilities.map { it.id }
+                .distinct()
+                .size == capabilities.size,
+        ) {
+            "Plugin capability IDs must be unique."
         }
     }
 
