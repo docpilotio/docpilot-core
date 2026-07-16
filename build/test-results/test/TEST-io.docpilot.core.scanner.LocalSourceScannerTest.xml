@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.docpilot.core.scanner.LocalSourceScannerTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.850Z" hostname="BOOK-QK1LID6B41" time="0.04">
+  <properties/>
+  <testcase name="classifies supported project files()" classname="io.docpilot.core.scanner.LocalSourceScannerTest" time="0.021"/>
+  <testcase name="returns relative paths in deterministic order()" classname="io.docpilot.core.scanner.LocalSourceScannerTest" time="0.006"/>
+  <testcase name="reports directory and file totals()" classname="io.docpilot.core.scanner.LocalSourceScannerTest" time="0.005"/>
+  <testcase name="ignores generated and tool managed directories()" classname="io.docpilot.core.scanner.LocalSourceScannerTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

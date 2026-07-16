@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.docpilot.core.DocPilotCoreTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.663Z" hostname="BOOK-QK1LID6B41" time="0.034">
+  <properties/>
+  <testcase name="exposes the current development version()" classname="io.docpilot.core.DocPilotCoreTest" time="0.022"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

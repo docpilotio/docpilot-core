@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.docpilot.core.extractor.SimpleKotlinSymbolExtractorTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-07-16T00:40:42.808Z" hostname="BOOK-QK1LID6B41" time="0.007">
+  <properties/>
+  <testcase name="extracts package imports and declarations()" classname="io.docpilot.core.extractor.SimpleKotlinSymbolExtractorTest" time="0.001"/>
+  <testcase name="records one based source location()" classname="io.docpilot.core.extractor.SimpleKotlinSymbolExtractorTest" time="0.001"/>
+  <testcase name="supports source without package()" classname="io.docpilot.core.extractor.SimpleKotlinSymbolExtractorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
