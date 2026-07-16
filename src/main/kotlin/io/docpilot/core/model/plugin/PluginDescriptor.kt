@@ -3,14 +3,21 @@ package io.docpilot.core.model.plugin
 @JvmInline
 value class PluginId(
     val value: String,
-) {
+) : Comparable<PluginId> {
+
     init {
         require(value.matches(ID_PATTERN)) {
             "Plugin ID must use lowercase letters, numbers, dots, or hyphens."
         }
     }
 
-    override fun toString(): String = value
+    override fun compareTo(
+        other: PluginId,
+    ): Int =
+        value.compareTo(other.value)
+
+    override fun toString(): String =
+        value
 
     private companion object {
         val ID_PATTERN =
@@ -35,12 +42,15 @@ data class PluginDescriptor(
         require(displayName.isNotBlank()) {
             "Plugin displayName must not be blank."
         }
+
         require(version.matches(VERSION_PATTERN)) {
             "Plugin version must use semantic version format."
         }
+
         require(description.isNotBlank()) {
             "Plugin description must not be blank."
         }
+
         require(
             capabilities.map { it.id }
                 .distinct()
@@ -52,6 +62,9 @@ data class PluginDescriptor(
 
     private companion object {
         val VERSION_PATTERN =
-            Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
+            Regex(
+                "[0-9]+\\.[0-9]+\\.[0-9]+" +
+                        "(?:[-+][0-9A-Za-z.-]+)?",
+            )
     }
 }
