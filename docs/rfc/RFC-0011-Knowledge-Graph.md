@@ -1,6 +1,6 @@
 # RFC-0011 — Knowledge Graph
 
-Status: Proposed
+Status: Accepted
 Version: 0.1
 Target: Sprint 4
 

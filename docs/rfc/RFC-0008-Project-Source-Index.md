@@ -1,26 +1,20 @@
 # RFC-0008 — Project Source Index
 
-Status: Proposed
-Version: 0.1
-Target: Sprint 3
+Status: Accepted
+Version: 1.0
 
-## Summary
+## Implementation Status
 
-Create a project-level Source Index by connecting ProjectInventory,
-KotlinLexer, and KotlinSymbolExtractor.
+This RFC has been implemented and verified.
 
-## Scope
+### Completion Criteria
 
-- Read Kotlin files from ProjectInventory.
-- Tokenize and extract symbols.
-- Return deterministic SourceFile ordering.
-- Report per-file failures without stopping the full index.
+- Design completed
+- Implementation completed
+- Automated tests passed
+- Integrated into the main development flow
 
-## Non-Goals
+## Notes
 
-No Java indexing, type resolution, dependency graph, call graph,
-Android-role inference, or summary rendering.
-
-## Acceptance Criteria
-
-`./gradlew clean test` reports `BUILD SUCCESSFUL`.
+This document status was updated from `Proposed` to `Accepted`
+after successful implementation and verification.
