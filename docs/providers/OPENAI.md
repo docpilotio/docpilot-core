@@ -1,5 +1,7 @@
 # OpenAI Provider
 
+> v0.5 scope note: the provider is bundled and mock-tested, but real OpenAI API invocation is outside the v0.5 MVP release-validation scope.
+
 ## Configuration
 
 ```powershell

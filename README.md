@@ -123,9 +123,19 @@ Completed RFCs:
 
 Release target:
 
-> v0.5 MVP Release Candidate
+> v0.5 MVP Release Candidate — runtime gates verified
 
-Implemented MVP capabilities include source scanning, knowledge construction, DIR 0.3 specification building, deterministic Markdown rendering, and Stable-ID-based incremental documentation planning.
+Implemented MVP capabilities include source scanning, knowledge construction, DIR 0.3 specification building, deterministic Markdown rendering, Stable-ID-based incremental documentation planning, prompt-package creation, and AI-assisted architecture generation through the Provider SPI.
+
+Release-gate validation on July 17, 2026 verified:
+
+- `./gradlew clean build`
+- `./gradlew test`
+- core CLI analysis against `C:\WorkSpace\architecture-samples`
+- Ollama generation with `qwen3:8b`
+- invalid-provider error handling
+
+OpenAI real API invocation is not part of the v0.5 validation scope.
 
 ### DIR version policy
 
@@ -134,7 +144,7 @@ Implemented MVP capabilities include source scanning, knowledge construction, DI
 - Snapshot schema versions and DIR schema versions are independent version lines.
 - Renderers consume `ProjectSpecification` only; they do not interpret `SourceIndex`, the Knowledge Graph, or `IncrementalUpdatePlan`.
 
-No stable public release has been published yet.
+No stable public release has been published yet. The remaining release-policy item is the artifact version, which is still `0.1.0-SNAPSHOT`.
 
 ---
 
@@ -147,6 +157,10 @@ The current foundation documents include:
 - `docs/cdd/CDD-0001-Core-Domain-Definition.md`
 - `docs/dsd/DSD-0001-DocPilot-Specification-Language.md`
 - `docs/decisions/DEC-0006-Initial-Validation-Target.md`
+- `ARCHITECTURE.md`
+- `PROJECT_PIPELINE.md`
+- `docs/release/v0.5-MVP-RELEASE-NOTES.md`
+- `snapshots/v0.5-mvp/RELEASE_SUMMARY.md`
 
 ---
 
