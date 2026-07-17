@@ -1,7 +1,9 @@
 # DSD-0001 — DocPilot Specification Language
 
 Status: Baseline  
-Version: 0.2
+Version: 0.2 with DIR 0.3 runtime extension
+
+> Version policy: DIR 0.2 remains the legacy, source-compatible baseline for manual `ProjectSpecification` construction. `DefaultSpecificationBuilder` emits DIR 0.3, which extends the model with package, API, property, and deterministic rendering data established by RFC-0035. Snapshot schema versions are independent from DIR schema versions.
 
 ## Purpose
 

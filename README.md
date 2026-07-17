@@ -115,18 +115,26 @@ Future repositories may provide CLI, IDE, automation, or integration layers.
 
 Current phase:
 
-> Sprint 0 — Project Foundation
+> Phase 1 — MVP
 
-Current focus:
+Completed RFCs:
 
-- project constitution,
-- vision,
-- core domain definition,
-- specification language,
-- validation strategy,
-- and the first end-to-end MVP design.
+> RFC-0001 through RFC-0038
 
-No stable release is available yet.
+Release target:
+
+> v0.5 MVP Release Candidate
+
+Implemented MVP capabilities include source scanning, knowledge construction, DIR 0.3 specification building, deterministic Markdown rendering, and Stable-ID-based incremental documentation planning.
+
+### DIR version policy
+
+- DIR `0.2` remains the source-compatible legacy default for manually constructed `ProjectSpecification` instances.
+- DIR `0.3` is the current output produced by `DefaultSpecificationBuilder`.
+- Snapshot schema versions and DIR schema versions are independent version lines.
+- Renderers consume `ProjectSpecification` only; they do not interpret `SourceIndex`, the Knowledge Graph, or `IncrementalUpdatePlan`.
+
+No stable public release has been published yet.
 
 ---
 

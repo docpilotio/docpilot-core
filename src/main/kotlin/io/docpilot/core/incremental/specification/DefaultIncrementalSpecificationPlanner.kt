@@ -12,7 +12,13 @@ public class DefaultIncrementalSpecificationPlanner : IncrementalSpecificationPl
     ): IncrementalUpdatePlan {
         if (!diff.hasChanges) return IncrementalUpdatePlan.EMPTY
 
-        val typeToPackage = buildTypeToPackage(previous, current)
+        val previousTypeToPackage = buildTypeToPackage(previous)
+        val currentTypeToPackage = buildTypeToPackage(current)
+        val previousApiToType = buildApiToType(previous)
+        val currentApiToType = buildApiToType(current)
+        val previousPropertyToType = buildPropertyToType(previous)
+        val currentPropertyToType = buildPropertyToType(current)
+
         val actions = buildList {
             addAll(diff.packageChanges.map { it.toAction(IncrementalUpdateTarget.PACKAGE) })
             addAll(diff.typeChanges.map { it.toAction(IncrementalUpdateTarget.TYPE) })
@@ -22,24 +28,41 @@ public class DefaultIncrementalSpecificationPlanner : IncrementalSpecificationPl
 
         val changedTypeIds = buildSet {
             diff.typeChanges.mapTo(this) { it.id }
-            diff.apiChanges.mapNotNullTo(this) { it.parentId }
-            diff.propertyChanges.mapNotNullTo(this) { it.parentId }
+            diff.apiChanges.forEach { change ->
+                previousApiToType[change.id]?.let(::add)
+                currentApiToType[change.id]?.let(::add)
+            }
+            diff.propertyChanges.forEach { change ->
+                previousPropertyToType[change.id]?.let(::add)
+                currentPropertyToType[change.id]?.let(::add)
+            }
         }.sorted()
 
         val changedPackageIds = buildSet {
             diff.packageChanges.mapTo(this) { it.id }
-            changedTypeIds.mapNotNullTo(this) { typeToPackage[it] }
+            changedTypeIds.forEach { typeId ->
+                previousTypeToPackage[typeId]?.let(::add)
+                currentTypeToPackage[typeId]?.let(::add)
+            }
         }.sorted()
 
         return IncrementalUpdatePlan(actions, changedPackageIds, changedTypeIds)
     }
 
-    private fun buildTypeToPackage(
-        previous: ProjectSpecification,
-        current: ProjectSpecification,
-    ): Map<String, String> = (previous.components + current.components)
-        .associateBy(ComponentSpecification::id)
-        .mapValues { (_, type) -> type.packageId ?: type.moduleId }
+    private fun buildTypeToPackage(specification: ProjectSpecification): Map<String, String> =
+        specification.components.associate { type -> type.id to (type.packageId ?: type.moduleId) }
+
+    private fun buildApiToType(specification: ProjectSpecification): Map<String, String> = buildMap {
+        specification.components.forEach { type ->
+            type.apis.forEach { api -> put(api.id, type.id) }
+        }
+    }
+
+    private fun buildPropertyToType(specification: ProjectSpecification): Map<String, String> = buildMap {
+        specification.components.forEach { type ->
+            type.properties.forEach { property -> put(property.id, type.id) }
+        }
+    }
 
     private fun <T> SpecificationChange<T>.toAction(target: IncrementalUpdateTarget): IncrementalUpdateAction =
         IncrementalUpdateAction(target, id, parentId, kind)
