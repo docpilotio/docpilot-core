@@ -18,7 +18,7 @@ data class ArchitectureGenerationRequest(
     val variables: PromptVariables = PromptVariables.EMPTY,
     val format: DocumentFormat = DocumentFormat.MARKDOWN,
     val temperature: Double? = null,
-    val maxOutputTokens: Int? = null,
+    val maxOutputTokens: Int? = DEFAULT_MAX_OUTPUT_TOKENS,
     val responseFormat: AiResponseFormat = AiResponseFormat.TEXT,
     val generationMetadata: Map<String, String> = emptyMap(),
     val documentMetadata: Map<String, String> = emptyMap(),
@@ -42,6 +42,7 @@ data class ArchitectureGenerationRequest(
     }
 
     companion object {
+        const val DEFAULT_MAX_OUTPUT_TOKENS: Int = 2_048
         const val DEFAULT_TITLE: String = "Architecture"
         const val DEFAULT_QUERY_NAME: String = "architecture"
     }

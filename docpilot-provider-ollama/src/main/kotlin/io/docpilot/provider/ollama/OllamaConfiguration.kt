@@ -6,7 +6,7 @@ import java.time.Duration
 data class OllamaConfiguration(
     val baseUri: URI = URI.create(DEFAULT_BASE_URL),
     val defaultModel: String = DEFAULT_MODEL,
-    val requestTimeout: Duration = Duration.ofSeconds(300),
+    val requestTimeout: Duration = Duration.ofMinutes(5),
 ) {
     init {
         require(baseUri.scheme == "http" || baseUri.scheme == "https") {
@@ -39,7 +39,7 @@ data class OllamaConfiguration(
                     "DOCPILOT_OLLAMA_TIMEOUT_SECONDS"
                 ]?.toLongOrNull()
                     ?.let(Duration::ofSeconds)
-                    ?: Duration.ofSeconds(120),
+                    ?: Duration.ofMinutes(5),
             )
     }
 }

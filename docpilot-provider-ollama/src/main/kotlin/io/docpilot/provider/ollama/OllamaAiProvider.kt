@@ -48,14 +48,15 @@ class OllamaAiProvider(
         val model = request.modelId.value.ifBlank {
             configuration.defaultModel
         }
-
+        val effectiveMaxOutputTokens =
+            request.maxOutputTokens ?: DEFAULT_MAX_OUTPUT_TOKENS
         val body = OllamaJson.requestBody(
             model = model,
             messages = request.messages.map { message ->
                 message.role.toOllamaRole() to message.content
             },
             temperature = request.temperature,
-            maxOutputTokens = request.maxOutputTokens,
+            maxOutputTokens = effectiveMaxOutputTokens,
             jsonResponse =
                 request.responseFormat == AiResponseFormat.JSON,
             thinking = false,
@@ -249,5 +250,6 @@ class OllamaAiProvider(
 
     companion object {
         val PROVIDER_ID = AiProviderId("ollama")
+        const val DEFAULT_MAX_OUTPUT_TOKENS = 1024
     }
 }
