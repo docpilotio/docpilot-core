@@ -6,6 +6,7 @@ import io.docpilot.core.incremental.planning.IncrementalGenerationPlan
 import io.docpilot.core.model.ai.AiError
 import io.docpilot.core.model.ai.AiModelId
 import io.docpilot.core.model.knowledge.KnowledgeBuildResult
+import io.docpilot.core.incremental.review.SectionReviewResult
 import java.nio.file.Path
 
 data class DocumentationGenerationRequest(
@@ -37,6 +38,7 @@ data class GenerationJobResult(
     val sectionId: ArchitectureSectionId,
     val status: GenerationJobStatus,
     val generatedSection: GeneratedSection? = null,
+    val review: SectionReviewResult? = null,
     val failure: GenerationFailure? = null,
 )
 
