@@ -23,10 +23,26 @@ object BuiltInTemplates {
         description = "Produces an ADR describing context, decision, alternatives, and consequences.",
         sectionTitle = "Architecture Decision Record",
         instructions = """
-            Generate an Architecture Decision Record from the supplied project knowledge.
-            Include status, context, decision, considered alternatives, positive consequences,
-            negative consequences, risks, and supporting evidence.
-            Do not invent a decision when the available evidence is insufficient.
+            Generate an Architecture Decision Record using this supplied decision data:
+
+            Title: {{adr.title}}
+            Status: {{adr.status}}
+
+            Context:
+            {{adr.context}}
+
+            Decision:
+            {{adr.decision}}
+
+            Considered alternatives:
+            {{adr.alternatives}}
+
+            Consequences:
+            {{adr.consequences}}
+
+            Structure the result with Status, Context, Decision, Alternatives, and Consequences sections.
+            Use the project knowledge as supporting evidence, clearly distinguish observed facts from
+            inference, and do not replace the explicitly supplied decision with an invented one.
         """.trimIndent(),
     )
 
