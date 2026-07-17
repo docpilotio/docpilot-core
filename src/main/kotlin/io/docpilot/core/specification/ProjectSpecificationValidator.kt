@@ -2,8 +2,8 @@ package io.docpilot.core.specification
 
 import io.docpilot.core.model.ProjectSpecification
 
-internal object ProjectSpecificationValidator {
-    fun validate(specification: ProjectSpecification) {
+public object ProjectSpecificationValidator {
+    public fun validate(specification: ProjectSpecification) {
         fun requireValidIds(label: String, ids: List<String>) {
             require(ids.all(String::isNotBlank)) { "$label IDs must not be blank." }
             require(ids.distinct().size == ids.size) { "$label IDs must be unique." }
