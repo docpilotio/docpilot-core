@@ -27,9 +27,17 @@ class DefaultProjectSourceIndexer(
                 try {
                     val path = inventory.project.path.resolve(projectFile.relativePath)
                     val source = Files.readString(path, StandardCharsets.UTF_8)
-                    files += extractor.extract(
+                    val extracted = extractor.extract(
                         projectFile.relativePath,
                         lexer.tokenize(source),
+                    )
+                    files += extracted.copy(
+                        candidateModulePath = candidateModulePath(
+                            extracted.relativePath,
+                        ),
+                        sourceSetName = sourceSetName(
+                            extracted.relativePath,
+                        ),
                     )
                 } catch (e: Exception) {
                     failures += SourceIndexFailure(
@@ -43,5 +51,20 @@ class DefaultProjectSourceIndexer(
             files = files.sortedBy { it.relativePath },
             failures = failures.sortedBy { it.relativePath },
         )
+    }
+
+    private fun candidateModulePath(relativePath: String): String? {
+        val normalized = relativePath.replace('\\', '/')
+        val marker = "/src/"
+        val markerIndex = normalized.indexOf(marker)
+        if (markerIndex <= 0) return null
+        return normalized.substring(0, markerIndex).takeIf(String::isNotBlank)
+    }
+
+    private fun sourceSetName(relativePath: String): String? {
+        val normalized = relativePath.replace('\\', '/')
+        val segments = normalized.split('/')
+        val srcIndex = segments.indexOf("src")
+        return segments.getOrNull(srcIndex + 1)?.takeIf(String::isNotBlank)
     }
 }

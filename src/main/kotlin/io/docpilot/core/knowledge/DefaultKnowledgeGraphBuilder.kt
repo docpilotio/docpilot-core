@@ -198,11 +198,20 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
             lineEnd = symbol.location?.lineEnd,
             columnEnd = symbol.location?.columnEnd,
             summary = "${symbol.kind.name} ${symbol.name} is declared.",
-            attributes = mapOf(
-                "symbolName" to symbol.name,
-                "symbolKind" to symbol.kind.name,
-                "visibility" to symbol.visibility.name,
-            ),
+            attributes = buildMap {
+                put("symbolName", symbol.name)
+                put("symbolKind", symbol.kind.name)
+                put("visibility", symbol.visibility.name)
+                symbol.qualifiedName?.let { put("qualifiedName", it) }
+                symbol.signature?.let { put("signature", it) }
+                symbol.type?.let { put("declaredType", it) }
+                symbol.receiverType?.let { put("receiverType", it) }
+                if (symbol.modifiers.isNotEmpty()) {
+                    put("modifiers", symbol.modifiers
+                        .sortedBy { it.ordinal }
+                        .joinToString(",") { it.name })
+                }
+            },
         )
 
         val symbolNode = KnowledgeNode(
@@ -220,6 +229,24 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                 }
                 symbol.location?.columnStart?.let {
                     put("columnStart", it.toString())
+                }
+                symbol.qualifiedName?.let { put("qualifiedName", it) }
+                symbol.signature?.let { put("signature", it) }
+                symbol.type?.let { put("declaredType", it) }
+                symbol.receiverType?.let { put("receiverType", it) }
+                if (symbol.modifiers.isNotEmpty()) {
+                    put("modifiers", symbol.modifiers
+                        .sortedBy { it.ordinal }
+                        .joinToString(",") { it.name })
+                }
+                if (symbol.parameters.isNotEmpty()) {
+                    put("parameters", symbol.parameters.joinToString(",") { parameter ->
+                        buildString {
+                            append(parameter.name)
+                            parameter.type?.let { append(":").append(it) }
+                            if (parameter.hasDefaultValue) append("=")
+                        }
+                    })
                 }
             },
             evidenceRefs = setOf(symbolEvidence.value),
@@ -320,8 +347,10 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
         symbol: SourceSymbol,
         siblingIndex: Int,
     ): String =
-        "symbol:$relativePath:${symbol.kind.name}:${symbol.name}:" +
-            "${symbol.location?.lineStart ?: "unknown"}:$siblingIndex"
+        symbol.id.takeIf(String::isNotBlank)
+            ?.let { "symbol:$it" }
+            ?: ("symbol:$relativePath:${symbol.kind.name}:${symbol.name}:" +
+                "${symbol.location?.lineStart ?: "unknown"}:$siblingIndex")
 
     private fun SourceSymbolKind.toKnowledgeNodeKind():
         KnowledgeNodeKind =
@@ -340,6 +369,10 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                 KnowledgeNodeKind.FUNCTION
             SourceSymbolKind.PROPERTY ->
                 KnowledgeNodeKind.PROPERTY
+            SourceSymbolKind.CONSTRUCTOR ->
+                KnowledgeNodeKind.CONSTRUCTOR
+            SourceSymbolKind.ENUM_ENTRY ->
+                KnowledgeNodeKind.ENUM_ENTRY
             SourceSymbolKind.TYPE_ALIAS ->
                 KnowledgeNodeKind.TYPE_ALIAS
             SourceSymbolKind.UNKNOWN ->

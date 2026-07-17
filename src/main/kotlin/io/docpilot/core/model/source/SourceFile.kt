@@ -9,6 +9,8 @@ data class SourceFile(
     val packageName: String? = null,
     val imports: List<SourceImport> = emptyList(),
     val symbols: List<SourceSymbol> = emptyList(),
+    val candidateModulePath: String? = null,
+    val sourceSetName: String? = null,
 ) {
     init {
         require(relativePath.isNotBlank()) {

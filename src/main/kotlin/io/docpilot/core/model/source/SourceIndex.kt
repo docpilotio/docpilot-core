@@ -5,7 +5,7 @@ data class SourceIndex(
     val failures: List<SourceIndexFailure> = emptyList(),
 ) {
     val totalFileCount: Int get() = files.size
-    val totalSymbolCount: Int get() = files.sumOf { it.symbols.size }
+    val totalSymbolCount: Int get() = files.sumOf { file -> file.symbols.sumOf(SourceSymbol::descendantCount) }
 }
 
 data class SourceIndexFailure(
@@ -17,3 +17,5 @@ data class SourceIndexFailure(
         require(message.isNotBlank()) { "message must not be blank." }
     }
 }
+
+private fun SourceSymbol.descendantCount(): Int = 1 + children.sumOf(SourceSymbol::descendantCount)

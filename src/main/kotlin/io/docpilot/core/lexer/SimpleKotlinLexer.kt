@@ -101,6 +101,25 @@ class SimpleKotlinLexer : KotlinLexer {
             )
         }
 
+
+        private fun scanBacktickIdentifier() {
+            val tokenLine = line
+            val tokenColumn = column
+            advance()
+            val start = index
+            while (!isAtEnd() && current() != '`') {
+                advance()
+            }
+            val text = source.substring(start, index)
+            if (!isAtEnd()) advance()
+            addToken(
+                KotlinTokenType.IDENTIFIER,
+                text,
+                tokenLine,
+                tokenColumn,
+            )
+        }
+
         private fun scanNumber() {
             val start = index
             val tokenLine = line
@@ -209,6 +228,10 @@ class SimpleKotlinLexer : KotlinLexer {
                 "internal",
                 "protected",
                 "private",
+                "constructor", "companion", "abstract", "final", "open",
+                "sealed", "data", "value", "inner", "suspend", "operator",
+                "infix", "inline", "tailrec", "override", "const", "lateinit",
+                "external", "expect", "actual", "where", "as", "out", "in",
             )
         }
     }

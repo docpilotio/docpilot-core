@@ -1,0 +1,7 @@
+package io.docpilot.core.model.source
+
+enum class SourceModifier {
+    ABSTRACT, FINAL, OPEN, SEALED, DATA, VALUE, INNER, COMPANION,
+    SUSPEND, OPERATOR, INFIX, INLINE, TAILREC, OVERRIDE, CONST,
+    LATEINIT, EXTERNAL, EXPECT, ACTUAL,
+}

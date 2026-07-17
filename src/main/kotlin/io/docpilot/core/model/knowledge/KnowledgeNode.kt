@@ -35,6 +35,8 @@ enum class KnowledgeNodeKind {
     ANNOTATION_CLASS,
     FUNCTION,
     PROPERTY,
+    CONSTRUCTOR,
+    ENUM_ENTRY,
     TYPE_ALIAS,
     EXTERNAL_TYPE,
     UNKNOWN,

@@ -73,4 +73,13 @@ class SimpleKotlinLexerTest {
         assertEquals(2, classToken.line)
         assertEquals(1, classToken.column)
     }
+    @Test
+    fun `tokenizes backtick identifiers and expect actual modifiers`() {
+        val tokens = lexer.tokenize("expect fun `when`(); actual fun `when`() = Unit")
+
+        assertTrue(tokens.any { it.text == "expect" && it.type == KotlinTokenType.KEYWORD })
+        assertTrue(tokens.any { it.text == "actual" && it.type == KotlinTokenType.KEYWORD })
+        assertEquals(2, tokens.count { it.text == "when" && it.type == KotlinTokenType.IDENTIFIER })
+    }
+
 }

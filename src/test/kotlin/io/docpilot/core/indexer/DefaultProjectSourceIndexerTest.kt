@@ -67,4 +67,21 @@ class DefaultProjectSourceIndexerTest {
         assertTrue(index.files.isEmpty())
         assertEquals(1, index.failures.size)
     }
+    @Test
+    fun `derives candidate module and source set from source path`() {
+        val root = Files.createTempDirectory("docpilot-index-path")
+        root.resolve("app/src/main/kotlin/example").createDirectories()
+            .resolve("Sample.kt")
+            .writeText("package example\nclass Sample")
+
+        val inventory = LocalSourceScanner().scan(
+            LocalProjectLoader().load(root),
+        )
+
+        val file = indexer.index(inventory).files.single()
+
+        assertEquals("app", file.candidateModulePath)
+        assertEquals("main", file.sourceSetName)
+    }
+
 }

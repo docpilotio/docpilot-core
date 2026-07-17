@@ -7,6 +7,8 @@ import io.docpilot.core.model.source.SourceImport
 import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceLanguage
 import io.docpilot.core.model.source.SourceLocation
+import io.docpilot.core.model.source.SourceModifier
+import io.docpilot.core.model.source.SourceParameter
 import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
 import io.docpilot.core.model.source.SourceVisibility
@@ -192,4 +194,39 @@ class DefaultKnowledgeGraphBuilderTest {
             first.edges,
         )
     }
+    @Test
+    fun `maps constructor and enriched symbol metadata`() {
+        val constructor = SourceSymbol(
+            name = "<init>",
+            kind = SourceSymbolKind.CONSTRUCTOR,
+            id = "constructor-id",
+            qualifiedName = "example.Repository.<init>",
+            signature = "constructor(name: String)",
+            modifiers = setOf(SourceModifier.SUSPEND),
+            parameters = listOf(SourceParameter("name", "String")),
+            location = SourceLocation("Repository.kt", 2, 5, 2, 29),
+        )
+        val graph = builder.build(
+            SourceIndex(
+                files = listOf(
+                    SourceFile(
+                        relativePath = "Repository.kt",
+                        language = SourceLanguage.KOTLIN,
+                        symbols = listOf(constructor),
+                    ),
+                ),
+            ),
+        )
+
+        val node = graph.nodes.single { it.kind == KnowledgeNodeKind.CONSTRUCTOR }
+        assertEquals("symbol:constructor-id", node.id)
+        assertEquals("example.Repository.<init>", node.attributes["qualifiedName"])
+        assertEquals("constructor(name: String)", node.attributes["signature"])
+        assertEquals("name:String", node.attributes["parameters"])
+        assertTrue(graph.edges.any {
+            it.relationship == RelationshipType.DECLARES &&
+                it.targetNodeId == node.id
+        })
+    }
+
 }
