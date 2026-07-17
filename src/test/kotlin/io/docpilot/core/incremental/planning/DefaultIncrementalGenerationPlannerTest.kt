@@ -37,15 +37,13 @@ class DefaultIncrementalGenerationPlannerTest {
             constraints = PlanningConstraints(totalContextTokens = 4_096),
         )
 
-        val actual = plan.sectionIds.map { it.value }
         assertEquals(
             listOf(
                 "components-and-responsibilities",
                 "data-and-control-flow",
                 "executive-summary",
             ),
-            actual,
-            "Actual plan: $actual"
+            plan.sectionIds.map { it.value },
         )
         assertEquals(
             listOf("components-and-responsibilities"),
@@ -72,11 +70,9 @@ class DefaultIncrementalGenerationPlannerTest {
             constraints = PlanningConstraints(totalContextTokens = 2_048),
         )
 
-        val actual = plan.sectionIds.map { it.value }
         assertEquals(
             listOf("dependencies-and-integrations", "executive-summary"),
-            actual,
-            "Actual plan: $actual"
+            plan.sectionIds.map { it.value },
         )
         assertFalse(plan.isEmpty)
         assertTrue(plan.jobs.all { it.contextTokenBudget >= 256 })
