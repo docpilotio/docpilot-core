@@ -12,7 +12,7 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
             relativePath = relativePath.replace('\\', '/'),
             language = SourceLanguage.KOTLIN,
             packageName = packageName,
-            imports = extractImports(tokens).sortedWith(compareBy(SourceImport::qualifiedName, { it.alias ?: "" })),
+            imports = extractImports(tokens),
             symbols = Parser(relativePath.replace('\\', '/'), packageName, tokens).parse(),
         )
     }
@@ -217,7 +217,7 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
                     ";" -> if (paren == 0 && angle == 0) return i + 1
                     "}" -> if (paren == 0 && angle == 0) return i
                 }
-                if (i > start && paren == 0 && angle == 0 &&
+                if (i >= start && paren == 0 && angle == 0 &&
                     tokens[i].line > tokens[i - 1].line &&
                     canStartDeclaration(i, end)
                 ) return i
