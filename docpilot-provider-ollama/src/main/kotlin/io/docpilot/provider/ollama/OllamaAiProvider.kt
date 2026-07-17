@@ -58,7 +58,13 @@ class OllamaAiProvider(
             maxOutputTokens = request.maxOutputTokens,
             jsonResponse =
                 request.responseFormat == AiResponseFormat.JSON,
+            thinking = false,
         )
+
+        println("[DEBUG] Ollama model: $model")
+        println("[DEBUG] Request chars: ${body.length}")
+        println("[DEBUG] Timeout: ${configuration.requestTimeout}")
+        println("[DEBUG] think=false")
 
         val httpRequest = HttpRequest.newBuilder()
             .uri(
@@ -74,7 +80,8 @@ class OllamaAiProvider(
                 httpRequest,
                 HttpResponse.BodyHandlers.ofString(),
             )
-
+            println("[DEBUG] HTTP status: ${response.statusCode()}")
+            println("[DEBUG] Response chars: ${response.body().length}")
             parseResponse(
                 statusCode = response.statusCode(),
                 responseBody = response.body(),

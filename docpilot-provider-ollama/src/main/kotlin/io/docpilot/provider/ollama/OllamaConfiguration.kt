@@ -6,7 +6,7 @@ import java.time.Duration
 data class OllamaConfiguration(
     val baseUri: URI = URI.create(DEFAULT_BASE_URL),
     val defaultModel: String = DEFAULT_MODEL,
-    val requestTimeout: Duration = Duration.ofSeconds(120),
+    val requestTimeout: Duration = Duration.ofSeconds(300),
 ) {
     init {
         require(baseUri.scheme == "http" || baseUri.scheme == "https") {

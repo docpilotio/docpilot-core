@@ -8,12 +8,14 @@ internal object OllamaJson {
         temperature: Double?,
         maxOutputTokens: Int?,
         jsonResponse: Boolean,
+        thinking: Boolean = false,
     ): String =
         buildString {
             append('{')
             append("\"model\":")
             append(string(model))
             append(",\"messages\":[")
+
             messages.forEachIndexed { index, (role, content) ->
                 if (index > 0) append(',')
                 append('{')
@@ -23,8 +25,11 @@ internal object OllamaJson {
                 append(string(content))
                 append('}')
             }
+
             append(']')
             append(",\"stream\":false")
+            append(",\"think\":")
+            append(thinking)
 
             if (jsonResponse) {
                 append(",\"format\":\"json\"")
@@ -51,7 +56,6 @@ internal object OllamaJson {
 
             append('}')
         }
-
     fun stringField(
         json: String,
         field: String,
