@@ -222,7 +222,7 @@ class DefaultIncrementalGenerationPlanner : IncrementalGenerationPlanner {
 
         private val HIGH_PRIORITY_SECTIONS = setOf(COMPONENTS, DATA_FLOW, DEPENDENCIES)
         private val SECTION_KEYWORDS = mapOf(
-            CONTEXT to listOf("manifest", "application", "readme", "architecture", "cli"),
+            CONTEXT to listOf("manifest", "application", "module", "cli"),
             COMPONENTS to listOf("class", "interface", "service", "controller", "manager", "module", "repository"),
             DATA_FLOW to listOf("flow", "state", "event", "usecase", "use-case", "repository", "database", "dao"),
             DEPENDENCIES to listOf("build.gradle", "settings.gradle", "libs.versions", "pom.xml", "dependency", "provider", "plugin"),
