@@ -71,3 +71,28 @@ Current ProjectSpecification
 ```
 
 Nested API and Property changes propagate to owning Type and Package scopes. Ownership moves preserve both previous and current affected scopes.
+
+## 4. AI incremental documentation review
+
+```text
+IncrementalUpdatePlan
++
+AI target-scoped patches
++
+Existing managed documentation blocks
+→ deterministic documentation diff
+→ DocumentationReviewProposal
+→ complete human decisions
+→ accepted patches only
+→ managed-block merge
+```
+
+Safety rules:
+
+- patches outside the update plan are rejected;
+- missing patches keep the proposal incomplete;
+- partial decisions do not modify documentation;
+- rejected patches never reach the merger;
+- accepted `NO_CHANGE` entries do not rewrite content;
+- Evidence references and stable target IDs remain visible in the review report.
+

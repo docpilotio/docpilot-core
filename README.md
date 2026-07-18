@@ -115,17 +115,21 @@ Future repositories may provide CLI, IDE, automation, or integration layers.
 
 Current phase:
 
-> Phase 1 — MVP
+> Phase 1 — MVP / POC
 
 Completed RFCs:
 
-> RFC-0001 through RFC-0038
+> RFC-0001 through RFC-0043
+
+Primary validation target:
+
+> `C:\WorkSpace\architecture-samples`
 
 Release target:
 
-> v0.5 MVP Release Candidate — runtime gates verified
+> v0.5 MVP / POC — runtime gates verified; incremental review implemented
 
-Implemented MVP capabilities include source scanning, knowledge construction, DIR 0.3 specification building, deterministic Markdown rendering, Stable-ID-based incremental documentation planning, prompt-package creation, and AI-assisted architecture generation through the Provider SPI.
+Implemented MVP capabilities include source scanning, knowledge construction, DIR 0.3 specification building, deterministic Markdown rendering, Stable-ID-based incremental documentation planning, specification snapshot persistence, incremental CLI execution, AI target-scoped patch generation, deterministic documentation diff/review, prompt-package creation, and AI-assisted architecture generation through the Provider SPI.
 
 Release-gate validation on July 17, 2026 verified:
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-This document reflects the v0.5 MVP release-candidate baseline completed through RFC-0038.
+This document reflects the Phase 1 MVP / POC baseline completed through RFC-0043.
 
 ## Core pipeline
 
@@ -67,6 +67,27 @@ Deterministic IncrementalUpdatePlan
 RFC-0037 introduced Stable-ID-based specification diffing. RFC-0038 stabilized moved-entity propagation so affected scopes include both previous and current owners when APIs, Properties, or Types move while retaining identity.
 
 Snapshot Incremental and Specification Incremental remain separate subdomains.
+
+
+## AI incremental review boundary
+
+```text
+Previous / Current ProjectSpecification
+        ↓
+IncrementalUpdatePlan
+        ↓
+AI target-scoped patches
+        ↓
+DocumentationReviewProposal
+        ↓
+Complete ACCEPTED / REJECTED decision set
+        ↓
+Accepted patches only
+        ↓
+Managed-block merge
+```
+
+RFC-0043 treats AI output as a proposal rather than approved documentation. Missing patches, partial decisions, malformed managed blocks, unauthorized targets, or invalid decisions prevent merge. Review entries preserve stable IDs, specification change kind, existing/proposed Markdown, and Evidence references.
 
 ## Architectural boundaries
 
