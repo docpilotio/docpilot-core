@@ -25,6 +25,7 @@ private fun printUsage() {
 
         Usage:
           docpilot generate architecture --project <path> --provider <id> --model <model> [--title <title>] [--output <file>]
+          docpilot generate specification --project <path> [--output <directory>]
           docpilot generate adr --project <path> --provider <id> --model <model> --title <title> --context <text> --decision <text> --consequences <text> [--alternatives <text>] [--status <status>] [--output <file>]
 
         Providers bundled by the distribution: ollama, openai

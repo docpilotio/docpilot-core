@@ -17,6 +17,7 @@ class GenerateCommand(
     private val renderer: DocumentRenderer = DocumentRenderer(),
     private val writer: OutputWriter = OutputWriter(),
     private val printer: ConsolePrinter = ConsolePrinter(),
+    private val specificationWorkflow: SpecificationGenerateWorkflow = DefaultSpecificationGenerateWorkflow(),
 ) {
     fun execute(args: List<String>): Int =
         try {
@@ -24,9 +25,13 @@ class GenerateCommand(
             when (args.first()) {
                 "architecture" -> architecture(CliArguments.parse(args.drop(1)))
                 "adr" -> adr(CliArguments.parse(args.drop(1)))
+                "specification" -> specification(CliArguments.parse(args.drop(1)))
                 else -> throw IllegalArgumentException("Unknown generation type: ${args.first()}")
             }
             0
+        } catch (exception: SpecificationWorkflowException) {
+            printer.error(exception.message ?: "Generation failed.")
+            exception.exitCode
         } catch (exception: Exception) {
             printer.error(exception.message ?: "Generation failed.")
             1
@@ -68,6 +73,43 @@ class GenerateCommand(
         emit(renderer.render(document), args.optional("output"))
     }
 
+
+    private fun specification(args: CliArguments) {
+        val project = Path.of(args.required("project"))
+        val outputRoot = Path.of(args.optional("output") ?: project.toString())
+        val result = specificationWorkflow.execute(project, outputRoot)
+
+        printer.content("Execution Mode: ${result.execution.mode}")
+        printer.content("Snapshot Validation: ${snapshotValidation(result.snapshotLoadResult)}")
+        result.execution.fallbackReason?.let { printer.content("Fallback Reason: $it") }
+        result.execution.warnings.forEach { printer.content("Warning: $it") }
+
+        if (result.execution.mode == io.docpilot.core.incremental.execution.IncrementalExecutionMode.FAILED) {
+            throw SpecificationWorkflowException(
+                message = result.errorMessage ?: result.execution.errorMessage ?: "Specification generation failed.",
+                exitCode = when (result.failureStage) {
+                    io.docpilot.core.incremental.specification.snapshot.SnapshotExecutionFailureStage.SNAPSHOT_LOAD -> 3
+                    io.docpilot.core.incremental.specification.snapshot.SnapshotExecutionFailureStage.SNAPSHOT_SAVE -> 4
+                    else -> 1
+                },
+            )
+        }
+
+        printer.success(
+            if (result.snapshotSaved) "Specification generated and snapshot saved."
+            else "Specification generation completed; snapshot unchanged.",
+        )
+    }
+
+    private fun snapshotValidation(
+        loadResult: io.docpilot.core.incremental.specification.snapshot.SpecificationSnapshotLoadResult,
+    ): String = when (loadResult) {
+        io.docpilot.core.incremental.specification.snapshot.SpecificationSnapshotLoadResult.NotFound -> "NOT_FOUND"
+        is io.docpilot.core.incremental.specification.snapshot.SpecificationSnapshotLoadResult.Valid -> "VALID"
+        is io.docpilot.core.incremental.specification.snapshot.SpecificationSnapshotLoadResult.Invalid ->
+            "${loadResult.reason}: ${loadResult.message}"
+    }
+
     private fun parseAdrStatus(value: String): AdrStatus =
         AdrStatus.entries.firstOrNull { it.value == value.lowercase() }
             ?: throw IllegalArgumentException(
@@ -84,3 +126,5 @@ class GenerateCommand(
         }
     }
 }
+
+private class SpecificationWorkflowException(message: String, val exitCode: Int) : RuntimeException(message)
