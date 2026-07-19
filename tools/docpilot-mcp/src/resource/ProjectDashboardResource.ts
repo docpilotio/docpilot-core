@@ -1,19 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import type { ReleaseReadiness } from "../model/ProjectStatus.js";
 import { ProjectStatusService } from "../service/ProjectStatusService.js";
 
 const PROJECT_DASHBOARD_URI = "docpilot://project/dashboard";
-
-type ReleaseReadiness = {
-  coreBuild: "pending";
-  coreTests: "pending";
-  cli: "pending";
-  incremental: "pending";
-  reviewWorkflow: "pending";
-  architectureSamplesValidation: "pending";
-  documentationSync: "pending";
-  releaseCandidate: "pending";
-};
 
 type ProjectDashboard = {
   project: string;
@@ -39,16 +29,6 @@ export function registerProjectDashboardResource(
     },
     async (uri) => {
       const status = await service.getProjectStatus();
-      const releaseReadiness: ReleaseReadiness = {
-        coreBuild: "pending",
-        coreTests: "pending",
-        cli: "pending",
-        incremental: "pending",
-        reviewWorkflow: "pending",
-        architectureSamplesValidation: "pending",
-        documentationSync: "pending",
-        releaseCandidate: "pending",
-      };
       const dashboard: ProjectDashboard = {
         project: status.project,
         phase: status.phase,
@@ -56,7 +36,7 @@ export function registerProjectDashboardResource(
         release: status.release,
         completedCount: status.completedRfcs.length,
         completedRfcs: status.completedRfcs,
-        releaseReadiness,
+        releaseReadiness: status.releaseReadiness,
       };
 
       return {

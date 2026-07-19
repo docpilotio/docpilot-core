@@ -4,7 +4,7 @@ DocPilot MCP is the MCP control plane for DocPilot project status, RFC workflow,
 
 ## Product scope
 
-The current product reads and updates a compact DocPilot project status, supports the current RFC completion workflow, reports completed RFCs, provides a consolidated read-only project dashboard, and generates a Main Planning synchronization artifact. Documentation and release operations are part of the intended control-plane scope, but dedicated documentation operations and persistent Release Readiness are not implemented yet.
+The current product reads and updates a compact DocPilot project status and persistent Release Readiness, supports the current RFC completion workflow, reports completed RFCs, provides a consolidated read-only project dashboard, and generates a Main Planning synchronization artifact. Documentation operations remain part of the intended control-plane scope but are not implemented yet.
 
 ## Current architecture
 
@@ -22,6 +22,7 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 - `getCurrentRfc` returns the current RFC with its phase and release context.
 - `updateProjectStatus` updates one or more of `phase`, `release`, and `currentRfc` after service validation.
 - `listCompletedRfcs` returns completed RFC identifiers, their count, and current project context.
+- `updateReleaseReadiness` accepts an `updates` object containing one or more readiness fields and returns the updated project status. Each value must be `pending`, `passed`, or `failed`; omitted fields retain their prior values.
 
 ### RFC Workflow
 
@@ -34,9 +35,9 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 ## Available Resources
 
 - `project-status` at `docpilot://project/status` returns the current project status as `application/json`.
-- `project-dashboard` at `docpilot://project/dashboard` returns a consolidated read-only dashboard as `application/json`. Its fields are `project`, `phase`, `currentRfc`, `release`, `completedCount`, `completedRfcs`, and `releaseReadiness`. Current project and RFC values come from `ProjectStatusService`; `completedCount` is derived from the ordered `completedRfcs` array.
+- `project-dashboard` at `docpilot://project/dashboard` returns a consolidated read-only dashboard as `application/json`. Its fields are `project`, `phase`, `currentRfc`, `release`, `completedCount`, `completedRfcs`, and `releaseReadiness`. Current values, including persisted readiness, come from `ProjectStatusService`; `completedCount` is derived from the ordered `completedRfcs` array.
 
-The dashboard's `releaseReadiness` object currently reports `pending` for core build, core tests, CLI, incremental processing, review workflow, architecture-samples validation, documentation sync, and release candidate readiness. These values are a non-persistent read-model placeholder and are not added to `project-state.json`.
+The `releaseReadiness` object contains `coreBuild`, `coreTests`, `cli`, `incremental`, `reviewWorkflow`, `architectureSamplesValidation`, `documentationSync`, and `releaseCandidate`. Each field is persisted as `pending`, `passed`, or `failed`.
 
 ## Available Prompts
 
@@ -46,7 +47,7 @@ The dashboard's `releaseReadiness` object currently reports `pending` for core b
 
 Runtime state is stored in `project-state.json`, resolved relative to the process working directory. The repository parses and validates the complete status shape on reads and writes. Saves serialize formatted JSON to `project-state.tmp.json` and rename it over `project-state.json`. The runtime state and temporary state files are not source artifacts and must not be committed.
 
-The server expects `project-state.json` to exist and contain string values for `project`, `phase`, `currentRfc`, and `release`, plus a string array named `completedRfcs`. There is currently no automatic initialization or migration.
+The server expects `project-state.json` to exist and contain string values for `project`, `phase`, `currentRfc`, and `release`, plus a string array named `completedRfcs`. The additive `releaseReadiness` object stores all eight readiness fields. Legacy files without the object, and objects with missing individual fields, load with deterministic `pending` defaults in memory. Reads do not rewrite legacy files; the complete readiness object is serialized on the next normal save. Invalid readiness values are rejected.
 
 ## Commands
 
@@ -72,7 +73,7 @@ npm run inspector
 
 ## Current limitations
 
-- Release Readiness is not yet persisted or managed as a workflow. The dashboard exposes fixed `pending` placeholders, and persistent readiness state is future work.
+- Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
 - Documentation operations are not implemented yet.
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.

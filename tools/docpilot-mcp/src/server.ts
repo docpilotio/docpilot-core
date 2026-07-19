@@ -11,6 +11,7 @@ import { registerGetCurrentRfcTool } from "./tool/GetCurrentRfcTool.js";
 import { registerGetProjectStatusTool } from "./tool/GetProjectStatusTool.js";
 import { registerListCompletedRfcsTool } from "./tool/ListCompletedRfcsTool.js";
 import { registerUpdateProjectStatusTool } from "./tool/UpdateProjectStatusTool.js";
+import { registerUpdateReleaseReadinessTool } from "./tool/UpdateReleaseReadinessTool.js";
 
 export function createServer(): McpServer {
   const repository = new ProjectStateRepository();
@@ -27,6 +28,7 @@ export function createServer(): McpServer {
   registerGenerateMainPlanningSyncTool(server, service);
   registerListCompletedRfcsTool(server, service);
   registerUpdateProjectStatusTool(server, service);
+  registerUpdateReleaseReadinessTool(server, service);
 
   registerProjectStatusResource(server, service);
   registerProjectDashboardResource(server, service);

@@ -5,7 +5,23 @@ import {
 } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import type { ProjectStatus } from "../model/ProjectStatus.js";
+import {
+  createDefaultReleaseReadiness,
+  type ProjectStatus,
+  type ReleaseReadiness,
+  type ReleaseReadinessState,
+} from "../model/ProjectStatus.js";
+
+const RELEASE_READINESS_FIELDS = [
+  "coreBuild",
+  "coreTests",
+  "cli",
+  "incremental",
+  "reviewWorkflow",
+  "architectureSamplesValidation",
+  "documentationSync",
+  "releaseCandidate",
+] as const;
 
 export class ProjectStateRepository {
   public constructor(
@@ -65,6 +81,62 @@ export class ProjectStateRepository {
       currentRfc: value.currentRfc,
       release: value.release,
       completedRfcs: [...value.completedRfcs],
+      releaseReadiness: this.validateReleaseReadiness(
+        "releaseReadiness" in value
+          ? value.releaseReadiness
+          : undefined,
+      ),
     };
+  }
+
+  private validateReleaseReadiness(value: unknown): ReleaseReadiness {
+    if (value === undefined) {
+      return createDefaultReleaseReadiness();
+    }
+
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new Error(
+        "project-state.json contains an invalid releaseReadiness object.",
+      );
+    }
+
+    const persistedReadiness = value as Record<string, unknown>;
+    const unknownField = Object.keys(persistedReadiness).find(
+      (field) =>
+        !RELEASE_READINESS_FIELDS.includes(
+          field as (typeof RELEASE_READINESS_FIELDS)[number],
+        ),
+    );
+
+    if (unknownField !== undefined) {
+      throw new Error(
+        `project-state.json contains an unknown releaseReadiness field: ${unknownField}.`,
+      );
+    }
+
+    const defaults = createDefaultReleaseReadiness();
+    const readiness = {} as ReleaseReadiness;
+
+    for (const field of RELEASE_READINESS_FIELDS) {
+      const fieldValue = field in persistedReadiness
+        ? persistedReadiness[field]
+        : defaults[field];
+
+      if (!this.isReleaseReadinessState(fieldValue)) {
+        throw new Error(
+          `project-state.json contains an invalid releaseReadiness value for ${field}.`,
+        );
+      }
+
+      readiness[field] = fieldValue;
+    }
+
+    return readiness;
+  }
+
+  private isReleaseReadinessState(
+    value: unknown,
+  ): value is ReleaseReadinessState {
+    return value === "pending" || value === "passed" || value === "failed";
   }
 }

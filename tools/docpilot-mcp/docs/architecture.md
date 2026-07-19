@@ -16,19 +16,19 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 ## Model
 
-`src/model/ProjectStatus.ts` defines the shared `ProjectStatus` data shape: `project`, `phase`, `currentRfc`, `release`, and `completedRfcs`. It is a TypeScript model rather than an active domain entity; business behavior remains in the service.
+`src/model/ProjectStatus.ts` defines the shared `ProjectStatus` data shape: `project`, `phase`, `currentRfc`, `release`, `completedRfcs`, and `releaseReadiness`. `ReleaseReadinessState` restricts values to `pending`, `passed`, or `failed`, while `ReleaseReadiness` defines the eight supported fields. The model also provides the deterministic all-pending default. It is a TypeScript model rather than an active domain entity; business behavior remains in the service.
 
 ## Repository
 
 `ProjectStateRepository` is the persistence boundary. It resolves `project-state.json` from the process working directory by default, reads and parses JSON, validates the complete persisted shape, and returns a defensive copy of `completedRfcs`.
 
-On save, it validates the model, formats the JSON, writes `project-state.tmp.json`, and renames that file to `project-state.json`. The repository therefore owns persistence mechanics, persistence-boundary validation, and serialization. Callers do not read or write the state file directly.
+On load, the repository defaults a missing `releaseReadiness` object or any missing readiness fields to `pending`. It rejects unknown readiness fields and invalid stored values. This backward-compatible deserialization does not rewrite the file. On save, it validates the model, formats the complete additive schema as JSON, writes `project-state.tmp.json`, and renames that file to `project-state.json`. The repository therefore owns persistence mechanics, persistence-boundary validation, defaulting, and serialization. Callers do not read or write the state file directly.
 
 ## Service
 
 `ProjectStatusService` coordinates all current application behavior. It loads and saves state through `ProjectStateRepository`, shapes query results, generates the Main Planning Markdown summary, and owns business validation and RFC workflow rules.
 
-In particular, the service trims mutable inputs, rejects empty phase or release values, requires RFC identifiers to match `RFC-0000`, requires at least one field for status updates, prevents completion into the same RFC, and avoids adding a duplicate completed RFC.
+In particular, the service trims mutable inputs, rejects empty phase or release values, requires RFC identifiers to match `RFC-0000`, requires at least one field for status updates, prevents completion into the same RFC, and avoids adding a duplicate completed RFC. For Release Readiness updates, it rejects empty updates, unknown fields, and values outside `pending`, `passed`, and `failed` before loading or saving state, then preserves all omitted readiness fields.
 
 ## Tool
 
@@ -37,6 +37,7 @@ Tool modules register MCP operations and adapt MCP inputs and outputs to service
 Current Tools are grouped as follows:
 
 - Project Status: `getProjectStatus`, `getCurrentRfc`, `updateProjectStatus`, and `listCompletedRfcs`.
+- Release Readiness: `updateReleaseReadiness`, which accepts `{ "updates": { ... } }` and persists one or more validated readiness fields.
 - RFC Workflow: `completeCurrentRfc`.
 - Planning: `generateMainPlanningSync`.
 
@@ -46,9 +47,9 @@ All Tools call `ProjectStatusService`; none accesses `ProjectStateRepository` di
 
 `ProjectStatusResource` registers the existing `project-status` Resource at the stable URI `docpilot://project/status`. It reads current state through `ProjectStatusService` and returns formatted JSON with the `application/json` media type.
 
-`ProjectDashboardResource` registers the read-only `project-dashboard` Resource at `docpilot://project/dashboard`. It calls `ProjectStatusService.getProjectStatus()` and returns `project`, `phase`, `currentRfc`, `release`, the ordered `completedRfcs`, a derived `completedCount`, and `releaseReadiness` as formatted JSON with the `application/json` media type. Its dependency path remains Resource → Service → Repository.
+`ProjectDashboardResource` registers the read-only `project-dashboard` Resource at `docpilot://project/dashboard`. It calls `ProjectStatusService.getProjectStatus()` and returns `project`, `phase`, `currentRfc`, `release`, the ordered `completedRfcs`, a derived `completedCount`, and persisted `releaseReadiness` as formatted JSON with the `application/json` media type. Its dependency path remains Resource → Service → Repository.
 
-The dashboard's eight Release Readiness fields are fixed to `pending`. They are a deterministic, non-persistent read-model placeholder: the Resource does not write state, and the fields are not part of the `project-state.json` schema. Persistent Release Readiness and its workflow remain future work.
+Dashboard reads never write state. The existing project-status Resource serializes the complete `ProjectStatus`, so `releaseReadiness` is an intentional backward-compatible additive field in that Resource's JSON response.
 
 Resources may read through Services or a dedicated read abstraction.
 
@@ -72,11 +73,21 @@ The runtime file must contain this logical shape:
   "phase": "...",
   "currentRfc": "RFC-0000",
   "release": "...",
-  "completedRfcs": []
+  "completedRfcs": [],
+  "releaseReadiness": {
+    "coreBuild": "pending",
+    "coreTests": "pending",
+    "cli": "pending",
+    "incremental": "pending",
+    "reviewWorkflow": "pending",
+    "architectureSamplesValidation": "pending",
+    "documentationSync": "pending",
+    "releaseCandidate": "pending"
+  }
 }
 ```
 
-Its location depends on the working directory used to start the server. It is runtime state, is ignored by Git, and must not be committed. There is no default creation, locking, schema version, migration, backup, or multi-project persistence strategy.
+Its location depends on the working directory used to start the server. It is runtime state, is ignored by Git, and must not be committed. `releaseReadiness` is an additive schema change: legacy files and missing individual readiness fields default to `pending` in memory without an automatic migration write. There is no default file creation, locking, schema version, migration, backup, or multi-project persistence strategy.
 
 ## Dependency direction
 
@@ -95,8 +106,8 @@ The intended request path is Tool/Resource/Prompt → Service → Repository. Di
 Validation is deliberately split by responsibility:
 
 - MCP Tool schemas validate protocol-facing input and output shapes.
-- `ProjectStatusService` validates business inputs and workflow transitions.
-- `ProjectStateRepository` validates persisted data before returning or saving it.
+- `ProjectStatusService` validates business inputs, Release Readiness updates, and workflow transitions.
+- `ProjectStateRepository` validates and defaults persisted data before returning or saving it, and owns its serialization.
 
 This overlap at external boundaries is intentional. Business rules must remain enforceable even when the service is called outside an MCP Tool callback.
 
@@ -104,4 +115,4 @@ This overlap at external boundaries is intentional. Business rules must remain e
 
 The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.
 
-The current boundary excludes persistent Release Readiness and its workflow, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.
+The current boundary includes manually managed persistent Release Readiness but excludes automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.

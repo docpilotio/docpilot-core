@@ -1,4 +1,8 @@
-import type { ProjectStatus } from "../model/ProjectStatus.js";
+import type {
+  ProjectStatus,
+  ReleaseReadiness,
+  ReleaseReadinessState,
+} from "../model/ProjectStatus.js";
 import { ProjectStateRepository } from "../repository/ProjectStateRepository.js";
 
 export type CurrentRfcStatus = {
@@ -46,6 +50,17 @@ export type UpdateProjectStatusRequest = {
   currentRfc?: string;
 };
 
+const RELEASE_READINESS_FIELDS = [
+  "coreBuild",
+  "coreTests",
+  "cli",
+  "incremental",
+  "reviewWorkflow",
+  "architectureSamplesValidation",
+  "documentationSync",
+  "releaseCandidate",
+] as const;
+
 export class ProjectStatusService {
   public constructor(
     private readonly repository: ProjectStateRepository,
@@ -53,6 +68,45 @@ export class ProjectStatusService {
 
   public async getProjectStatus(): Promise<ProjectStatus> {
     return this.repository.load();
+  }
+
+  public async updateReleaseReadiness(
+    updates: Partial<ReleaseReadiness>,
+  ): Promise<ProjectStatus> {
+    const entries = Object.entries(updates);
+
+    if (entries.length === 0) {
+      throw new Error("At least one Release Readiness field must be provided.");
+    }
+
+    for (const [field, value] of entries) {
+      if (
+        !RELEASE_READINESS_FIELDS.includes(
+          field as (typeof RELEASE_READINESS_FIELDS)[number],
+        )
+      ) {
+        throw new Error(`Unknown Release Readiness field: ${field}.`);
+      }
+
+      if (!this.isReleaseReadinessState(value)) {
+        throw new Error(
+          `Invalid Release Readiness value for ${field}; expected pending, passed, or failed.`,
+        );
+      }
+    }
+
+    const status = await this.repository.load();
+    const updatedStatus: ProjectStatus = {
+      ...status,
+      releaseReadiness: {
+        ...status.releaseReadiness,
+        ...updates,
+      },
+    };
+
+    await this.repository.save(updatedStatus);
+
+    return updatedStatus;
   }
 
   public async getCurrentRfc(): Promise<CurrentRfcStatus> {
@@ -210,5 +264,11 @@ export class ProjectStatusService {
     await this.repository.save(updatedStatus);
 
     return updatedStatus;
+  }
+
+  private isReleaseReadinessState(
+    value: unknown,
+  ): value is ReleaseReadinessState {
+    return value === "pending" || value === "passed" || value === "failed";
   }
 }
