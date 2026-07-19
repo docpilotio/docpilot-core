@@ -63,6 +63,11 @@ describe("ProjectDashboardResource", () => {
         reason: "Current RFC has not been marked completed.",
       },
       lifecycleHistory: [],
+      rollbackPreview: {
+        eligible: false,
+        currentRfc: "RFC-0039",
+        blockingReason: "Lifecycle history is empty; no previous RFC can be resolved.",
+      },
     });
     expect(text).toBe(`${JSON.stringify(dashboard, null, 2)}`);
     await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(
@@ -246,6 +251,15 @@ describe("ProjectDashboardResource", () => {
         fromRfc: "RFC-0040",
       }),
     ]);
+    expect(dashboard.rollbackPreview).toEqual({
+      eligible: false,
+      currentRfc: "RFC-0039",
+      blockingReason: "Repeated rollback is not supported after the latest rollback event.",
+    });
+    const repeated = await connection.client.readResource({
+      uri: "docpilot://project/dashboard",
+    });
+    expect(repeated).toEqual(result);
     await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(
       before,
     );

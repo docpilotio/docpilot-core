@@ -29,6 +29,7 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 - `markCurrentRfcCompleted` accepts strict empty input (`{}`), marks the current RFC completed, and leaves the current RFC, phase, release, and Release Readiness unchanged.
 - `startNextRfc` starts an explicitly supplied later RFC, preserves completed history, optionally updates `phase` and `release`, and resets all Release Readiness fields to `pending`. Input is `{ "nextRfc": "RFC-0045", "phase"?: "...", "release"?: "..." }`; no other fields are accepted.
 - `rollbackCurrentRfc` accepts strict empty input (`{}`) and restores the immediately previous active RFC from lifecycle-history evidence. It resets Release Readiness and appends an audit event; it does not roll back Git, source files, branches, or commits.
+- `previewCurrentRfcRollback` accepts strict empty input (`{}`) and reports whether that same one-step rollback is eligible, including the restored RFC, phase, release, and all-pending readiness state. It is read-only and returns a stable blocking reason when ineligible.
 - `completeCurrentRfc` is the legacy shortcut that records the current RFC and advances immediately to its required `nextRfc`.
 
 The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `generateMainPlanningSync`. Marking validates the current RFC against exact `RFC-[0-9]{4}` syntax, explicitly rejects an already completed RFC, numerically orders and deduplicates completed history, and performs one Repository save. It does not reset readiness or invoke planning.
@@ -60,7 +61,7 @@ Because `completeCurrentRfc` advances directly to a new current RFC without stor
 
 The `releaseReadiness` object contains `coreBuild`, `coreTests`, `cli`, `incremental`, `reviewWorkflow`, `architectureSamplesValidation`, `documentationSync`, and `releaseCandidate`. Each field is persisted as `pending`, `passed`, or `failed`.
 
-The dashboard also exposes the append-only `lifecycleHistory` array in persisted order.
+The dashboard also exposes the append-only `lifecycleHistory` array in persisted order and a derived `rollbackPreview`. Repeated dashboard reads do not save state or append events.
 
 ## Available Prompts
 
@@ -85,6 +86,12 @@ Main Planning Markdown includes an RFC Lifecycle Timeline derived from persisted
 `rollbackCurrentRfc` is deliberately limited to one project-management transition. The Service validates every event and replays the canonical append order to identify the active RFC immediately before the latest `started` transition. It never guesses by subtracting an RFC number. The current persisted RFC must agree with the replayed active RFC, the latest transition must have activated it, and ambiguous, missing, malformed, or repeated-rollback evidence is rejected before any save.
 
 On success, the prior event context restores the RFC, phase, and release; completed RFCs remain historical completion records; all eight Release Readiness fields reset to `pending`; and one `rollbackCompleted` compensating event is appended in the same single save. Earlier history is never deleted, edited, reordered, or normalized. Lifecycle Guidance remains useful after rollback even when the restored RFC is in completed history. Arbitrary targets, multi-step rollback, generalized event replay, source restoration, and Git rollback are future work.
+
+### Rollback eligibility and Preview
+
+`previewCurrentRfcRollback` and `rollbackCurrentRfc` use the same internal Service resolver, so eligibility cannot be weaker than execution. Eligible output predicts the current and restored RFC, restored phase and release, and the deterministic all-`pending` Release Readiness state. Ineligible output contains the resolver's stable blocking reason. Normal business ineligibility is structured output; invalid persisted JSON may still be rejected by the Repository before domain preview calculation.
+
+Preview data is derived each time and is never added to `project-state.json`. Preview performs no save, appends no lifecycle event, consumes no event ID, and does not mutate readiness or the loaded status. Dashboard, Main Planning structured output and Markdown, and the read-only planning Prompt expose it additively. The explicit Main Planning Tool retains its established single `planningSynced` event; Preview itself creates no additional event. Rollback remains exceptional corrective behavior and does not replace Lifecycle Guidance's forward-workflow recommendation. Multi-step Preview and an operator confirmation workflow remain future work.
 
 ## Commands
 

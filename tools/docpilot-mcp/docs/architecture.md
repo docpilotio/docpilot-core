@@ -22,6 +22,8 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 `src/model/RfcLifecycleEvent.ts` defines readonly lifecycle events with stable `started`, `completed`, `planningSynced`, and compensating `rollbackCompleted` types. Rollback events carry optional `fromRfc` audit evidence; older event types remain loadable without it. `ProjectStatus.lifecycleHistory` preserves append order.
 
+`src/model/RfcRollbackPreview.ts` defines immutable derived rollback eligibility output. It contains no timestamp, ID, Repository dependency, or persistence behavior. Eligible results add the target RFC context and all-pending readiness prediction; ineligible results add one deterministic blocking reason.
+
 ## Repository
 
 `ProjectStateRepository` is the persistence boundary. It resolves `project-state.json` from the process working directory by default, reads and parses JSON, validates the complete persisted shape, and returns a defensive copy of `completedRfcs`.
@@ -46,6 +48,8 @@ The Service appends lifecycle events using deterministic sequence IDs and expose
 
 `rollbackCurrentRfc` performs a one-step project-state rollback. Its resolver validates and replays lifecycle events in append order, tracking the active RFC context established by `started` and `rollbackCompleted` transitions while requiring `completed` and `planningSynced` events to refer to that active RFC. The replayed active RFC must match `ProjectStatus.currentRfc`, and the most recent transition must be the `started` event that activated it. The method restores the transition's prior RFC, phase, and release, preserves `completedRfcs` as historical evidence, resets Release Readiness, appends one compensating event, and saves exactly once. It rejects empty, ambiguous, inconsistent, or repeated-rollback histories rather than guessing or subtracting RFC numbers.
 
+`previewCurrentRfcRollback` calls that same internal resolver and converts normal domain failures into a stable ineligible read model. It never saves, appends an event, allocates an ID, or mutates the supplied status. Repository parsing errors remain persistence-boundary errors. This shared resolution policy guarantees that an eligible target, phase, release, and readiness prediction match actual rollback execution.
+
 ## Tool
 
 Tool modules register MCP operations and adapt MCP inputs and outputs to service calls. They own their published MCP schemas and error response formatting, but do not own business rules or persistence.
@@ -54,7 +58,7 @@ Current Tools are grouped as follows:
 
 - Project Status: `getProjectStatus`, `getCurrentRfc`, `updateProjectStatus`, and `listCompletedRfcs`.
 - Release Readiness: `updateReleaseReadiness`, which accepts `{ "updates": { ... } }` and persists one or more validated readiness fields.
-- RFC Workflow: `markCurrentRfcCompleted`, `startNextRfc`, `rollbackCurrentRfc`, and the legacy combined `completeCurrentRfc` shortcut.
+- RFC Workflow: `markCurrentRfcCompleted`, `startNextRfc`, `rollbackCurrentRfc`, read-only `previewCurrentRfcRollback`, and the legacy combined `completeCurrentRfc` shortcut.
 - Planning: `generateMainPlanningSync`.
 
 All Tools call `ProjectStatusService`; none accesses `ProjectStateRepository` directly.
@@ -71,6 +75,8 @@ The dashboard also obtains additive `lifecycleGuidance` through `ProjectStatusSe
 
 The dashboard returns additive `lifecycleHistory` in persisted order, providing the initial timeline read model without adding Resource-side persistence.
 
+The dashboard also returns additive `rollbackPreview`, calculated from the already loaded status through the Service. This avoids a second state load and keeps every dashboard read side-effect free.
+
 Resources may read through Services or a dedicated read abstraction.
 
 ## Prompt
@@ -80,6 +86,8 @@ Resources may read through Services or a dedicated read abstraction.
 Both the planning Tool and Prompt include an additive RFC Lifecycle section from the same Service-derived guidance. The Tool also exposes the guidance in structured content. Guidance derivation and Prompt generation remain deterministic and read-only.
 
 The explicit planning Tool additionally appends `planningSynced` and renders an RFC Lifecycle Timeline from the resulting history. A rollback line includes both `fromRfc` and the restored `rfc`. Prompt generation remains read-only and does not claim synchronization occurred.
+
+Both planning surfaces add a Rollback Preview section. The explicit Tool calculates Preview after its established `planningSynced` save but Preview itself performs no further save or event append. Prompt Preview remains wholly read-only. Lifecycle Guidance action semantics are unchanged because rollback is an exceptional operator action rather than the recommended forward transition.
 
 ## Server registration
 
@@ -150,4 +158,4 @@ The current foundation does not configure coverage reporting, launch the stdio e
 
 The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.
 
-The current boundary includes mark-only completion, explicit next-RFC startup, one-step project-state rollback, the backward-compatible combined completion shortcut, derived lifecycle guidance, append-only lifecycle history, and manually managed persistent Release Readiness. Rollback is a compensating domain transition, not Git or source restoration. Completed RFC records are retained as historical evidence. Guidance cannot distinguish a legacy complete-and-advance result from ordinary in-progress work, and the legacy shortcut does not backfill synthetic events. The boundary excludes arbitrary or multi-step rollback, generalized event replay, a workflow engine, automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage.
+The current boundary includes mark-only completion, explicit next-RFC startup, one-step project-state rollback and read-only Preview, the backward-compatible combined completion shortcut, derived lifecycle guidance, append-only lifecycle history, and manually managed persistent Release Readiness. Rollback is a compensating domain transition, not Git or source restoration. Completed RFC records are retained as historical evidence. Guidance cannot distinguish a legacy complete-and-advance result from ordinary in-progress work, and the legacy shortcut does not backfill synthetic events. The boundary excludes arbitrary or multi-step rollback/Preview, operator confirmation orchestration, generalized event replay, a workflow engine, automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage.

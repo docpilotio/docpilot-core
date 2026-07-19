@@ -11,6 +11,7 @@ import { registerGetCurrentRfcTool } from "./tool/GetCurrentRfcTool.js";
 import { registerGetProjectStatusTool } from "./tool/GetProjectStatusTool.js";
 import { registerListCompletedRfcsTool } from "./tool/ListCompletedRfcsTool.js";
 import { registerMarkCurrentRfcCompletedTool } from "./tool/MarkCurrentRfcCompletedTool.js";
+import { registerPreviewCurrentRfcRollbackTool } from "./tool/PreviewCurrentRfcRollbackTool.js";
 import { registerRollbackCurrentRfcTool } from "./tool/RollbackCurrentRfcTool.js";
 import { registerStartNextRfcTool } from "./tool/StartNextRfcTool.js";
 import { registerUpdateProjectStatusTool } from "./tool/UpdateProjectStatusTool.js";
@@ -30,6 +31,7 @@ export function createServer(): McpServer {
   registerCompleteCurrentRfcTool(server, service);
   registerMarkCurrentRfcCompletedTool(server, service);
   registerRollbackCurrentRfcTool(server, service);
+  registerPreviewCurrentRfcRollbackTool(server, service);
   registerGenerateMainPlanningSyncTool(server, service);
   registerListCompletedRfcsTool(server, service);
   registerUpdateProjectStatusTool(server, service);

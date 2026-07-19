@@ -5,6 +5,7 @@ import type {
 } from "../model/ProjectStatus.js";
 import { createDefaultReleaseReadiness } from "../model/ProjectStatus.js";
 import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
+import type { RfcRollbackPreview } from "../model/RfcRollbackPreview.js";
 import type {
   RfcLifecycleEvent,
   RfcLifecycleEventType,
@@ -50,6 +51,7 @@ export type MainPlanningSyncResult = {
   markdown: string;
   lifecycleGuidance: RfcLifecycleGuidance;
   lifecycleHistory: readonly RfcLifecycleEvent[];
+  rollbackPreview: RfcRollbackPreview;
 };
 
 export type UpdateProjectStatusRequest = {
@@ -152,11 +154,7 @@ export class ProjectStatusService {
   public async rollbackCurrentRfc(): Promise<ProjectStatus> {
     const status = await this.repository.load();
 
-    if (!this.isValidRfcIdentifier(status.currentRfc)) {
-      throw new Error("The current RFC must use the exact format RFC-0000.");
-    }
-
-    const previous = this.resolvePreviousRfc(status);
+    const previous = this.resolveRollbackTransition(status);
 
     if (previous.rfc === status.currentRfc) {
       throw new Error("Rollback must restore a different RFC.");
@@ -184,6 +182,33 @@ export class ProjectStatusService {
     await this.repository.save(updatedStatus);
 
     return updatedStatus;
+  }
+
+  public async previewCurrentRfcRollback(
+    status?: ProjectStatus,
+  ): Promise<RfcRollbackPreview> {
+    const currentStatus = status ?? await this.repository.load();
+
+    try {
+      const target = this.resolveRollbackTransition(currentStatus);
+
+      return {
+        eligible: true,
+        currentRfc: currentStatus.currentRfc,
+        targetRfc: target.rfc,
+        targetPhase: target.phase,
+        targetRelease: target.release,
+        readinessAfterRollback: createDefaultReleaseReadiness(),
+      };
+    } catch (error: unknown) {
+      return {
+        eligible: false,
+        currentRfc: currentStatus.currentRfc,
+        blockingReason: error instanceof Error
+          ? error.message
+          : "Rollback eligibility could not be determined.",
+      };
+    }
   }
 
   public async startNextRfc(
@@ -335,6 +360,7 @@ export class ProjectStatusService {
     await this.repository.save(updatedStatus);
 
     const lifecycleGuidance = this.deriveRfcLifecycleGuidance(updatedStatus);
+    const rollbackPreview = await this.previewCurrentRfcRollback(updatedStatus);
     const completedRfcLines = updatedStatus.completedRfcs.length > 0
       ? updatedStatus.completedRfcs.map((rfc) => `- ${rfc}`)
       : ["- None"];
@@ -379,6 +405,10 @@ export class ProjectStatusService {
       "",
       ...timelineLines,
       "",
+      "## Rollback Preview",
+      "",
+      ...this.formatRollbackPreview(rollbackPreview),
+      "",
       "## Release Readiness",
       "",
       ...readinessItems.map((item) => `- ${item}: ⏳`),
@@ -394,6 +424,7 @@ export class ProjectStatusService {
       markdown,
       lifecycleGuidance,
       lifecycleHistory: updatedStatus.lifecycleHistory,
+      rollbackPreview,
     };
   }
 
@@ -588,7 +619,11 @@ export class ProjectStatusService {
     return [...status.lifecycleHistory, event];
   }
 
-  private resolvePreviousRfc(status: ProjectStatus): ActiveRfcContext {
+  private resolveRollbackTransition(status: ProjectStatus): ActiveRfcContext {
+    if (!this.isValidRfcIdentifier(status.currentRfc)) {
+      throw new Error("The current RFC must use the exact format RFC-0000.");
+    }
+
     if (status.lifecycleHistory.length === 0) {
       throw new Error("Lifecycle history is empty; no previous RFC can be resolved.");
     }
@@ -708,5 +743,23 @@ export class ProjectStatusService {
     }
 
     return `Planning Synced for ${event.rfc}`;
+  }
+
+  private formatRollbackPreview(preview: RfcRollbackPreview): string[] {
+    if (!preview.eligible) {
+      return [
+        "- Eligible: No",
+        `- Current RFC: ${preview.currentRfc}`,
+        `- Reason: ${preview.blockingReason}`,
+      ];
+    }
+
+    return [
+      "- Eligible: Yes",
+      `- Current RFC: ${preview.currentRfc}`,
+      `- Rollback Target: ${preview.targetRfc}`,
+      `- Restored Phase: ${preview.targetPhase}`,
+      `- Restored Release: ${preview.targetRelease}`,
+    ];
   }
 }

@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { ProjectStatusService } from "../service/ProjectStatusService.js";
+import { rollbackPreviewSchema } from "./PreviewCurrentRfcRollbackTool.js";
 
 export function registerGenerateMainPlanningSyncTool(
   server: McpServer,
@@ -51,6 +52,7 @@ export function registerGenerateMainPlanningSyncTool(
             timestamp: z.string(),
           }),
         ),
+        rollbackPreview: rollbackPreviewSchema,
       },
     },
     async () => {

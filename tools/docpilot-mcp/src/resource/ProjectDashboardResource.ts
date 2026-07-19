@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReleaseReadiness } from "../model/ProjectStatus.js";
 import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
 import type { RfcLifecycleEvent } from "../model/RfcLifecycleEvent.js";
+import type { RfcRollbackPreview } from "../model/RfcRollbackPreview.js";
 import { ProjectStatusService } from "../service/ProjectStatusService.js";
 
 const PROJECT_DASHBOARD_URI = "docpilot://project/dashboard";
@@ -17,6 +18,7 @@ type ProjectDashboard = {
   releaseReadiness: ReleaseReadiness;
   lifecycleGuidance: RfcLifecycleGuidance;
   lifecycleHistory: readonly RfcLifecycleEvent[];
+  rollbackPreview: RfcRollbackPreview;
 };
 
 export function registerProjectDashboardResource(
@@ -34,6 +36,7 @@ export function registerProjectDashboardResource(
     async (uri) => {
       const status = await service.getProjectStatus();
       const lifecycleGuidance = await service.getRfcLifecycleGuidance(status);
+      const rollbackPreview = await service.previewCurrentRfcRollback(status);
       const dashboard: ProjectDashboard = {
         project: status.project,
         phase: status.phase,
@@ -44,6 +47,7 @@ export function registerProjectDashboardResource(
         releaseReadiness: status.releaseReadiness,
         lifecycleGuidance,
         lifecycleHistory: status.lifecycleHistory,
+        rollbackPreview,
       };
 
       return {

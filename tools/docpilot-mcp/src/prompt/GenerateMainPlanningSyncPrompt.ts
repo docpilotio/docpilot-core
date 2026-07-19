@@ -27,6 +27,7 @@ export function registerGenerateMainPlanningSyncPrompt(
     async ({ completedWork, nextWork }) => {
       const status = await service.getProjectStatus();
       const lifecycleGuidance = await service.getRfcLifecycleGuidance(status);
+      const rollbackPreview = await service.previewCurrentRfcRollback(status);
 
       const basePromptText = [
         "다음 DocPilot 프로젝트 상태를 Main Planning에 동기화해 주세요.",
@@ -58,6 +59,18 @@ export function registerGenerateMainPlanningSyncPrompt(
         `- State: \`${lifecycleGuidance.state}\``,
         `- Recommended Tool: \`${lifecycleGuidance.nextAction}\``,
         `- Reason: ${lifecycleGuidance.reason}`,
+        "",
+        "## Rollback Preview",
+        "",
+        `- Eligible: ${rollbackPreview.eligible ? "Yes" : "No"}`,
+        `- Current RFC: ${rollbackPreview.currentRfc}`,
+        ...(rollbackPreview.eligible
+          ? [
+              `- Rollback Target: ${rollbackPreview.targetRfc}`,
+              `- Restored Phase: ${rollbackPreview.targetPhase}`,
+              `- Restored Release: ${rollbackPreview.targetRelease}`,
+            ]
+          : [`- Reason: ${rollbackPreview.blockingReason}`]),
       ].join("\n");
 
       return {

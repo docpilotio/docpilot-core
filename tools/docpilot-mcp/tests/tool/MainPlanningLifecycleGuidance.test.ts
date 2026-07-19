@@ -140,6 +140,8 @@ describe("Main Planning lifecycle guidance", () => {
     );
     expect(text).toContain("Done");
     expect(text).toContain("Next");
+    expect(text).toContain("## Rollback Preview");
+    expect(text).toContain("- Eligible: No");
     await expect(readFile(temporaryState!.stateFilePath, "utf-8")).resolves.toBe(
       before,
     );
@@ -206,5 +208,58 @@ describe("Main Planning lifecycle guidance", () => {
       ],
     });
     expect(text).toContain("Rolled back RFC-0040 → RFC-0039");
+    expect(text).toContain("## Rollback Preview");
+    expect(result.structuredContent).toMatchObject({
+      rollbackPreview: {
+        eligible: false,
+        currentRfc: "RFC-0039",
+        blockingReason: "Repeated rollback is not supported after the latest rollback event.",
+      },
+    });
+  });
+
+  it("adds an eligible Preview to structured and Markdown planning output", async () => {
+    temporaryState = await createTemporaryState(
+      createProjectStatus({
+        phase: "Current Phase",
+        currentRfc: "RFC-0040",
+        release: "v0.8.0",
+        lifecycleHistory: [
+          {
+            id: "rfc-event-000001", type: "completed", rfc: "RFC-0039",
+            phase: "Target Phase", release: "v0.7.0", timestamp: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "rfc-event-000002", type: "started", rfc: "RFC-0040",
+            phase: "Current Phase", release: "v0.8.0", timestamp: "2026-01-02T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    const server = new McpServer({ name: "planning-test", version: "0.0.0" });
+    registerGenerateMainPlanningSyncTool(server, temporaryState.service);
+    const connection = await connectTestClient(server);
+    closeClient = connection.close;
+
+    const result = await connection.client.callTool({
+      name: "generateMainPlanningSync",
+      arguments: {},
+    });
+    const text = result.content[0] !== undefined && "text" in result.content[0]
+      ? result.content[0].text
+      : "";
+
+    expect(result.structuredContent).toMatchObject({
+      rollbackPreview: {
+        eligible: true,
+        currentRfc: "RFC-0040",
+        targetRfc: "RFC-0039",
+        targetPhase: "Target Phase",
+        targetRelease: "v0.7.0",
+      },
+    });
+    expect(text).toContain("## Rollback Preview");
+    expect(text).toContain("- Eligible: Yes");
+    expect(text).toContain("- Rollback Target: RFC-0039");
   });
 });
