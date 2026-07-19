@@ -111,6 +111,14 @@ Validation is deliberately split by responsibility:
 
 This overlap at external boundaries is intentional. Business rules must remain enforceable even when the service is called outside an MCP Tool callback.
 
+## Automated testing
+
+Vitest tests are organized entirely under `tests/`: repository persistence compatibility, service business behavior, Resource responses, Tool protocol behavior, server registration, and shared support utilities are separated by directory. MCP-facing tests use the SDK's linked in-memory transports, so no network listener, Inspector, or external server is required.
+
+Every persistence test uses a unique directory created beneath the operating system temporary directory and removes it during teardown. Tests never read or write the runtime `project-state.json`. Repository and service tests use real filesystem persistence where practical; Tool and Resource tests exercise the registered MCP handlers through a client. `npm.cmd run build` and `npm.cmd test` are the required verification commands.
+
+The current foundation does not configure coverage reporting, launch the stdio entry point as a child process, or exhaustively test every legacy Tool error response and planning-output detail.
+
 ## Current architectural boundaries
 
 The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.

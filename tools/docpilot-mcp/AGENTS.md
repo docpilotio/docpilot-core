@@ -12,3 +12,6 @@
 - Do not commit generated files.
 - Do not commit `node_modules`, `dist`, logs, caches, or runtime `project-state.json`.
 - Run `npm run build` after every implementation change.
+- Add or update automated tests for every product behavior change.
+- Tests must use isolated temporary state and must never use the runtime `project-state.json`.
+- Run both `npm run build` and `npm test` successfully before completing work.

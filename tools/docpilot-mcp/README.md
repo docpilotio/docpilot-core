@@ -71,6 +71,24 @@ MCP Inspector:
 npm run inspector
 ```
 
+Tests (single run):
+
+```sh
+npm.cmd test
+```
+
+Tests (watch mode):
+
+```sh
+npm.cmd run test:watch
+```
+
+## Automated tests
+
+Vitest is the single test framework. Tests live under `tests/`, grouped into `repository`, `service`, `resource`, `tool`, `server`, and shared `support` directories. Persistence tests create isolated directories through the operating system temporary-directory APIs and remove them after each test; they never use the runtime `project-state.json`.
+
+The current suites cover repository serialization and backward compatibility, service workflows and validation, dashboard Resource behavior, the Release Readiness Tool, server registration, and smoke checks for existing Tools, the status Resource, and the planning Prompt. Coverage reporting is not configured, and the planning output details, every error branch of older Tools, and stdio process startup are not exhaustively tested.
+
 ## Current limitations
 
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
@@ -78,4 +96,4 @@ npm run inspector
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.
 - The server currently exposes only the stdio transport and has no authentication or multi-project selection.
-- Automated tests are not currently configured; `npm run build` is the available verification command.
+- Automated tests cover the core layers and MCP registrations but do not yet exercise the stdio entry point as a child process or provide coverage metrics.
