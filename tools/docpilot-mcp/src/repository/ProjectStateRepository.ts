@@ -24,6 +24,12 @@ import type {
   VerificationStatus,
 } from "../model/RfcHandoff.js";
 import { RFC_HANDOFF_SCHEMA_VERSION } from "../model/RfcHandoff.js";
+import {
+  IMPLEMENTATION_EXECUTION_SCHEMA_VERSION,
+  IMPLEMENTATION_WORK_ORDER_SCHEMA_VERSION,
+  type ImplementationExecutionRecord,
+  type ImplementationWorkOrder,
+} from "../model/ImplementationOrchestration.js";
 
 const RELEASE_READINESS_FIELDS = [
   "coreBuild",
@@ -107,7 +113,63 @@ export class ProjectStateRepository {
       ...("pendingRfcHandoff" in value && value.pendingRfcHandoff !== undefined
         ? { pendingRfcHandoff: this.validateRfcHandoff(value.pendingRfcHandoff) }
         : {}),
+      ...("pendingImplementationWorkOrder" in value && value.pendingImplementationWorkOrder !== undefined
+        ? { pendingImplementationWorkOrder: this.validateImplementationWorkOrder(value.pendingImplementationWorkOrder) }
+        : {}),
+      ...("implementationExecutionRecord" in value && value.implementationExecutionRecord !== undefined
+        ? { implementationExecutionRecord: this.validateExecutionRecord(value.implementationExecutionRecord) }
+        : {}),
     };
+  }
+
+  private validateImplementationWorkOrder(value: unknown): ImplementationWorkOrder {
+    const order = this.requireObject(value, "pendingImplementationWorkOrder");
+    const repository = this.requireObject(order.repository, "pendingImplementationWorkOrder.repository");
+    const objective = this.requireObject(order.objective, "pendingImplementationWorkOrder.objective");
+    const scope = this.requireObject(order.scope, "pendingImplementationWorkOrder.scope");
+    const execution = this.requireObject(order.execution, "pendingImplementationWorkOrder.execution");
+    const verification = this.requireObject(order.verification, "pendingImplementationWorkOrder.verification");
+    const gitPolicy = this.requireObject(order.gitPolicy, "pendingImplementationWorkOrder.gitPolicy");
+    const resultContract = this.requireObject(order.resultContract, "pendingImplementationWorkOrder.resultContract");
+    if (order.schemaVersion !== IMPLEMENTATION_WORK_ORDER_SCHEMA_VERSION) throw new Error(`project-state.json contains an unsupported Work Order schemaVersion: ${String(order.schemaVersion)}.`);
+    if (typeof order.id !== "string" || typeof order.rfcId !== "string" || !/^RFC-[0-9]{4}$/.test(order.rfcId)) throw new Error("project-state.json contains an invalid Pending Work Order identity.");
+    const commands = (input: unknown, field: string) => {
+      if (!Array.isArray(input)) throw new Error(`project-state.json contains an invalid ${field}.`);
+      return input.map((item) => {
+        const command = this.requireObject(item, field);
+        if (typeof command.id !== "string" || typeof command.executable !== "string" || !Array.isArray(command.args) || !command.args.every((arg) => typeof arg === "string") || typeof command.workingDirectory !== "string" || typeof command.timeoutSeconds !== "number" || typeof command.required !== "boolean" || !["TARGETED_TEST", "MODULE_TEST", "BUILD", "REGRESSION_TEST", "SMOKE"].includes(String(command.category))) throw new Error(`project-state.json contains an invalid ${field} command.`);
+        return command as ImplementationWorkOrder["verification"]["targetedCommands"][number];
+      });
+    };
+    if (!Array.isArray(objective.approvedPlan) || !Array.isArray(objective.acceptanceCriteria) || !Array.isArray(objective.alphaCriteria) || !Array.isArray(scope.allowedPaths) || !Array.isArray(scope.forbiddenPaths) || !Array.isArray(execution.codexArguments) || !Array.isArray(execution.environmentAllowlist) || !Array.isArray(order.warnings)) throw new Error("project-state.json contains an invalid Pending Work Order array.");
+    return {
+      schemaVersion: IMPLEMENTATION_WORK_ORDER_SCHEMA_VERSION,
+      id: order.id,
+      rfcId: order.rfcId,
+      repository: repository as ImplementationWorkOrder["repository"],
+      objective: objective as ImplementationWorkOrder["objective"],
+      scope: scope as ImplementationWorkOrder["scope"],
+      execution: execution as ImplementationWorkOrder["execution"],
+      verification: {
+        targetedCommands: commands(verification.targetedCommands, "targetedCommands"),
+        moduleCommands: commands(verification.moduleCommands, "moduleCommands"),
+        buildCommands: commands(verification.buildCommands, "buildCommands"),
+        regressionCommands: commands(verification.regressionCommands, "regressionCommands"),
+        smokeCommands: commands(verification.smokeCommands, "smokeCommands"),
+      },
+      gitPolicy: gitPolicy as ImplementationWorkOrder["gitPolicy"],
+      resultContract: resultContract as ImplementationWorkOrder["resultContract"],
+      warnings: [...order.warnings] as string[],
+    };
+  }
+
+  private validateExecutionRecord(value: unknown): ImplementationExecutionRecord {
+    const record = this.requireObject(value, "implementationExecutionRecord");
+    if (record.schemaVersion !== IMPLEMENTATION_EXECUTION_SCHEMA_VERSION || typeof record.rfcId !== "string" || typeof record.workOrderId !== "string" || typeof record.baselineCommit !== "string" || !["CREATED", "PREFLIGHT_FAILED", "READY", "RUNNING", "SUCCEEDED", "FAILED", "BLOCKED", "TIMED_OUT", "CANCELLED"].includes(String(record.status)) || !Array.isArray(record.warnings) || !Array.isArray(record.errors)) throw new Error("project-state.json contains an invalid Implementation Execution Record.");
+    if (record.status === "RUNNING") {
+      return { ...(record as unknown as ImplementationExecutionRecord), status: "BLOCKED", warnings: [...record.warnings as string[], "Recovered an untracked RUNNING execution after restart; automatic retry is disabled."] };
+    }
+    return record as unknown as ImplementationExecutionRecord;
   }
 
   private validateRfcHandoff(value: unknown): RfcHandoff {

@@ -31,8 +31,8 @@ describe("Project Control Context and Completion Readiness", () => {
         testEvidence: true, regressionEvidence: true, smokeEvidence: true,
         diffReviewEvidence: true, completionReadiness: true,
       },
-      worker: { workOrderGeneration: false, localExecution: false, cloudExecution: false, resultSubmission: true },
-      git: { commit: false, push: false, pushApproval: false, pullRequest: false, merge: false, release: false },
+      worker: { workOrderGeneration: true, localExecution: true, cloudExecution: false, resultSubmission: true },
+      git: { commit: true, push: false, pushApproval: true, pullRequest: false, merge: false, release: false },
       lifecycle: { automaticCompletion: false, automaticAdvance: false },
     });
   });

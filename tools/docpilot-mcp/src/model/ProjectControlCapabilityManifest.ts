@@ -37,11 +37,11 @@ export function createProjectControlCapabilityManifest(): ProjectControlCapabili
       smokeEvidence: true, diffReviewEvidence: true, completionReadiness: true,
     },
     worker: {
-      workOrderGeneration: false, localExecution: false,
+      workOrderGeneration: true, localExecution: true,
       cloudExecution: false, resultSubmission: true,
     },
     git: {
-      commit: false, push: false, pushApproval: false,
+      commit: true, push: false, pushApproval: true,
       pullRequest: false, merge: false, release: false,
     },
     lifecycle: { automaticCompletion: false, automaticAdvance: false },

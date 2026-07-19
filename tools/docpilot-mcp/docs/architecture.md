@@ -32,6 +32,8 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 ## Repository
 
+v0.12 adds optional `pendingImplementationWorkOrder` and `implementationExecutionRecord` fields to the existing Project Status document. The Repository validates supported schema versions, preserves stable field order, uses the same atomic temporary-file replacement, and loads v0.11 state without migration. An orphaned persisted `RUNNING` state is recovered in memory as `BLOCKED`; reads do not clean, reset, stash, or retry the Git workspace.
+
 The optional additive `pendingRfcHandoff` is validated and serialized through the existing Repository and atomic temporary-file replacement. Missing v0.9 data means no Pending Handoff and causes no migration write. Unsupported schema versions and malformed nested values are rejected. No second file or Registry is introduced.
 
 `ProjectStateRepository` is the persistence boundary. It resolves `project-state.json` from the process working directory by default, reads and parses JSON, validates the complete persisted shape, and returns a defensive copy of `completedRfcs`.
@@ -41,6 +43,14 @@ On load, the repository defaults a missing `releaseReadiness` object or any miss
 The Repository also defaults a missing `lifecycleHistory` to `[]`, validates every event, exact sequential event ID, RFC field, optional rollback `fromRfc`, and ISO timestamp, reconstructs events in stable field order, and serializes the array without reordering it. A rollback event requires a distinct `fromRfc`; other event types reject that field. It owns no event-creation or workflow rules and never rewrites legacy state during a read.
 
 ## Service
+
+`ImplementationOrchestrationService` is an application service alongside `ProjectStatusService`, not a second Project State aggregate. It owns Work Order rules, ordered preflight, controlled verification orchestration, scope/diff validation, policy review, twelve MCP Alpha gates, Handoff mapping, and commit eligibility. It persists through `ProjectStateRepository`; Tools never access persistence or Git directly.
+
+Process and Git details are isolated behind `ProcessRunner`, `CodexWorkerAdapter`, and `GitRepositoryController`. The controlled runner uses `spawn` with `shell:false`, explicit executable/arguments, an in-repository working directory, timeout/cancellation, allowlisted environment, bounded output, and secret masking. Git operations use fixed non-destructive argument arrays and porcelain output. Reset, clean, stash, checkout, amend, push, force-push, and branch manipulation are absent.
+
+The Work Order ID is `${RFC}-${baseline short SHA}`. Preparation fixes HEAD and branch, normalizes scope, and stores at most one current-RFC Work Order. Preflight evaluates a fixed check order: identity/presence/schema, repository/Git/baseline/HEAD/branch/tree, scope/path, Codex availability, result path, command policy, and Pending Handoff absence. Dry-run performs no save or process execution.
+
+Execution separates the implementation pass from MCP review. Worker output is schema-validated but never trusted as final evidence. Verification runs targeted, module, build, regression, and smoke groups deterministically. Repository evidence is compared with authorized scope and Worker-reported paths. Only a passing Alpha result creates a v0.10-compatible Pending Handoff; RFC lifecycle and Planning Synchronization remain untouched.
 
 The Service evaluates Completion Readiness from the validated Pending Handoff rather than trusting its top-level `PASSED` claim. Identity, schema, implementation, five verification fields, alpha blockers/unresolved items, limitations, evidence presence, and push policy are evaluated independently. No build/test command or Git operation is executed. Missing scope paths remain a check warning because only submitted scope evidence is available.
 
@@ -72,7 +82,7 @@ The evaluator predicts `documentationSync=passed` for `current` and `pending` fo
 
 ## Tool
 
-The Project Control Query Boundary contains `loadRfcContext`, `getPendingRfcHandoff`, `getDocPilotProjectControlContext`, and `evaluateRfcCompletionReadiness`; `submitRfcHandoff` is the sole command. All Tools call the Service and strict schemas reject unknown input.
+The Project Control Query Boundary adds `getPendingImplementationWorkOrder`. Controlled commands are `prepareImplementationWorkOrder`, `executePendingImplementationWorkOrder`, and `createImplementationCommit`, alongside `submitRfcHandoff`. All Tools call a Service and strict schemas reject unknown input.
 
 RFC Context/Handoff Tools are read-only `loadRfcContext`, command `submitRfcHandoff`, and read-only `getPendingRfcHandoff`. Their strict schemas preserve the Command/Query boundary and all call the Service.
 
@@ -107,6 +117,8 @@ Resources may read through Services or a dedicated read abstraction.
 
 ## Prompt
 
+Main Planning additively renders persisted Work Order, preflight, Worker, verification, diff, Alpha, commit, and push-boundary status under `Implementation Orchestration`. It reads structured state only; it does not execute or parse Markdown.
+
 Main Planning additively renders a Project Control section containing current RFC, Pending Handoff presence, Completion Readiness, unsupported Worker/commit automation, push policy, and any blockers or warnings. Rendering never consumes Handoff state or advances lifecycle.
 
 Main Planning Markdown additively embeds the deterministic Handoff renderer when a Pending Handoff exists. Structured Handoff remains available through its dedicated query Tool; Planning never parses Markdown or consumes the Handoff.
@@ -125,7 +137,7 @@ Both surfaces also add Planning Synchronization status. Prompt evaluation is ful
 
 `src/index.ts` creates the server, connects `StdioServerTransport`, and reports startup or fatal startup errors on standard error. `src/server.ts` is the composition root: it creates one repository, injects it into one service, constructs the MCP server, and registers every Tool, Resource, and Prompt.
 
-The MCP server identity is currently `docpilot-project-control` at version `0.1.0`. Package metadata and MCP server identity are separate concerns.
+The MCP server identity is `docpilot-project-control` at version `0.12.0`.
 
 The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `generateMainPlanningSync`. The existing `completeCurrentRfc` contract remains a combined completion-and-advancement operation with its required input and response shape for compatibility. Both completion methods use the same Service-owned numeric ordering and duplicate removal. The Repository remains unaware of workflow semantics, and Main Planning synchronization remains an explicit follow-up Tool or Prompt operation.
 
@@ -187,6 +199,8 @@ Every persistence test uses a unique directory created beneath the operating sys
 The current foundation does not configure coverage reporting, launch the stdio entry point as a child process, or exhaustively test every legacy Tool error response and planning-output detail.
 
 ## Current architectural boundaries
+
+v0.12 includes one local controlled Worker, deterministic Work Orders, preflight, bounded process execution, actual Git evidence, verification orchestration, policy review, MCP Alpha evaluation, Pending Handoff generation, and an Alpha-gated explicit-file commit candidate. Push approval is represented as a boundary only; actual push is impossible. There is no cloud/multi-worker queue, retry loop, generalized workflow engine, approval/evidence registry, PR/merge/tag/release/CI integration, or automatic RFC completion/advance.
 
 v0.11 selects read-only Pending Handoff evaluation only: acknowledge, consume, archive, and history remain unsupported. The boundary excludes Codex/OpenAI/process execution, Work Orders, retries/queues, Git/PR/release/CI operations, registries, automatic readiness mutation, RFC completion/advance, and DocPilot Core integration.
 

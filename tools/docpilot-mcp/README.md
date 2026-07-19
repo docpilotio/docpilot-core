@@ -21,11 +21,22 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 - `getDocPilotProjectControlContext` accepts strict empty input and composes the official current project, lifecycle, RFC Context, Pending Handoff summary, Completion Readiness, Capability Manifest, policies, Planning Synchronization, Release Readiness, and explicit evidence limitations. It is read-only.
 - `evaluateRfcCompletionReadiness` optionally accepts the current `rfcId` and evaluates deterministic Alpha Gates without writing state or executing submitted commands.
 
-Project Control Query Boundary consists of `loadRfcContext`, `getPendingRfcHandoff`, `getDocPilotProjectControlContext`, and `evaluateRfcCompletionReadiness`. Its only command is `submitRfcHandoff`. Acknowledge, consume, archive, history, worker execution, Git operations, and lifecycle advancement remain outside the boundary.
+Project Control Query Boundary consists of `loadRfcContext`, `getPendingRfcHandoff`, `getDocPilotProjectControlContext`, `evaluateRfcCompletionReadiness`, and `getPendingImplementationWorkOrder`. Commands are `submitRfcHandoff`, `prepareImplementationWorkOrder`, `executePendingImplementationWorkOrder`, and `createImplementationCommit`. Acknowledge, consume, archive, history, cloud workers, push/PR/release automation, and lifecycle advancement remain outside the boundary.
 
 Completion Readiness uses fixed ordered checks for identity, Handoff presence/schema/RFC, implementation, build, tests, regression, smoke, scope, alpha review, known limitations, and Git push policy. Results are `NOT_READY`, `BLOCKED`, `READY_WITH_WARNINGS`, or `READY`. Submitted evidence is structurally validated but MCP does not independently execute commands or verify Git diffs. Missing allowed paths are disclosed on the Scope check.
 
-The Capability Manifest reports Context loading, Handoff submission/retrieval, structured evidence validation, Completion Readiness, and Worker result submission as supported. It explicitly reports acknowledgement/consumption/history, worker execution, Git/PR/release automation, and automatic lifecycle completion/advance as unsupported.
+The Capability Manifest reports deterministic Work Order generation, controlled local execution, Alpha-gated commit creation, and a push-approval boundary as supported. `git.pushApproval=true` describes the boundary only: no push implementation exists. Cloud execution, push, PR/release automation, and automatic lifecycle completion/advance remain false.
+
+### Controlled Implementation Orchestration
+
+- `prepareImplementationWorkOrder` fixes the current RFC, Git root/branch/HEAD baseline, approved plan, normalized scope, controlled verification commands, result contract, and conservative Git policy. One restart-safe Pending Work Order is allowed per current RFC.
+- `getPendingImplementationWorkOrder` is a strict, deterministic, zero-write query.
+- `executePendingImplementationWorkOrder` accepts optional `{ "dryRun": true }`. Dry-run returns ordered preflight checks plus the deterministic Codex prompt/command without executing or saving. A real run requires a clean working tree, fixed HEAD, valid in-repository paths, an available Codex executable, no Pending Handoff, and valid controlled commands. It records RUNNING before execution and a terminal result afterward.
+- `createImplementationCommit` accepts `{ "message": "..." }` only after MCP Alpha passes and the Work Order permits commits. It stages explicit authorized evidence paths, runs cached diff checks, creates one non-amended commit, and returns `PENDING_APPROVAL`. It never pushes.
+
+`ControlledCommand` separates executable and arguments, fixes an in-repository working directory, requires a timeout, runs without a shell, passes only allowlisted environment variables, limits output, and masks common secret forms. Verification order is targeted tests, module tests, build, regression, then smoke; a required failure skips subsequent commands. Git evidence uses porcelain status and records branch, baseline/HEAD, changed, created, deleted, renamed, staged, and untracked paths. Diff validation blocks forbidden/out-of-scope paths, unauthorized dependency/build configuration changes, unapproved public-API candidates, and disallowed untracked files.
+
+The Worker JSON is treated as a claim. MCP independently validates its schema/RFC/Work Order identity, actual Git evidence, verification results, policy review, and twelve ordered Alpha Gates. Only `PASSED` or `PASSED_WITH_LIMITATIONS` creates the official Pending Handoff; failure remains in the Execution Record. Work Order preparation, execution, Handoff generation, and commit never complete or advance an RFC and never mark Planning synchronized.
 
 ### RFC Context and Handoff
 
@@ -103,6 +114,8 @@ The dashboard also exposes the append-only `lifecycleHistory` array, derived `ro
 
 `pendingRfcHandoff` is an optional additive field in the existing atomically replaced `project-state.json`. Legacy v0.9 files without it remain valid and are not rewritten by reads. When present, schema version `1.0` is required; unsupported future versions are rejected. Submission changes only this field and preserves project status, lifecycle, readiness, and planning state.
 
+`pendingImplementationWorkOrder` and `implementationExecutionRecord` are optional v0.12 additive fields in the same atomic state document. Legacy v0.11 state loads without migration. A persisted orphaned `RUNNING` record is exposed as `BLOCKED` with a recovery warning and is never retried automatically. Work Order/result IDs derive from RFC plus baseline commit; no UUID or timestamp drives orchestration identity.
+
 `RfcExecutionContext` is a non-persistent read model. Because Project State does not store RFC title, goal, detailed scope, acceptance criteria, next RFC, or repository baseline, Context returns conservative empty/optional values and a warning instead of inventing data. Default alpha criteria cover build, focused tests, regression, smoke, scope, and review in stable order.
 
 `RfcHandoff` is the structured source for implementation, verification, alpha review, limitations, architecture/API changes, Git reporting, and planning updates. Markdown is rendered from it and never parsed back into official state. Main Planning Markdown includes a Pending Handoff when present.
@@ -173,9 +186,9 @@ The current suites cover repository serialization and backward compatibility, se
 
 ## Current limitations
 
-- Completion Readiness validates submitted structured evidence but cannot prove that commands ran or that reported file changes match the actual Git diff.
-- Project Control does not acknowledge, consume, or archive Pending Handoffs and does not execute Workers.
-- v0.12 work-order/process/Git automation is intentionally absent.
+- Completion Readiness still evaluates a submitted Handoff, while v0.12 execution independently collects process and Git evidence before generating that Handoff.
+- Project Control does not acknowledge, consume, or archive Pending Handoffs.
+- Local Codex execution depends on a compatible installed CLI. No cloud Worker, retry queue, push, PR, merge, tag, release, or CI/CD execution is implemented.
 
 - Pending Handoff supports one current-RFC item with reject-on-duplicate behavior; consumption, archival history, approval, worker orchestration, Git automation, and automatic RFC advancement are not implemented.
 - Detailed RFC definitions are not persisted, so Context warns about unavailable scope and acceptance metadata.
