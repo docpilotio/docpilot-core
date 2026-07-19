@@ -50,6 +50,7 @@ describe("server registration and existing behavior", () => {
       "markCurrentRfcCompleted",
       "rollbackCurrentRfc",
       "previewCurrentRfcRollback",
+      "getPlanningSynchronizationStatus",
       "generateMainPlanningSync",
       "listCompletedRfcs",
       "updateProjectStatus",

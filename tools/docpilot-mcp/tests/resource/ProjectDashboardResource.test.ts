@@ -61,12 +61,23 @@ describe("ProjectDashboardResource", () => {
         state: "in_progress",
         nextAction: "markCurrentRfcCompleted",
         reason: "Current RFC has not been marked completed.",
+        planningSynchronizationState: "neverSynced",
+        planningSynchronizationRequired: true,
       },
       lifecycleHistory: [],
       rollbackPreview: {
         eligible: false,
         currentRfc: "RFC-0039",
         blockingReason: "Lifecycle history is empty; no previous RFC can be resolved.",
+      },
+      planningSynchronization: {
+        state: "neverSynced",
+        synchronized: false,
+        currentRfc: "RFC-0039",
+        reason: "Main Planning has not been synchronized yet.",
+        recommendedAction: "generateMainPlanningSync",
+        expectedDocumentationSync: "pending",
+        documentationSyncConsistent: true,
       },
     });
     expect(text).toBe(`${JSON.stringify(dashboard, null, 2)}`);
@@ -155,7 +166,7 @@ describe("ProjectDashboardResource", () => {
         rfc: "RFC-0039",
       }),
     ]);
-    expect(markedDashboard.lifecycleGuidance).toEqual({
+    expect(markedDashboard.lifecycleGuidance).toMatchObject({
       state: "completed_waiting_next",
       nextAction: "startNextRfc",
       reason: "Current RFC is completed and the next RFC may now be started.",
@@ -179,7 +190,7 @@ describe("ProjectDashboardResource", () => {
     expect(startedDashboard.releaseReadiness).toEqual(
       createDefaultReleaseReadiness(),
     );
-    expect(startedDashboard.lifecycleGuidance).toEqual({
+    expect(startedDashboard.lifecycleGuidance).toMatchObject({
       state: "in_progress",
       nextAction: "markCurrentRfcCompleted",
       reason: "Current RFC has not been marked completed.",
@@ -255,6 +266,12 @@ describe("ProjectDashboardResource", () => {
       eligible: false,
       currentRfc: "RFC-0039",
       blockingReason: "Repeated rollback is not supported after the latest rollback event.",
+    });
+    expect(dashboard.planningSynchronization).toMatchObject({
+      state: "neverSynced",
+      synchronized: false,
+      latestRelevantEventType: "rollbackCompleted",
+      recommendedAction: "generateMainPlanningSync",
     });
     const repeated = await connection.client.readResource({
       uri: "docpilot://project/dashboard",

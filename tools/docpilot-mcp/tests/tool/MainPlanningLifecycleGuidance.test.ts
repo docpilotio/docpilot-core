@@ -74,10 +74,25 @@ describe("Main Planning lifecycle guidance", () => {
           rfc: "RFC-0039",
         }),
       ],
+      planningSynchronization: {
+        state: "current",
+        synchronized: true,
+        recommendedAction: "none",
+      },
     });
     expect(result.content).toEqual([
       expect.objectContaining({
         text: expect.stringContaining("## RFC Lifecycle"),
+      }),
+    ]);
+    expect(result.content).toEqual([
+      expect.objectContaining({
+        text: expect.stringContaining("## Planning Synchronization"),
+      }),
+    ]);
+    expect(result.content).toEqual([
+      expect.objectContaining({
+        text: expect.stringContaining("- Status: current"),
       }),
     ]);
     expect(result.content).toEqual([
@@ -142,6 +157,8 @@ describe("Main Planning lifecycle guidance", () => {
     expect(text).toContain("Next");
     expect(text).toContain("## Rollback Preview");
     expect(text).toContain("- Eligible: No");
+    expect(text).toContain("## Planning Synchronization");
+    expect(text).toContain("- Status: neverSynced");
     await expect(readFile(temporaryState!.stateFilePath, "utf-8")).resolves.toBe(
       before,
     );
@@ -261,5 +278,39 @@ describe("Main Planning lifecycle guidance", () => {
     expect(text).toContain("## Rollback Preview");
     expect(text).toContain("- Eligible: Yes");
     expect(text).toContain("- Rollback Target: RFC-0039");
+  });
+
+  it("renders stale Planning Synchronization in the read-only Prompt", async () => {
+    temporaryState = await createTemporaryState(
+      createProjectStatus({
+        lifecycleHistory: [
+          {
+            id: "rfc-event-000001", type: "planningSynced", rfc: "RFC-0039",
+            phase: "Phase 1", release: "v0.8.0", timestamp: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "rfc-event-000002", type: "completed", rfc: "RFC-0039",
+            phase: "Phase 1", release: "v0.8.0", timestamp: "2026-01-02T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    const server = new McpServer({ name: "planning-test", version: "0.0.0" });
+    registerGenerateMainPlanningSyncPrompt(server, temporaryState.service);
+    const connection = await connectTestClient(server);
+    closeClient = connection.close;
+    const before = await readFile(temporaryState.stateFilePath, "utf-8");
+
+    const result = await connection.client.getPrompt({
+      name: "generateMainPlanningSync",
+      arguments: {},
+    });
+    const content = result.messages[0]?.content;
+    const text = content !== undefined && "text" in content ? content.text : "";
+
+    expect(text).toContain("## Planning Synchronization");
+    expect(text).toContain("- Status: stale");
+    expect(text).toContain("- Recommended Action: generateMainPlanningSync");
+    await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(before);
   });
 });

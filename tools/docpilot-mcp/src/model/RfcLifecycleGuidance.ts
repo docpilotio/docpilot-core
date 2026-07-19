@@ -12,4 +12,6 @@ export type RfcLifecycleGuidance = {
   state: RfcLifecycleState;
   nextAction: RfcLifecycleAction;
   reason: string;
+  planningSynchronizationState?: import("./PlanningSynchronizationStatus.js").PlanningSynchronizationState;
+  planningSynchronizationRequired?: boolean;
 };

@@ -53,6 +53,19 @@ Because `completeCurrentRfc` advances directly to a new current RFC without stor
 ### Planning
 
 - `generateMainPlanningSync` generates a Markdown Main Planning status summary and structured status data.
+- `getPlanningSynchronizationStatus` accepts strict empty input (`{}`) and read-only evaluates whether lifecycle changes are covered by the latest `planningSynced` event.
+
+### Planning Synchronization Status
+
+Planning status is derived from validated lifecycle history in persisted append order; timestamps are never compared. `started`, `completed`, and `rollbackCompleted` are planning-relevant changes. A later `planningSynced` covers those changes without itself making Planning stale.
+
+- `neverSynced`: no valid `planningSynced` event exists; the recommended action is `generateMainPlanningSync`.
+- `current`: no relevant transition occurs after the latest sync; the recommended action is `none`.
+- `stale`: a relevant transition occurs after the latest sync; the recommended action is `generateMainPlanningSync`. Rollback uses a dedicated stable reason.
+
+Evaluation creates no timestamp, performs no save, appends no event, consumes no event ID, and does not mutate Project Status. The derived expected `documentationSync` is `passed` for `current` and `pending` otherwise. The result reports whether persisted readiness agrees and supplies a deterministic mismatch reason; it never corrects readiness automatically. Lifecycle Guidance adds synchronization state and required status separately while retaining its primary RFC workflow action.
+
+The legacy combined completion workflow has no transition event. For compatibility, an explicit `planningSynced` event matching persisted `currentRfc` may re-anchor planning evaluation after that workflow; rollback resolution remains strict. Future work may automatically maintain Documentation Sync and use this status in release gates.
 
 ## Available Resources
 
@@ -61,7 +74,7 @@ Because `completeCurrentRfc` advances directly to a new current RFC without stor
 
 The `releaseReadiness` object contains `coreBuild`, `coreTests`, `cli`, `incremental`, `reviewWorkflow`, `architectureSamplesValidation`, `documentationSync`, and `releaseCandidate`. Each field is persisted as `pending`, `passed`, or `failed`.
 
-The dashboard also exposes the append-only `lifecycleHistory` array in persisted order and a derived `rollbackPreview`. Repeated dashboard reads do not save state or append events.
+The dashboard also exposes the append-only `lifecycleHistory` array, derived `rollbackPreview`, and complete `planningSynchronization` status. Repeated dashboard reads do not save state or append events.
 
 ## Available Prompts
 
@@ -136,6 +149,7 @@ The current suites cover repository serialization and backward compatibility, se
 ## Current limitations
 
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
+- Planning status detects Documentation Sync mismatch but does not automatically update readiness or enforce a release gate.
 - The legacy `completeCurrentRfc` operation remains supported, so clients can still bypass the preferred split lifecycle.
 - Lifecycle guidance is derived only from current status; it does not track transition history or distinguish legacy advancement from ordinary in-progress work.
 - Rollback supports only the immediately previous lifecycle transition; arbitrary targets, consecutive rollback, and generalized replay are not implemented.

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { ProjectStatusService } from "../service/ProjectStatusService.js";
 import { rollbackPreviewSchema } from "./PreviewCurrentRfcRollbackTool.js";
+import { planningSynchronizationStatusSchema } from "./GetPlanningSynchronizationStatusTool.js";
 
 export function registerGenerateMainPlanningSyncTool(
   server: McpServer,
@@ -35,6 +36,12 @@ export function registerGenerateMainPlanningSyncTool(
             "manualReview",
           ]),
           reason: z.string(),
+          planningSynchronizationState: z.enum([
+            "neverSynced",
+            "current",
+            "stale",
+          ]).optional(),
+          planningSynchronizationRequired: z.boolean().optional(),
         }),
         lifecycleHistory: z.array(
           z.object({
@@ -53,6 +60,7 @@ export function registerGenerateMainPlanningSyncTool(
           }),
         ),
         rollbackPreview: rollbackPreviewSchema,
+        planningSynchronization: planningSynchronizationStatusSchema,
       },
     },
     async () => {

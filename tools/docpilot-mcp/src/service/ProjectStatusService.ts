@@ -5,6 +5,10 @@ import type {
 } from "../model/ProjectStatus.js";
 import { createDefaultReleaseReadiness } from "../model/ProjectStatus.js";
 import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
+import type {
+  PlanningSynchronizationStatus,
+  PlanningSynchronizationState,
+} from "../model/PlanningSynchronizationStatus.js";
 import type { RfcRollbackPreview } from "../model/RfcRollbackPreview.js";
 import type {
   RfcLifecycleEvent,
@@ -52,6 +56,7 @@ export type MainPlanningSyncResult = {
   lifecycleGuidance: RfcLifecycleGuidance;
   lifecycleHistory: readonly RfcLifecycleEvent[];
   rollbackPreview: RfcRollbackPreview;
+  planningSynchronization: PlanningSynchronizationStatus;
 };
 
 export type UpdateProjectStatusRequest = {
@@ -91,6 +96,17 @@ type RfcTransition = {
   to: ActiveRfcContext;
 };
 
+type LifecycleAnalysis = {
+  active?: ActiveRfcContext;
+  latestTransition?: RfcTransition;
+};
+
+const PLANNING_RELEVANT_EVENT_TYPES: readonly RfcLifecycleEventType[] = [
+  "started",
+  "completed",
+  "rollbackCompleted",
+];
+
 export class ProjectStatusService {
   public constructor(
     private readonly repository: ProjectStateRepository,
@@ -106,6 +122,14 @@ export class ProjectStatusService {
     const currentStatus = status ?? await this.repository.load();
 
     return this.deriveRfcLifecycleGuidance(currentStatus);
+  }
+
+  public async getPlanningSynchronizationStatus(
+    status?: ProjectStatus,
+  ): Promise<PlanningSynchronizationStatus> {
+    const currentStatus = status ?? await this.repository.load();
+
+    return this.derivePlanningSynchronizationStatus(currentStatus);
   }
 
   public async getRfcLifecycleHistory(): Promise<readonly RfcLifecycleEvent[]> {
@@ -361,6 +385,8 @@ export class ProjectStatusService {
 
     const lifecycleGuidance = this.deriveRfcLifecycleGuidance(updatedStatus);
     const rollbackPreview = await this.previewCurrentRfcRollback(updatedStatus);
+    const planningSynchronization =
+      this.derivePlanningSynchronizationStatus(updatedStatus);
     const completedRfcLines = updatedStatus.completedRfcs.length > 0
       ? updatedStatus.completedRfcs.map((rfc) => `- ${rfc}`)
       : ["- None"];
@@ -409,6 +435,10 @@ export class ProjectStatusService {
       "",
       ...this.formatRollbackPreview(rollbackPreview),
       "",
+      "## Planning Synchronization",
+      "",
+      ...this.formatPlanningSynchronization(planningSynchronization),
+      "",
       "## Release Readiness",
       "",
       ...readinessItems.map((item) => `- ${item}: ⏳`),
@@ -425,6 +455,7 @@ export class ProjectStatusService {
       lifecycleGuidance,
       lifecycleHistory: updatedStatus.lifecycleHistory,
       rollbackPreview,
+      planningSynchronization,
     };
   }
 
@@ -529,11 +560,27 @@ export class ProjectStatusService {
   private deriveRfcLifecycleGuidance(
     status: ProjectStatus,
   ): RfcLifecycleGuidance {
+    const planningFields: Pick<
+      RfcLifecycleGuidance,
+      "planningSynchronizationState" | "planningSynchronizationRequired"
+    > = {};
+
+    try {
+      const planningSynchronization =
+        this.derivePlanningSynchronizationStatus(status);
+      planningFields.planningSynchronizationState = planningSynchronization.state;
+      planningFields.planningSynchronizationRequired =
+        !planningSynchronization.synchronized;
+    } catch {
+      // Primary lifecycle guidance retains its established inconsistent result.
+    }
+
     if (!this.isValidRfcIdentifier(status.currentRfc)) {
       return {
         state: "inconsistent",
         nextAction: "manualReview",
         reason: "Current RFC does not use the required RFC-0000 format.",
+        ...planningFields,
       };
     }
 
@@ -542,6 +589,7 @@ export class ProjectStatusService {
         state: "inconsistent",
         nextAction: "manualReview",
         reason: "Completed RFC history contains a malformed RFC identifier.",
+        ...planningFields,
       };
     }
 
@@ -550,6 +598,7 @@ export class ProjectStatusService {
         state: "inconsistent",
         nextAction: "manualReview",
         reason: "Completed RFC history contains duplicate RFC identifiers.",
+        ...planningFields,
       };
     }
 
@@ -558,6 +607,7 @@ export class ProjectStatusService {
         state: "completed_waiting_next",
         nextAction: "startNextRfc",
         reason: "Current RFC is completed and the next RFC may now be started.",
+        ...planningFields,
       };
     }
 
@@ -565,6 +615,71 @@ export class ProjectStatusService {
       state: "in_progress",
       nextAction: "markCurrentRfcCompleted",
       reason: "Current RFC has not been marked completed.",
+      ...planningFields,
+    };
+  }
+
+  private derivePlanningSynchronizationStatus(
+    status: ProjectStatus,
+  ): PlanningSynchronizationStatus {
+    this.analyzeLifecycleHistory(status, true);
+
+    const latestPlanningSync = [...status.lifecycleHistory]
+      .reverse()
+      .find(({ type }) => type === "planningSynced");
+    const latestRelevant = [...status.lifecycleHistory]
+      .reverse()
+      .find(({ type }) => PLANNING_RELEVANT_EVENT_TYPES.includes(type));
+    let state: PlanningSynchronizationState;
+    let reason: string;
+
+    if (latestPlanningSync === undefined) {
+      state = "neverSynced";
+      reason = "Main Planning has not been synchronized yet.";
+    } else {
+      const syncIndex = status.lifecycleHistory.indexOf(latestPlanningSync);
+      const relevantIndex = latestRelevant === undefined
+        ? -1
+        : status.lifecycleHistory.indexOf(latestRelevant);
+
+      if (
+        relevantIndex > syncIndex ||
+        latestPlanningSync.rfc !== status.currentRfc
+      ) {
+        state = "stale";
+        reason = latestRelevant?.type === "rollbackCompleted"
+          ? "RFC rollback occurred after the latest Main Planning synchronization."
+          : "RFC lifecycle changed after the latest Main Planning synchronization.";
+      } else {
+        state = "current";
+        reason = "Main Planning reflects the latest lifecycle state.";
+      }
+    }
+
+    const expectedDocumentationSync = state === "current" ? "passed" : "pending";
+    const documentationSyncConsistent =
+      status.releaseReadiness.documentationSync === expectedDocumentationSync;
+
+    return {
+      state,
+      synchronized: state === "current",
+      currentRfc: status.currentRfc,
+      ...(latestPlanningSync === undefined ? {} : {
+        lastPlanningSyncEventId: latestPlanningSync.id,
+        lastPlanningSyncRfc: latestPlanningSync.rfc,
+      }),
+      ...(latestRelevant === undefined ? {} : {
+        latestRelevantEventId: latestRelevant.id,
+        latestRelevantEventType: latestRelevant.type,
+      }),
+      reason,
+      recommendedAction: state === "current" ? "none" : "generateMainPlanningSync",
+      expectedDocumentationSync,
+      documentationSyncConsistent,
+      ...(documentationSyncConsistent ? {} : {
+        documentationSyncReason:
+          `Documentation Sync is ${status.releaseReadiness.documentationSync}, but expected ${expectedDocumentationSync} while Main Planning is ${state}.`,
+      }),
     };
   }
 
@@ -619,13 +734,12 @@ export class ProjectStatusService {
     return [...status.lifecycleHistory, event];
   }
 
-  private resolveRollbackTransition(status: ProjectStatus): ActiveRfcContext {
+  private analyzeLifecycleHistory(
+    status: ProjectStatus,
+    allowLegacyPlanningReanchor: boolean = false,
+  ): LifecycleAnalysis {
     if (!this.isValidRfcIdentifier(status.currentRfc)) {
       throw new Error("The current RFC must use the exact format RFC-0000.");
-    }
-
-    if (status.lifecycleHistory.length === 0) {
-      throw new Error("Lifecycle history is empty; no previous RFC can be resolved.");
     }
 
     let active: ActiveRfcContext | undefined;
@@ -693,6 +807,16 @@ export class ProjectStatusService {
         continue;
       }
 
+      if (
+        event.type === "planningSynced" &&
+        event.rfc !== active.rfc &&
+        allowLegacyPlanningReanchor &&
+        event.rfc === status.currentRfc
+      ) {
+        active = eventContext;
+        continue;
+      }
+
       if (event.rfc !== active.rfc) {
         throw new Error(
           `Lifecycle history conflicts with the active RFC at index ${index}.`,
@@ -702,11 +826,28 @@ export class ProjectStatusService {
       active = eventContext;
     }
 
-    if (active?.rfc !== status.currentRfc) {
+    if (
+      active !== undefined &&
+      active.rfc !== status.currentRfc &&
+      !allowLegacyPlanningReanchor
+    ) {
       throw new Error(
         "Current project state conflicts with lifecycle history.",
       );
     }
+
+    return {
+      ...(active === undefined ? {} : { active }),
+      ...(latestTransition === undefined ? {} : { latestTransition }),
+    };
+  }
+
+  private resolveRollbackTransition(status: ProjectStatus): ActiveRfcContext {
+    if (status.lifecycleHistory.length === 0) {
+      throw new Error("Lifecycle history is empty; no previous RFC can be resolved.");
+    }
+
+    const { latestTransition } = this.analyzeLifecycleHistory(status);
 
     if (latestTransition === undefined) {
       throw new Error("Lifecycle history does not contain a previous RFC transition.");
@@ -760,6 +901,21 @@ export class ProjectStatusService {
       `- Rollback Target: ${preview.targetRfc}`,
       `- Restored Phase: ${preview.targetPhase}`,
       `- Restored Release: ${preview.targetRelease}`,
+    ];
+  }
+
+  private formatPlanningSynchronization(
+    status: PlanningSynchronizationStatus,
+  ): string[] {
+    return [
+      `- Status: ${status.state}`,
+      `- Current RFC: ${status.currentRfc}`,
+      ...(status.lastPlanningSyncEventId === undefined
+        ? []
+        : [`- Last Planning Sync: ${status.lastPlanningSyncEventId}`]),
+      `- Reason: ${status.reason}`,
+      `- Documentation Sync: ${status.documentationSyncConsistent ? "Consistent" : "Inconsistent"}`,
+      `- Recommended Action: ${status.recommendedAction}`,
     ];
   }
 }

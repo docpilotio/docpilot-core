@@ -28,6 +28,8 @@ export function registerGenerateMainPlanningSyncPrompt(
       const status = await service.getProjectStatus();
       const lifecycleGuidance = await service.getRfcLifecycleGuidance(status);
       const rollbackPreview = await service.previewCurrentRfcRollback(status);
+      const planningSynchronization =
+        await service.getPlanningSynchronizationStatus(status);
 
       const basePromptText = [
         "다음 DocPilot 프로젝트 상태를 Main Planning에 동기화해 주세요.",
@@ -71,6 +73,14 @@ export function registerGenerateMainPlanningSyncPrompt(
               `- Restored Release: ${rollbackPreview.targetRelease}`,
             ]
           : [`- Reason: ${rollbackPreview.blockingReason}`]),
+        "",
+        "## Planning Synchronization",
+        "",
+        `- Status: ${planningSynchronization.state}`,
+        `- Current RFC: ${planningSynchronization.currentRfc}`,
+        `- Reason: ${planningSynchronization.reason}`,
+        `- Documentation Sync: ${planningSynchronization.documentationSyncConsistent ? "Consistent" : "Inconsistent"}`,
+        `- Recommended Action: ${planningSynchronization.recommendedAction}`,
       ].join("\n");
 
       return {

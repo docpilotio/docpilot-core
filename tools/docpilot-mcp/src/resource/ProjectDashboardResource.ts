@@ -4,6 +4,7 @@ import type { ReleaseReadiness } from "../model/ProjectStatus.js";
 import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
 import type { RfcLifecycleEvent } from "../model/RfcLifecycleEvent.js";
 import type { RfcRollbackPreview } from "../model/RfcRollbackPreview.js";
+import type { PlanningSynchronizationStatus } from "../model/PlanningSynchronizationStatus.js";
 import { ProjectStatusService } from "../service/ProjectStatusService.js";
 
 const PROJECT_DASHBOARD_URI = "docpilot://project/dashboard";
@@ -19,6 +20,7 @@ type ProjectDashboard = {
   lifecycleGuidance: RfcLifecycleGuidance;
   lifecycleHistory: readonly RfcLifecycleEvent[];
   rollbackPreview: RfcRollbackPreview;
+  planningSynchronization: PlanningSynchronizationStatus;
 };
 
 export function registerProjectDashboardResource(
@@ -37,6 +39,8 @@ export function registerProjectDashboardResource(
       const status = await service.getProjectStatus();
       const lifecycleGuidance = await service.getRfcLifecycleGuidance(status);
       const rollbackPreview = await service.previewCurrentRfcRollback(status);
+      const planningSynchronization =
+        await service.getPlanningSynchronizationStatus(status);
       const dashboard: ProjectDashboard = {
         project: status.project,
         phase: status.phase,
@@ -48,6 +52,7 @@ export function registerProjectDashboardResource(
         lifecycleGuidance,
         lifecycleHistory: status.lifecycleHistory,
         rollbackPreview,
+        planningSynchronization,
       };
 
       return {

@@ -32,7 +32,7 @@ describe("ProjectStatusService", () => {
 
     await expect(
       temporaryState.service.getRfcLifecycleGuidance(),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       state: "in_progress",
       nextAction: "markCurrentRfcCompleted",
       reason: "Current RFC has not been marked completed.",
@@ -48,7 +48,7 @@ describe("ProjectStatusService", () => {
 
     await expect(
       temporaryState.service.getRfcLifecycleGuidance(),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       state: "completed_waiting_next",
       nextAction: "startNextRfc",
       reason: "Current RFC is completed and the next RFC may now be started.",
@@ -78,7 +78,7 @@ describe("ProjectStatusService", () => {
 
       await expect(
         temporaryState.service.getRfcLifecycleGuidance(),
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         state: "inconsistent",
         nextAction: "manualReview",
         reason,
