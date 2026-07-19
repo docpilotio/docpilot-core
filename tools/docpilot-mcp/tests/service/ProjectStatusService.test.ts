@@ -98,7 +98,7 @@ describe("ProjectStatusService", () => {
     await expect(temporaryState.repository.load()).resolves.toEqual(updated);
   });
 
-  it("completes the current RFC without disturbing completed ordering", async () => {
+  it("preserves the legacy combined complete-and-advance behavior", async () => {
     temporaryState = await createTemporaryState(createProjectStatus());
 
     const result = await temporaryState.service.completeCurrentRfc("RFC-0040");
@@ -111,9 +111,12 @@ describe("ProjectStatusService", () => {
     const persisted = await temporaryState.repository.load();
     expect(persisted.currentRfc).toBe("RFC-0040");
     expect(persisted.completedRfcs).toEqual(result.completedRfcs);
+    expect(persisted.releaseReadiness).toEqual(
+      createProjectStatus().releaseReadiness,
+    );
   });
 
-  it("does not duplicate an already completed RFC", async () => {
+  it("canonicalizes completed RFC ordering without duplicates", async () => {
     temporaryState = await createTemporaryState(
       createProjectStatus({
         completedRfcs: ["RFC-0037", "RFC-0039", "RFC-0038"],
@@ -122,11 +125,91 @@ describe("ProjectStatusService", () => {
 
     const result = await temporaryState.service.completeCurrentRfc("RFC-0040");
 
-    expect(result.completedRfcs).toEqual([
-      "RFC-0037",
-      "RFC-0039",
-      "RFC-0038",
-    ]);
+    expect(result.completedRfcs).toEqual(["RFC-0037", "RFC-0038", "RFC-0039"]);
+  });
+
+  it("marks the current RFC completed with preserved state and one save", async () => {
+    const status = createProjectStatus({
+      completedRfcs: ["RFC-0038", "RFC-0037", "RFC-0037"],
+      releaseReadiness: {
+        ...createDefaultReleaseReadiness(),
+        coreBuild: "passed",
+        coreTests: "failed",
+        releaseCandidate: "passed",
+      },
+    });
+    temporaryState = await createTemporaryState(status);
+    const saveSpy = vi.spyOn(temporaryState.repository, "save");
+
+    const updated = await temporaryState.service.markCurrentRfcCompleted();
+
+    expect(updated).toEqual({
+      ...status,
+      currentRfc: status.currentRfc,
+      phase: status.phase,
+      release: status.release,
+      completedRfcs: ["RFC-0037", "RFC-0038", "RFC-0039"],
+      releaseReadiness: status.releaseReadiness,
+    });
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    expect(saveSpy).toHaveBeenCalledWith(updated);
+    await expect(temporaryState.repository.load()).resolves.toEqual(updated);
+  });
+
+  it.each([
+    [
+      "an already completed current RFC",
+      createProjectStatus({ completedRfcs: ["RFC-0039"] }),
+      "The current RFC is already completed.",
+    ],
+    [
+      "a malformed current RFC",
+      createProjectStatus({ currentRfc: "RFC-39" }),
+      "The current RFC must use the exact format RFC-0000.",
+    ],
+  ])(
+    "rejects %s without modifying persistence",
+    async (_caseName, status, errorMessage) => {
+      temporaryState = await createTemporaryState(status);
+      const before = await readFile(temporaryState.stateFilePath, "utf-8");
+      const saveSpy = vi.spyOn(temporaryState.repository, "save");
+
+      await expect(
+        temporaryState.service.markCurrentRfcCompleted(),
+      ).rejects.toThrow(errorMessage);
+
+      expect(saveSpy).not.toHaveBeenCalled();
+      await expect(
+        readFile(temporaryState.stateFilePath, "utf-8"),
+      ).resolves.toBe(before);
+    },
+  );
+
+  it("supports the preferred mark-then-start lifecycle", async () => {
+    const readiness = {
+      ...createDefaultReleaseReadiness(),
+      coreBuild: "passed" as const,
+      documentationSync: "failed" as const,
+    };
+    temporaryState = await createTemporaryState(
+      createProjectStatus({ releaseReadiness: readiness }),
+    );
+
+    await expect(
+      temporaryState.service.startNextRfc({ nextRfc: "RFC-0040" }),
+    ).rejects.toThrow("must be completed");
+    const marked = await temporaryState.service.markCurrentRfcCompleted();
+    expect(marked.currentRfc).toBe("RFC-0039");
+    expect(marked.releaseReadiness).toEqual(readiness);
+
+    const started = await temporaryState.service.startNextRfc({
+      nextRfc: "RFC-0040",
+    });
+    expect(started.currentRfc).toBe("RFC-0040");
+    expect(started.completedRfcs).toEqual(marked.completedRfcs);
+    expect(started.releaseReadiness).toEqual(
+      createDefaultReleaseReadiness(),
+    );
   });
 
   it("starts and persists a valid next RFC with one final save", async () => {

@@ -30,6 +30,8 @@ On load, the repository defaults a missing `releaseReadiness` object or any miss
 
 In particular, the service trims mutable project-status inputs, rejects empty phase or release values, requires RFC identifiers to match `RFC-0000`, requires at least one field for status updates, prevents completion into the same RFC, and avoids adding a duplicate completed RFC. For Release Readiness updates, it rejects empty updates, unknown fields, and values outside `pending`, `passed`, and `failed` before loading or saving state, then preserves all omitted readiness fields.
 
+`markCurrentRfcCompleted` is the mark-only Service transition. It validates the persisted current RFC, explicitly rejects duplicate completion, adds it to a numerically sorted and deduplicated completed history, preserves every other status field including Release Readiness, and issues one Repository save. The Tool exposes this method through a strict empty input schema.
+
 `startNextRfc` is a focused Service-owned transition. It accepts an exact, untrimmed `RFC-[0-9]{4}` identifier plus optional non-empty phase and release updates. Before persistence, the Service verifies that the next RFC differs from the current RFC, is numerically greater, is absent from completed history, and follows a current RFC already present in completed history. It constructs one complete state, preserves completed ordering, resets Release Readiness with the model default, and performs one Repository save. Validation failures do not write state.
 
 ## Tool
@@ -40,8 +42,7 @@ Current Tools are grouped as follows:
 
 - Project Status: `getProjectStatus`, `getCurrentRfc`, `updateProjectStatus`, and `listCompletedRfcs`.
 - Release Readiness: `updateReleaseReadiness`, which accepts `{ "updates": { ... } }` and persists one or more validated readiness fields.
-- RFC Workflow: `completeCurrentRfc`.
-- RFC Workflow: `startNextRfc`, which accepts `nextRfc` and optional `phase` and `release` fields.
+- RFC Workflow: `markCurrentRfcCompleted`, `startNextRfc`, and the legacy combined `completeCurrentRfc` shortcut.
 - Planning: `generateMainPlanningSync`.
 
 All Tools call `ProjectStatusService`; none accesses `ProjectStateRepository` directly.
@@ -66,7 +67,7 @@ Resources may read through Services or a dedicated read abstraction.
 
 The MCP server identity is currently `docpilot-project-control` at version `0.1.0`. Package metadata and MCP server identity are separate concerns.
 
-The existing `completeCurrentRfc` contract remains a combined completion-and-advancement operation for compatibility. `startNextRfc` is a separate stricter operation for states whose current RFC is already recorded as completed. Neither workflow invokes the Main Planning Tool or Prompt; planning synchronization remains an explicit follow-up operation.
+The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `generateMainPlanningSync`. The existing `completeCurrentRfc` contract remains a combined completion-and-advancement operation with its required input and response shape for compatibility. Both completion methods use the same Service-owned numeric ordering and duplicate removal. The Repository remains unaware of workflow semantics, and Main Planning synchronization remains an explicit follow-up Tool or Prompt operation.
 
 ## `project-state.json` persistence
 
@@ -128,4 +129,4 @@ The current foundation does not configure coverage reporting, launch the stdio e
 
 The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.
 
-The current boundary includes manually managed persistent Release Readiness and explicit next-RFC startup but excludes a mark-only replacement for the legacy combined completion workflow, automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.
+The current boundary includes mark-only completion, explicit next-RFC startup, the backward-compatible combined completion shortcut, and manually managed persistent Release Readiness. It excludes automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.

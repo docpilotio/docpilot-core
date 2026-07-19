@@ -26,12 +26,15 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 
 ### RFC Workflow
 
-- `completeCurrentRfc` records the current RFC as completed and advances to a supplied next RFC.
+- `markCurrentRfcCompleted` accepts strict empty input (`{}`), marks the current RFC completed, and leaves the current RFC, phase, release, and Release Readiness unchanged.
 - `startNextRfc` starts an explicitly supplied later RFC, preserves completed history, optionally updates `phase` and `release`, and resets all Release Readiness fields to `pending`. Input is `{ "nextRfc": "RFC-0045", "phase"?: "...", "release"?: "..." }`; no other fields are accepted.
+- `completeCurrentRfc` is the legacy shortcut that records the current RFC and advances immediately to its required `nextRfc`.
 
-`startNextRfc` requires the exact `RFC-[0-9]{4}` format with no surrounding whitespace. The next RFC must differ from and be numerically greater than the current RFC, must not already be completed, and the current RFC must already appear in completed history. Optional phase and release values must be non-empty. The Service validates the complete transition and sends one final state to the Repository for persistence.
+The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `generateMainPlanningSync`. Marking validates the current RFC against exact `RFC-[0-9]{4}` syntax, explicitly rejects an already completed RFC, numerically orders and deduplicates completed history, and performs one Repository save. It does not reset readiness or invoke planning.
 
-For backward compatibility, `completeCurrentRfc` retains its existing combined behavior: it records the current RFC and immediately advances to its required `nextRfc`. This means its newly current RFC is not yet eligible for `startNextRfc` until that current RFC is represented as completed in persisted state. The two Tools are not silently chained, and starting an RFC does not generate or write Main Planning sync output; planning remains a separate Tool or Prompt operation.
+`startNextRfc` requires the exact `RFC-[0-9]{4}` format with no surrounding whitespace. The next RFC must differ from and be numerically greater than the current RFC, must not already be completed, and the current RFC must already appear in completed history. Optional phase and release values must be non-empty. The Service validates each transition and sends one complete state to the Repository for persistence.
+
+For backward compatibility, `completeCurrentRfc` retains its existing input, response, and combined complete-and-advance behavior. Completed history produced by either completion method is canonicalized into numeric RFC order without duplicates. No workflow automatically generates or writes Main Planning sync output; planning remains a separate Tool or Prompt operation.
 
 ### Planning
 
@@ -97,7 +100,7 @@ The current suites cover repository serialization and backward compatibility, se
 ## Current limitations
 
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
-- The legacy `completeCurrentRfc` operation combines completion and advancement; a future version may introduce a mark-only completion workflow before making `startNextRfc` the standard advancement path.
+- The legacy `completeCurrentRfc` operation remains supported, so clients can still bypass the preferred split lifecycle.
 - Documentation operations are not implemented yet.
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.

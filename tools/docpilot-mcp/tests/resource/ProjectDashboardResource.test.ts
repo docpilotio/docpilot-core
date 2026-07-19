@@ -104,4 +104,57 @@ describe("ProjectDashboardResource", () => {
       createDefaultReleaseReadiness(),
     );
   });
+
+  it("reflects mark-only completion before the next RFC starts", async () => {
+    const readiness = {
+      ...createDefaultReleaseReadiness(),
+      coreBuild: "passed" as const,
+      releaseCandidate: "failed" as const,
+    };
+    temporaryState = await createTemporaryState(
+      createProjectStatus({ releaseReadiness: readiness }),
+    );
+    await temporaryState.service.markCurrentRfcCompleted();
+    const server = new McpServer({ name: "resource-test", version: "0.0.0" });
+    registerProjectDashboardResource(server, temporaryState.service);
+    const connection = await connectTestClient(server);
+    closeClient = connection.close;
+
+    const markedResult = await connection.client.readResource({
+      uri: "docpilot://project/dashboard",
+    });
+    const markedContent = markedResult.contents[0];
+    const markedText =
+      markedContent !== undefined && "text" in markedContent
+        ? markedContent.text
+        : "";
+    const markedDashboard = JSON.parse(markedText) as Record<string, unknown>;
+
+    expect(markedDashboard.currentRfc).toBe("RFC-0039");
+    expect(markedDashboard.completedRfcs).toEqual([
+      "RFC-0037",
+      "RFC-0038",
+      "RFC-0039",
+    ]);
+    expect(markedDashboard.releaseReadiness).toEqual(readiness);
+
+    await temporaryState.service.startNextRfc({ nextRfc: "RFC-0040" });
+    const startedResult = await connection.client.readResource({
+      uri: "docpilot://project/dashboard",
+    });
+    const startedContent = startedResult.contents[0];
+    const startedText =
+      startedContent !== undefined && "text" in startedContent
+        ? startedContent.text
+        : "";
+    const startedDashboard = JSON.parse(startedText) as Record<string, unknown>;
+
+    expect(startedDashboard.currentRfc).toBe("RFC-0040");
+    expect(startedDashboard.completedRfcs).toEqual(
+      markedDashboard.completedRfcs,
+    );
+    expect(startedDashboard.releaseReadiness).toEqual(
+      createDefaultReleaseReadiness(),
+    );
+  });
 });

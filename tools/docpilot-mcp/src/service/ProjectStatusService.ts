@@ -79,6 +79,30 @@ export class ProjectStatusService {
     return this.repository.load();
   }
 
+  public async markCurrentRfcCompleted(): Promise<ProjectStatus> {
+    const status = await this.repository.load();
+
+    if (!this.isValidRfcIdentifier(status.currentRfc)) {
+      throw new Error("The current RFC must use the exact format RFC-0000.");
+    }
+
+    if (status.completedRfcs.includes(status.currentRfc)) {
+      throw new Error("The current RFC is already completed.");
+    }
+
+    const updatedStatus: ProjectStatus = {
+      ...status,
+      completedRfcs: this.addCompletedRfcDeterministically(
+        status.completedRfcs,
+        status.currentRfc,
+      ),
+    };
+
+    await this.repository.save(updatedStatus);
+
+    return updatedStatus;
+  }
+
   public async startNextRfc(
     input: StartNextRfcRequest,
   ): Promise<ProjectStatus> {
@@ -276,9 +300,10 @@ export class ProjectStatusService {
       );
     }
 
-    const completedRfcs = status.completedRfcs.includes(completedRfc)
-      ? [...status.completedRfcs]
-      : [...status.completedRfcs, completedRfc];
+    const completedRfcs = this.addCompletedRfcDeterministically(
+      status.completedRfcs,
+      completedRfc,
+    );
 
     const updatedStatus: ProjectStatus = {
       ...status,
@@ -349,5 +374,33 @@ export class ProjectStatusService {
     value: unknown,
   ): value is ReleaseReadinessState {
     return value === "pending" || value === "passed" || value === "failed";
+  }
+
+  private isValidRfcIdentifier(value: string): boolean {
+    return /^RFC-[0-9]{4}$/.test(value);
+  }
+
+  private addCompletedRfcDeterministically(
+    completedRfcs: string[],
+    completedRfc: string,
+  ): string[] {
+    return [...new Set([...completedRfcs, completedRfc])].sort((left, right) => {
+      const leftMatch = /^RFC-([0-9]{4})$/.exec(left);
+      const rightMatch = /^RFC-([0-9]{4})$/.exec(right);
+
+      if (leftMatch !== null && rightMatch !== null) {
+        return Number(leftMatch[1]) - Number(rightMatch[1]);
+      }
+
+      if (leftMatch !== null) {
+        return -1;
+      }
+
+      if (rightMatch !== null) {
+        return 1;
+      }
+
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
   }
 }

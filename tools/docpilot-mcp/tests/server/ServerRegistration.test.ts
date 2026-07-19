@@ -47,6 +47,7 @@ describe("server registration and existing behavior", () => {
       "getProjectStatus",
       "getCurrentRfc",
       "completeCurrentRfc",
+      "markCurrentRfcCompleted",
       "generateMainPlanningSync",
       "listCompletedRfcs",
       "updateProjectStatus",
@@ -82,6 +83,11 @@ describe("server registration and existing behavior", () => {
       const result = await connection.client.callTool({ name, arguments: {} });
       expect(result.isError).not.toBe(true);
     }
+    const missingCompletionInput = await connection.client.callTool({
+      name: "completeCurrentRfc",
+      arguments: {},
+    });
+    expect(missingCompletionInput.isError).toBe(true);
     const completion = await connection.client.callTool({
       name: "completeCurrentRfc",
       arguments: { nextRfc: "RFC-0040" },
