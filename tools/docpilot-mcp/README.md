@@ -36,6 +36,18 @@ The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `gen
 
 For backward compatibility, `completeCurrentRfc` retains its existing input, response, and combined complete-and-advance behavior. Completed history produced by either completion method is canonicalized into numeric RFC order without duplicates. No workflow automatically generates or writes Main Planning sync output; planning remains a separate Tool or Prompt operation.
 
+### RFC Lifecycle Guidance
+
+Lifecycle guidance is derived from the current persisted project status and is never stored. It reports one of three stable states:
+
+- `in_progress` recommends `markCurrentRfcCompleted` when the current RFC is absent from completed history.
+- `completed_waiting_next` recommends `startNextRfc` when the current RFC is already completed.
+- `inconsistent` recommends `manualReview` when the current RFC or completed history contains malformed identifiers or duplicate completed entries.
+
+The Service owns these decisions and deterministic reason strings. The `generateMainPlanningSync` Tool exposes guidance in structured content and in its Markdown, the Prompt appends the same RFC Lifecycle section, and `docpilot://project/dashboard` includes an additive `lifecycleGuidance` object. These reads do not persist state or execute a recommended Tool.
+
+Because `completeCurrentRfc` advances directly to a new current RFC without storing transition metadata, its result is structurally identical to ordinary in-progress work. Guidance therefore recommends `markCurrentRfcCompleted` for that new current RFC and does not infer how it became active.
+
 ### Planning
 
 - `generateMainPlanningSync` generates a Markdown Main Planning status summary and structured status data.
@@ -101,6 +113,7 @@ The current suites cover repository serialization and backward compatibility, se
 
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
 - The legacy `completeCurrentRfc` operation remains supported, so clients can still bypass the preferred split lifecycle.
+- Lifecycle guidance is derived only from current status; it does not track transition history or distinguish legacy advancement from ordinary in-progress work.
 - Documentation operations are not implemented yet.
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.

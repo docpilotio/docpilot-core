@@ -26,8 +26,9 @@ export function registerGenerateMainPlanningSyncPrompt(
     },
     async ({ completedWork, nextWork }) => {
       const status = await service.getProjectStatus();
+      const lifecycleGuidance = await service.getRfcLifecycleGuidance(status);
 
-      const promptText = [
+      const basePromptText = [
         "다음 DocPilot 프로젝트 상태를 Main Planning에 동기화해 주세요.",
         "",
         "## 현재 프로젝트 상태",
@@ -48,6 +49,15 @@ export function registerGenerateMainPlanningSyncPrompt(
         "- Release 상태를 갱신해 주세요.",
         "- Roadmap 및 다음 RFC 시작 정보를 정리해 주세요.",
         "- 기술 부채나 후속 작업이 있으면 함께 기록해 주세요.",
+      ].join("\n");
+      const promptText = [
+        basePromptText,
+        "",
+        "## RFC Lifecycle",
+        "",
+        `- State: \`${lifecycleGuidance.state}\``,
+        `- Recommended Tool: \`${lifecycleGuidance.nextAction}\``,
+        `- Reason: ${lifecycleGuidance.reason}`,
       ].join("\n");
 
       return {

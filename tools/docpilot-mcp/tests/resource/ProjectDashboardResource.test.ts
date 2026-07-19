@@ -57,6 +57,11 @@ describe("ProjectDashboardResource", () => {
       completedCount: status.completedRfcs.length,
       completedRfcs: status.completedRfcs,
       releaseReadiness: status.releaseReadiness,
+      lifecycleGuidance: {
+        state: "in_progress",
+        nextAction: "markCurrentRfcCompleted",
+        reason: "Current RFC has not been marked completed.",
+      },
     });
     expect(text).toBe(`${JSON.stringify(dashboard, null, 2)}`);
     await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(
@@ -137,6 +142,11 @@ describe("ProjectDashboardResource", () => {
       "RFC-0039",
     ]);
     expect(markedDashboard.releaseReadiness).toEqual(readiness);
+    expect(markedDashboard.lifecycleGuidance).toEqual({
+      state: "completed_waiting_next",
+      nextAction: "startNextRfc",
+      reason: "Current RFC is completed and the next RFC may now be started.",
+    });
 
     await temporaryState.service.startNextRfc({ nextRfc: "RFC-0040" });
     const startedResult = await connection.client.readResource({
@@ -156,5 +166,10 @@ describe("ProjectDashboardResource", () => {
     expect(startedDashboard.releaseReadiness).toEqual(
       createDefaultReleaseReadiness(),
     );
+    expect(startedDashboard.lifecycleGuidance).toEqual({
+      state: "in_progress",
+      nextAction: "markCurrentRfcCompleted",
+      reason: "Current RFC has not been marked completed.",
+    });
   });
 });

@@ -22,6 +22,19 @@ export function registerGenerateMainPlanningSyncTool(
         completedRfcs: z.array(z.string()),
         completedCount: z.number().int().nonnegative(),
         markdown: z.string(),
+        lifecycleGuidance: z.object({
+          state: z.enum([
+            "in_progress",
+            "completed_waiting_next",
+            "inconsistent",
+          ]),
+          nextAction: z.enum([
+            "markCurrentRfcCompleted",
+            "startNextRfc",
+            "manualReview",
+          ]),
+          reason: z.string(),
+        }),
       },
     },
     async () => {

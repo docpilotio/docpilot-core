@@ -4,6 +4,7 @@ import type {
   ReleaseReadinessState,
 } from "../model/ProjectStatus.js";
 import { createDefaultReleaseReadiness } from "../model/ProjectStatus.js";
+import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
 import { ProjectStateRepository } from "../repository/ProjectStateRepository.js";
 
 export type CurrentRfcStatus = {
@@ -43,6 +44,7 @@ export type MainPlanningSyncResult = {
   completedRfcs: string[];
   completedCount: number;
   markdown: string;
+  lifecycleGuidance: RfcLifecycleGuidance;
 };
 
 export type UpdateProjectStatusRequest = {
@@ -77,6 +79,14 @@ export class ProjectStatusService {
 
   public async getProjectStatus(): Promise<ProjectStatus> {
     return this.repository.load();
+  }
+
+  public async getRfcLifecycleGuidance(
+    status?: ProjectStatus,
+  ): Promise<RfcLifecycleGuidance> {
+    const currentStatus = status ?? await this.repository.load();
+
+    return this.deriveRfcLifecycleGuidance(currentStatus);
   }
 
   public async markCurrentRfcCompleted(): Promise<ProjectStatus> {
@@ -235,6 +245,7 @@ export class ProjectStatusService {
 
   public async generateMainPlanningSync(): Promise<MainPlanningSyncResult> {
     const status = await this.repository.load();
+    const lifecycleGuidance = this.deriveRfcLifecycleGuidance(status);
     const completedRfcLines = status.completedRfcs.length > 0
       ? status.completedRfcs.map((rfc) => `- ${rfc}`)
       : ["- None"];
@@ -266,6 +277,12 @@ export class ProjectStatusService {
       "",
       `The current RFC, ${status.currentRfc}, is in progress.`,
       "",
+      "## RFC Lifecycle",
+      "",
+      `- State: \`${lifecycleGuidance.state}\``,
+      `- Recommended Tool: \`${lifecycleGuidance.nextAction}\``,
+      `- Reason: ${lifecycleGuidance.reason}`,
+      "",
       "## Release Readiness",
       "",
       ...readinessItems.map((item) => `- ${item}: ⏳`),
@@ -279,6 +296,7 @@ export class ProjectStatusService {
       completedRfcs: status.completedRfcs,
       completedCount: status.completedRfcs.length,
       markdown,
+      lifecycleGuidance,
     };
   }
 
@@ -378,6 +396,48 @@ export class ProjectStatusService {
 
   private isValidRfcIdentifier(value: string): boolean {
     return /^RFC-[0-9]{4}$/.test(value);
+  }
+
+  private deriveRfcLifecycleGuidance(
+    status: ProjectStatus,
+  ): RfcLifecycleGuidance {
+    if (!this.isValidRfcIdentifier(status.currentRfc)) {
+      return {
+        state: "inconsistent",
+        nextAction: "manualReview",
+        reason: "Current RFC does not use the required RFC-0000 format.",
+      };
+    }
+
+    if (status.completedRfcs.some((rfc) => !this.isValidRfcIdentifier(rfc))) {
+      return {
+        state: "inconsistent",
+        nextAction: "manualReview",
+        reason: "Completed RFC history contains a malformed RFC identifier.",
+      };
+    }
+
+    if (new Set(status.completedRfcs).size !== status.completedRfcs.length) {
+      return {
+        state: "inconsistent",
+        nextAction: "manualReview",
+        reason: "Completed RFC history contains duplicate RFC identifiers.",
+      };
+    }
+
+    if (status.completedRfcs.includes(status.currentRfc)) {
+      return {
+        state: "completed_waiting_next",
+        nextAction: "startNextRfc",
+        reason: "Current RFC is completed and the next RFC may now be started.",
+      };
+    }
+
+    return {
+      state: "in_progress",
+      nextAction: "markCurrentRfcCompleted",
+      reason: "Current RFC has not been marked completed.",
+    };
   }
 
   private addCompletedRfcDeterministically(

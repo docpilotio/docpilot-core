@@ -18,6 +18,8 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 `src/model/ProjectStatus.ts` defines the shared `ProjectStatus` data shape: `project`, `phase`, `currentRfc`, `release`, `completedRfcs`, and `releaseReadiness`. `ReleaseReadinessState` restricts values to `pending`, `passed`, or `failed`, while `ReleaseReadiness` defines the eight supported fields. The model also provides the deterministic all-pending default. It is a TypeScript model rather than an active domain entity; business behavior remains in the service.
 
+`src/model/RfcLifecycleGuidance.ts` defines protocol-independent fixed unions for lifecycle state and recommended action. Guidance is derived at read time and is not part of `ProjectStatus` or the persisted schema.
+
 ## Repository
 
 `ProjectStateRepository` is the persistence boundary. It resolves `project-state.json` from the process working directory by default, reads and parses JSON, validates the complete persisted shape, and returns a defensive copy of `completedRfcs`.
@@ -33,6 +35,8 @@ In particular, the service trims mutable project-status inputs, rejects empty ph
 `markCurrentRfcCompleted` is the mark-only Service transition. It validates the persisted current RFC, explicitly rejects duplicate completion, adds it to a numerically sorted and deduplicated completed history, preserves every other status field including Release Readiness, and issues one Repository save. The Tool exposes this method through a strict empty input schema.
 
 `startNextRfc` is a focused Service-owned transition. It accepts an exact, untrimmed `RFC-[0-9]{4}` identifier plus optional non-empty phase and release updates. Before persistence, the Service verifies that the next RFC differs from the current RFC, is numerically greater, is absent from completed history, and follows a current RFC already present in completed history. It constructs one complete state, preserves completed ordering, resets Release Readiness with the model default, and performs one Repository save. Validation failures do not write state.
+
+`getRfcLifecycleGuidance` derives deterministic guidance from a supplied or freshly loaded status. A valid current RFC absent from completed history is `in_progress` with `markCurrentRfcCompleted`; a current RFC present in completed history is `completed_waiting_next` with `startNextRfc`. Malformed identifiers or duplicate completed entries are `inconsistent` with `manualReview`. The method neither normalizes nor persists state.
 
 ## Tool
 
@@ -55,11 +59,15 @@ All Tools call `ProjectStatusService`; none accesses `ProjectStateRepository` di
 
 Dashboard reads never write state. The existing project-status Resource serializes the complete `ProjectStatus`, so `releaseReadiness` is an intentional backward-compatible additive field in that Resource's JSON response.
 
+The dashboard also obtains additive `lifecycleGuidance` through `ProjectStatusService`. The Resource contains no lifecycle rules and does not persist or execute the recommendation.
+
 Resources may read through Services or a dedicated read abstraction.
 
 ## Prompt
 
 `GenerateMainPlanningSyncPrompt` registers the `generateMainPlanningSync` Prompt. It accepts optional `completedWork` and `nextWork` arguments, reads current project state through the service, and constructs the existing synchronization message. Prompt behavior and argument schemas are part of the current external contract.
+
+Both the planning Tool and Prompt include an additive RFC Lifecycle section from the same Service-derived guidance. The Tool also exposes the guidance in structured content. Planning generation remains deterministic and read-only.
 
 ## Server registration
 
@@ -129,4 +137,4 @@ The current foundation does not configure coverage reporting, launch the stdio e
 
 The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.
 
-The current boundary includes mark-only completion, explicit next-RFC startup, the backward-compatible combined completion shortcut, and manually managed persistent Release Readiness. It excludes automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.
+The current boundary includes mark-only completion, explicit next-RFC startup, the backward-compatible combined completion shortcut, derived lifecycle guidance, and manually managed persistent Release Readiness. Guidance does not persist lifecycle history and cannot distinguish a legacy complete-and-advance result from ordinary in-progress work. The boundary excludes rollback, a workflow engine, automated readiness integrations, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage.

@@ -27,6 +27,89 @@ describe("ProjectStatusService", () => {
     );
   });
 
+  it("guides an in-progress RFC to markCurrentRfcCompleted", async () => {
+    temporaryState = await createTemporaryState(createProjectStatus());
+
+    await expect(
+      temporaryState.service.getRfcLifecycleGuidance(),
+    ).resolves.toEqual({
+      state: "in_progress",
+      nextAction: "markCurrentRfcCompleted",
+      reason: "Current RFC has not been marked completed.",
+    });
+  });
+
+  it("guides a completed current RFC to startNextRfc", async () => {
+    temporaryState = await createTemporaryState(
+      createProjectStatus({
+        completedRfcs: ["RFC-0037", "RFC-0038", "RFC-0039"],
+      }),
+    );
+
+    await expect(
+      temporaryState.service.getRfcLifecycleGuidance(),
+    ).resolves.toEqual({
+      state: "completed_waiting_next",
+      nextAction: "startNextRfc",
+      reason: "Current RFC is completed and the next RFC may now be started.",
+    });
+  });
+
+  it.each([
+    [
+      "malformed current RFC",
+      createProjectStatus({ currentRfc: "RFC-39" }),
+      "Current RFC does not use the required RFC-0000 format.",
+    ],
+    [
+      "malformed completed RFC",
+      createProjectStatus({ completedRfcs: ["RFC-0037", "bad-rfc"] }),
+      "Completed RFC history contains a malformed RFC identifier.",
+    ],
+    [
+      "duplicate completed RFC",
+      createProjectStatus({ completedRfcs: ["RFC-0037", "RFC-0037"] }),
+      "Completed RFC history contains duplicate RFC identifiers.",
+    ],
+  ])(
+    "returns manual review guidance for %s",
+    async (_caseName, status, reason) => {
+      temporaryState = await createTemporaryState(status);
+
+      await expect(
+        temporaryState.service.getRfcLifecycleGuidance(),
+      ).resolves.toEqual({
+        state: "inconsistent",
+        nextAction: "manualReview",
+        reason,
+      });
+    },
+  );
+
+  it("derives guidance deterministically without modifying state", async () => {
+    const status = createProjectStatus({
+      completedRfcs: ["RFC-0038", "RFC-0037"],
+      releaseReadiness: {
+        ...createDefaultReleaseReadiness(),
+        coreBuild: "passed",
+        releaseCandidate: "failed",
+      },
+    });
+    temporaryState = await createTemporaryState(status);
+    const before = await readFile(temporaryState.stateFilePath, "utf-8");
+    const saveSpy = vi.spyOn(temporaryState.repository, "save");
+
+    const first = await temporaryState.service.getRfcLifecycleGuidance();
+    const second = await temporaryState.service.getRfcLifecycleGuidance();
+
+    expect(second).toEqual(first);
+    expect(saveSpy).not.toHaveBeenCalled();
+    await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(
+      before,
+    );
+    await expect(temporaryState.repository.load()).resolves.toEqual(status);
+  });
+
   it("updates one readiness field and preserves omitted fields", async () => {
     temporaryState = await createTemporaryState(createProjectStatus());
 
