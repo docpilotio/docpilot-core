@@ -3,6 +3,7 @@ import type {
   ReleaseReadiness,
   ReleaseReadinessState,
 } from "../model/ProjectStatus.js";
+import { createDefaultReleaseReadiness } from "../model/ProjectStatus.js";
 import { ProjectStateRepository } from "../repository/ProjectStateRepository.js";
 
 export type CurrentRfcStatus = {
@@ -50,6 +51,14 @@ export type UpdateProjectStatusRequest = {
   currentRfc?: string;
 };
 
+export type StartNextRfcRequest = {
+  nextRfc: string;
+  phase?: string;
+  release?: string;
+};
+
+const START_NEXT_RFC_FIELDS = ["nextRfc", "phase", "release"] as const;
+
 const RELEASE_READINESS_FIELDS = [
   "coreBuild",
   "coreTests",
@@ -68,6 +77,76 @@ export class ProjectStatusService {
 
   public async getProjectStatus(): Promise<ProjectStatus> {
     return this.repository.load();
+  }
+
+  public async startNextRfc(
+    input: StartNextRfcRequest,
+  ): Promise<ProjectStatus> {
+    const unknownField = Object.keys(input).find(
+      (field) =>
+        !START_NEXT_RFC_FIELDS.includes(
+          field as (typeof START_NEXT_RFC_FIELDS)[number],
+        ),
+    );
+
+    if (unknownField !== undefined) {
+      throw new Error(`Unknown startNextRfc field: ${unknownField}.`);
+    }
+
+    if (typeof input.nextRfc !== "string" || !/^RFC-[0-9]{4}$/.test(input.nextRfc)) {
+      throw new Error("nextRfc must use the exact format RFC-0000.");
+    }
+
+    const phase = input.phase?.trim();
+    const release = input.release?.trim();
+
+    if (phase !== undefined && phase.length === 0) {
+      throw new Error("phase must not be empty.");
+    }
+
+    if (release !== undefined && release.length === 0) {
+      throw new Error("release must not be empty.");
+    }
+
+    const status = await this.repository.load();
+
+    if (input.nextRfc === status.currentRfc) {
+      throw new Error("nextRfc must be different from the current RFC.");
+    }
+
+    if (status.completedRfcs.includes(input.nextRfc)) {
+      throw new Error("nextRfc must not already be completed.");
+    }
+
+    if (!/^RFC-[0-9]{4}$/.test(status.currentRfc)) {
+      throw new Error("The current RFC must use the exact format RFC-0000.");
+    }
+
+    const currentRfcNumber = Number(status.currentRfc.slice(4));
+    const nextRfcNumber = Number(input.nextRfc.slice(4));
+
+    if (nextRfcNumber <= currentRfcNumber) {
+      throw new Error("nextRfc must be numerically greater than the current RFC.");
+    }
+
+    if (!status.completedRfcs.includes(status.currentRfc)) {
+      throw new Error(
+        "The current RFC must be completed before starting the next RFC.",
+      );
+    }
+
+    const updatedStatus: ProjectStatus = {
+      ...status,
+      phase: phase ?? status.phase,
+      currentRfc: input.nextRfc,
+      release: release ?? status.release,
+      completedRfcs: [...status.completedRfcs],
+      releaseReadiness: createDefaultReleaseReadiness(),
+    };
+
+    await this.repository.save(updatedStatus);
+
+    return updatedStatus;
   }
 
   public async updateReleaseReadiness(

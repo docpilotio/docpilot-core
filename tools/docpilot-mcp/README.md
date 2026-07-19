@@ -27,6 +27,11 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 ### RFC Workflow
 
 - `completeCurrentRfc` records the current RFC as completed and advances to a supplied next RFC.
+- `startNextRfc` starts an explicitly supplied later RFC, preserves completed history, optionally updates `phase` and `release`, and resets all Release Readiness fields to `pending`. Input is `{ "nextRfc": "RFC-0045", "phase"?: "...", "release"?: "..." }`; no other fields are accepted.
+
+`startNextRfc` requires the exact `RFC-[0-9]{4}` format with no surrounding whitespace. The next RFC must differ from and be numerically greater than the current RFC, must not already be completed, and the current RFC must already appear in completed history. Optional phase and release values must be non-empty. The Service validates the complete transition and sends one final state to the Repository for persistence.
+
+For backward compatibility, `completeCurrentRfc` retains its existing combined behavior: it records the current RFC and immediately advances to its required `nextRfc`. This means its newly current RFC is not yet eligible for `startNextRfc` until that current RFC is represented as completed in persisted state. The two Tools are not silently chained, and starting an RFC does not generate or write Main Planning sync output; planning remains a separate Tool or Prompt operation.
 
 ### Planning
 
@@ -92,6 +97,7 @@ The current suites cover repository serialization and backward compatibility, se
 ## Current limitations
 
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
+- The legacy `completeCurrentRfc` operation combines completion and advancement; a future version may introduce a mark-only completion workflow before making `startNextRfc` the standard advancement path.
 - Documentation operations are not implemented yet.
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.

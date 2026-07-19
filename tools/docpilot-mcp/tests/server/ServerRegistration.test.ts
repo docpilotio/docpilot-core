@@ -51,6 +51,7 @@ describe("server registration and existing behavior", () => {
       "listCompletedRfcs",
       "updateProjectStatus",
       "updateReleaseReadiness",
+      "startNextRfc",
     ]);
     expect(resources).toEqual([
       "docpilot://project/status",
