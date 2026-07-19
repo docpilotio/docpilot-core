@@ -16,6 +16,17 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 
 ## Available Tools
 
+### Project Control Boundary
+
+- `getDocPilotProjectControlContext` accepts strict empty input and composes the official current project, lifecycle, RFC Context, Pending Handoff summary, Completion Readiness, Capability Manifest, policies, Planning Synchronization, Release Readiness, and explicit evidence limitations. It is read-only.
+- `evaluateRfcCompletionReadiness` optionally accepts the current `rfcId` and evaluates deterministic Alpha Gates without writing state or executing submitted commands.
+
+Project Control Query Boundary consists of `loadRfcContext`, `getPendingRfcHandoff`, `getDocPilotProjectControlContext`, and `evaluateRfcCompletionReadiness`. Its only command is `submitRfcHandoff`. Acknowledge, consume, archive, history, worker execution, Git operations, and lifecycle advancement remain outside the boundary.
+
+Completion Readiness uses fixed ordered checks for identity, Handoff presence/schema/RFC, implementation, build, tests, regression, smoke, scope, alpha review, known limitations, and Git push policy. Results are `NOT_READY`, `BLOCKED`, `READY_WITH_WARNINGS`, or `READY`. Submitted evidence is structurally validated but MCP does not independently execute commands or verify Git diffs. Missing allowed paths are disclosed on the Scope check.
+
+The Capability Manifest reports Context loading, Handoff submission/retrieval, structured evidence validation, Completion Readiness, and Worker result submission as supported. It explicitly reports acknowledgement/consumption/history, worker execution, Git/PR/release automation, and automatic lifecycle completion/advance as unsupported.
+
 ### RFC Context and Handoff
 
 - `loadRfcContext` optionally accepts the current `rfcId` and returns deterministic official project context, operating rules, alpha criteria, guidance, synchronization, readiness, and warnings for unavailable RFC metadata. It is read-only.
@@ -161,6 +172,10 @@ Vitest is the single test framework. Tests live under `tests/`, grouped into `re
 The current suites cover repository serialization and backward compatibility, service workflows and validation, dashboard Resource behavior, the Release Readiness Tool, server registration, and smoke checks for existing Tools, the status Resource, and the planning Prompt. Coverage reporting is not configured, and the planning output details, every error branch of older Tools, and stdio process startup are not exhaustively tested.
 
 ## Current limitations
+
+- Completion Readiness validates submitted structured evidence but cannot prove that commands ran or that reported file changes match the actual Git diff.
+- Project Control does not acknowledge, consume, or archive Pending Handoffs and does not execute Workers.
+- v0.12 work-order/process/Git automation is intentionally absent.
 
 - Pending Handoff supports one current-RFC item with reject-on-duplicate behavior; consumption, archival history, approval, worker orchestration, Git automation, and automatic RFC advancement are not implemented.
 - Detailed RFC definitions are not persisted, so Context warns about unavailable scope and acceptance metadata.

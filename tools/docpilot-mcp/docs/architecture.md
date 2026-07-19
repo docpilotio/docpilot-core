@@ -16,6 +16,8 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 ## Model
 
+`DocPilotProjectControlContext` is the schema-versioned integration read model composed from the existing Project State aggregate. `ProjectControlCapabilityManifest` is a deterministic declaration of implemented and unsupported boundaries. `CompletionReadiness` contains 13 stable ordered Alpha Gate checks and does not persist.
+
 `RfcExecutionContext` is a deterministic, non-persistent query model with schema version `1.0`. `RfcHandoff` is the schema-versioned structured implementation result; verification and reporting states are closed unions. Markdown is renderer output only.
 
 `src/model/ProjectStatus.ts` defines the shared `ProjectStatus` data shape: `project`, `phase`, `currentRfc`, `release`, `completedRfcs`, and `releaseReadiness`. `ReleaseReadinessState` restricts values to `pending`, `passed`, or `failed`, while `ReleaseReadiness` defines the eight supported fields. The model also provides the deterministic all-pending default. It is a TypeScript model rather than an active domain entity; business behavior remains in the service.
@@ -39,6 +41,10 @@ On load, the repository defaults a missing `releaseReadiness` object or any miss
 The Repository also defaults a missing `lifecycleHistory` to `[]`, validates every event, exact sequential event ID, RFC field, optional rollback `fromRfc`, and ISO timestamp, reconstructs events in stable field order, and serializes the array without reordering it. A rollback event requires a distinct `fromRfc`; other event types reject that field. It owns no event-creation or workflow rules and never rewrites legacy state during a read.
 
 ## Service
+
+The Service evaluates Completion Readiness from the validated Pending Handoff rather than trusting its top-level `PASSED` claim. Identity, schema, implementation, five verification fields, alpha blockers/unresolved items, limitations, evidence presence, and push policy are evaluated independently. No build/test command or Git operation is executed. Missing scope paths remain a check warning because only submitted scope evidence is available.
+
+`getDocPilotProjectControlContext` loads Project State once and supplies that same snapshot to existing RFC Context, Planning Synchronization, Lifecycle Guidance, and Completion Readiness derivations. It creates no parallel aggregate and performs no save or event append.
 
 `loadRfcContext` composes current status, lifecycle guidance, Planning Synchronization, Release Readiness, stable operating rules, and default alpha criteria without saving. Missing RFC-definition metadata is represented explicitly rather than inferred.
 
@@ -65,6 +71,8 @@ The Service appends lifecycle events using deterministic sequence IDs and expose
 The evaluator predicts `documentationSync=passed` for `current` and `pending` for other states, compares that expectation with persisted readiness, and reports any mismatch without writing it. Repeated calls are deeply deterministic and perform no save, event append, ID allocation, or model mutation.
 
 ## Tool
+
+The Project Control Query Boundary contains `loadRfcContext`, `getPendingRfcHandoff`, `getDocPilotProjectControlContext`, and `evaluateRfcCompletionReadiness`; `submitRfcHandoff` is the sole command. All Tools call the Service and strict schemas reject unknown input.
 
 RFC Context/Handoff Tools are read-only `loadRfcContext`, command `submitRfcHandoff`, and read-only `getPendingRfcHandoff`. Their strict schemas preserve the Command/Query boundary and all call the Service.
 
@@ -98,6 +106,8 @@ The additive `planningSynchronization` dashboard field is calculated from that s
 Resources may read through Services or a dedicated read abstraction.
 
 ## Prompt
+
+Main Planning additively renders a Project Control section containing current RFC, Pending Handoff presence, Completion Readiness, unsupported Worker/commit automation, push policy, and any blockers or warnings. Rendering never consumes Handoff state or advances lifecycle.
 
 Main Planning Markdown additively embeds the deterministic Handoff renderer when a Pending Handoff exists. Structured Handoff remains available through its dedicated query Tool; Planning never parses Markdown or consumes the Handoff.
 
@@ -177,6 +187,8 @@ Every persistence test uses a unique directory created beneath the operating sys
 The current foundation does not configure coverage reporting, launch the stdio entry point as a child process, or exhaustively test every legacy Tool error response and planning-output detail.
 
 ## Current architectural boundaries
+
+v0.11 selects read-only Pending Handoff evaluation only: acknowledge, consume, archive, and history remain unsupported. The boundary excludes Codex/OpenAI/process execution, Work Orders, retries/queues, Git/PR/release/CI operations, registries, automatic readiness mutation, RFC completion/advance, and DocPilot Core integration.
 
 The v0.10 boundary adds RFC execution Context and one restart-safe Pending Handoff. It excludes Handoff consumption/history, approvals, evidence registries, worker orchestration, Git/PR/CI automation, automatic lifecycle advancement, and DocPilot Core integration.
 

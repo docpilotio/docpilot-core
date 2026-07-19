@@ -24,6 +24,19 @@ import type {
   RfcLifecycleEventType,
 } from "../model/RfcLifecycleEvent.js";
 import { ProjectStateRepository } from "../repository/ProjectStateRepository.js";
+import {
+  COMPLETION_READINESS_SCHEMA_VERSION,
+  type CompletionCheck,
+  type CompletionReadiness,
+} from "../model/CompletionReadiness.js";
+import {
+  PROJECT_CONTROL_CONTEXT_SCHEMA_VERSION,
+  type DocPilotProjectControlContext,
+} from "../model/DocPilotProjectControlContext.js";
+import {
+  createProjectControlCapabilityManifest,
+  type ProjectControlCapabilityManifest,
+} from "../model/ProjectControlCapabilityManifest.js";
 
 export type CurrentRfcStatus = {
   [key: string]: unknown;
@@ -146,12 +159,15 @@ export class ProjectStatusService {
     return this.repository.load();
   }
 
-  public async loadRfcContext(rfcId?: string): Promise<RfcExecutionContext> {
+  public async loadRfcContext(
+    rfcId?: string,
+    providedStatus?: ProjectStatus,
+  ): Promise<RfcExecutionContext> {
     if (rfcId !== undefined && !this.isValidRfcIdentifier(rfcId)) {
       throw new Error("rfcId must use the exact format RFC-0000.");
     }
 
-    const status = await this.repository.load();
+    const status = providedStatus ?? await this.repository.load();
     if (!this.isValidRfcIdentifier(status.currentRfc)) {
       throw new Error("The current RFC must use the exact format RFC-0000.");
     }
@@ -190,6 +206,195 @@ export class ProjectStatusService {
       releaseReadiness: { ...status.releaseReadiness },
       warnings: [
         "RFC title, goal, detailed scope, acceptance criteria, repository baseline, and next RFC are not persisted in Project State.",
+      ],
+    };
+  }
+
+  public getProjectControlCapabilityManifest(): ProjectControlCapabilityManifest {
+    return createProjectControlCapabilityManifest();
+  }
+
+  public async evaluateRfcCompletionReadiness(
+    rfcId?: string,
+    providedStatus?: ProjectStatus,
+  ): Promise<CompletionReadiness> {
+    if (rfcId !== undefined && !this.isValidRfcIdentifier(rfcId)) {
+      throw new Error("rfcId must use the exact format RFC-0000.");
+    }
+    const status = providedStatus ?? await this.repository.load();
+    if (!this.isValidRfcIdentifier(status.currentRfc)) {
+      throw new Error("The current RFC must use the exact format RFC-0000.");
+    }
+    if (rfcId !== undefined && rfcId !== status.currentRfc) {
+      throw new Error(`Completion Readiness is available only for the current RFC ${status.currentRfc}.`);
+    }
+
+    const handoff = status.pendingRfcHandoff;
+    const checks: CompletionCheck[] = [];
+    const blockers: string[] = [];
+    const warnings: string[] = [];
+    const add = (
+      id: string,
+      label: string,
+      required: boolean,
+      checkStatus: CompletionCheck["status"],
+      evidence: string[] = [],
+      checkWarnings: string[] = [],
+    ) => checks.push({ id, label, required, status: checkStatus, evidence, warnings: checkWarnings });
+
+    add("CURRENT_RFC_MATCH", "Current RFC identity", true, "SATISFIED", [status.currentRfc]);
+    add("HANDOFF_PRESENT", "Pending Handoff is present", true,
+      handoff === undefined ? "NOT_SATISFIED" : "SATISFIED",
+      handoff === undefined ? [] : [handoff.rfcId]);
+
+    if (handoff === undefined) {
+      for (const [id, label, required] of [
+        ["HANDOFF_SCHEMA_VALID", "Handoff schema is supported", true],
+        ["HANDOFF_RFC_MATCH", "Handoff RFC matches current RFC", true],
+        ["IMPLEMENTATION_STATUS", "Implementation passed", true],
+        ["BUILD_VERIFICATION", "Build verification passed", true],
+        ["TEST_VERIFICATION", "Test verification passed", true],
+        ["REGRESSION_VERIFICATION", "Regression verification passed", true],
+        ["SMOKE_VERIFICATION", "Smoke verification passed", true],
+        ["SCOPE_VERIFICATION", "Scope verification passed", true],
+        ["ALPHA_REVIEW", "Alpha review passed", true],
+        ["KNOWN_LIMITATIONS_RECORDED", "Known limitations reviewed", false],
+        ["GIT_PUSH_POLICY", "Git push policy", false],
+      ] as const) add(id, label, required, "NOT_AVAILABLE");
+      return {
+        schemaVersion: COMPLETION_READINESS_SCHEMA_VERSION,
+        rfcId: status.currentRfc,
+        status: "NOT_READY",
+        checks,
+        blockers: [],
+        warnings: [],
+      };
+    }
+
+    const schemaValid = handoff.schemaVersion === RFC_HANDOFF_SCHEMA_VERSION;
+    add("HANDOFF_SCHEMA_VALID", "Handoff schema is supported", true,
+      schemaValid ? "SATISFIED" : "BLOCKED", [handoff.schemaVersion]);
+    if (!schemaValid) blockers.push(`Unsupported Handoff schemaVersion: ${handoff.schemaVersion}.`);
+    const rfcMatches = handoff.rfcId === status.currentRfc;
+    add("HANDOFF_RFC_MATCH", "Handoff RFC matches current RFC", true,
+      rfcMatches ? "SATISFIED" : "BLOCKED", [handoff.rfcId, status.currentRfc]);
+    if (!rfcMatches) blockers.push(`Handoff RFC ${handoff.rfcId} does not match current RFC ${status.currentRfc}.`);
+
+    const implementation = handoff.implementation.status;
+    const implementationPassing = implementation === "PASSED" || implementation === "PASSED_WITH_LIMITATIONS";
+    const implementationBlocked = implementation === "FAILED" || implementation === "BLOCKED";
+    add("IMPLEMENTATION_STATUS", "Implementation passed", true,
+      implementationBlocked ? "BLOCKED" : implementationPassing ? (implementation === "PASSED" ? "SATISFIED" : "WARNING") : "NOT_SATISFIED",
+      [implementation]);
+    if (implementationBlocked) blockers.push(`Implementation status is ${implementation}.`);
+    if (implementation === "PASSED_WITH_LIMITATIONS") warnings.push("Implementation passed with limitations.");
+
+    const verificationEntries = [
+      ["BUILD_VERIFICATION", "Build verification passed", "build", handoff.verification.build],
+      ["TEST_VERIFICATION", "Test verification passed", "tests", handoff.verification.tests],
+      ["REGRESSION_VERIFICATION", "Regression verification passed", "regression", handoff.verification.regression],
+      ["SMOKE_VERIFICATION", "Smoke verification passed", "smoke", handoff.verification.smoke],
+      ["SCOPE_VERIFICATION", "Scope verification passed", "scope", handoff.verification.scope],
+    ] as const;
+    let missingEvidence = false;
+    for (const [id, label, field, value] of verificationEntries) {
+      const failed = value === "FAILED" || value === "BLOCKED";
+      add(
+        id,
+        label,
+        true,
+        failed ? "BLOCKED" : value === "PASSED" ? "SATISFIED" : "NOT_SATISFIED",
+        [value],
+        field === "scope"
+          ? ["Scope verification relies on submitted Handoff evidence because allowedPaths are unavailable."]
+          : [],
+      );
+      if (failed) blockers.push(`${field} verification is ${value}.`);
+    }
+    if (handoff.verification.commandsExecuted.length === 0 || handoff.verification.details.length === 0) {
+      missingEvidence = true;
+      warnings.push("Verification claims do not include both executed commands and details.");
+    }
+
+    const alpha = handoff.alphaReview.status;
+    const alphaPassing = alpha === "PASSED" || alpha === "PASSED_WITH_LIMITATIONS";
+    const alphaBlocked = alpha === "FAILED" || alpha === "BLOCKED" || handoff.alphaReview.blockers.length > 0 || handoff.alphaReview.unresolvedItems.length > 0;
+    add("ALPHA_REVIEW", "Alpha review passed", true,
+      alphaBlocked ? "BLOCKED" : alphaPassing ? (alpha === "PASSED" ? "SATISFIED" : "WARNING") : "NOT_SATISFIED",
+      [alpha, ...handoff.alphaReview.findings], [...handoff.alphaReview.warnings]);
+    if (alpha === "FAILED" || alpha === "BLOCKED") blockers.push(`Alpha review status is ${alpha}.`);
+    blockers.push(...handoff.alphaReview.blockers, ...handoff.alphaReview.unresolvedItems);
+    if (alpha === "PASSED_WITH_LIMITATIONS") warnings.push("Alpha review passed with limitations.");
+
+    const limitations = handoff.alphaReview.knownLimitations;
+    add("KNOWN_LIMITATIONS_RECORDED", "Known limitations reviewed", false,
+      limitations.length === 0 ? "SATISFIED" : "WARNING", [...limitations]);
+    if (limitations.length > 0) warnings.push(...limitations);
+    warnings.push(...handoff.alphaReview.warnings, ...handoff.planningUpdate.warnings);
+
+    const pushed = handoff.git.pushStatus === "PUSHED";
+    add("GIT_PUSH_POLICY", "Git push policy", false, pushed ? "WARNING" : "SATISFIED",
+      [handoff.git.pushStatus], pushed ? ["Push was reported although MCP has no push approval capability."] : []);
+    if (pushed) warnings.push("Push was reported although MCP has no push approval capability.");
+
+    const hasPendingRequired = checks.some(({ required, status: value }) =>
+      required && (value === "NOT_AVAILABLE" || value === "NOT_SATISFIED"));
+    const readinessStatus: CompletionReadiness["status"] = blockers.length > 0
+      ? "BLOCKED"
+      : hasPendingRequired
+        ? "NOT_READY"
+        : warnings.length > 0 || missingEvidence
+          ? "READY_WITH_WARNINGS"
+          : "READY";
+    return {
+      schemaVersion: COMPLETION_READINESS_SCHEMA_VERSION,
+      rfcId: status.currentRfc,
+      status: readinessStatus,
+      checks,
+      blockers: [...blockers],
+      warnings: [...new Set(warnings)],
+    };
+  }
+
+  public async getDocPilotProjectControlContext(): Promise<DocPilotProjectControlContext> {
+    const status = await this.repository.load();
+    const rfcExecution = await this.loadRfcContext(undefined, status);
+    const completionReadiness = await this.evaluateRfcCompletionReadiness(undefined, status);
+    const planningSynchronization = await this.getPlanningSynchronizationStatus(status);
+    const lifecycleGuidance = await this.getRfcLifecycleGuidance(status);
+    const handoff = status.pendingRfcHandoff;
+    return {
+      schemaVersion: PROJECT_CONTROL_CONTEXT_SCHEMA_VERSION,
+      project: { name: status.project, phase: status.phase, release: status.release },
+      lifecycle: {
+        currentRfc: status.currentRfc,
+        completedRfcs: [...status.completedRfcs],
+        status: lifecycleGuidance.state,
+      },
+      rfcExecution,
+      handoff: {
+        pending: handoff !== undefined,
+        rfcId: handoff?.rfcId ?? status.currentRfc,
+        ...(handoff === undefined ? {} : {
+          summary: handoff.implementation.summary,
+          implementationStatus: handoff.implementation.status,
+          alphaStatus: handoff.alphaReview.status,
+        }),
+      },
+      completionReadiness,
+      capabilities: this.getProjectControlCapabilityManifest(),
+      policies: {
+        lifecycleAutoAdvance: false,
+        automaticCommit: false,
+        automaticPush: false,
+        automaticMerge: false,
+        pushRequiresUserApproval: true,
+      },
+      planningSynchronization,
+      releaseReadiness: { ...status.releaseReadiness },
+      warnings: [
+        ...rfcExecution.warnings,
+        "Build, test, diff, and command execution evidence is structurally validated but not independently executed by MCP.",
       ],
     };
   }
@@ -515,6 +720,8 @@ export class ProjectStatusService {
     const rollbackPreview = await this.previewCurrentRfcRollback(updatedStatus);
     const planningSynchronization =
       this.derivePlanningSynchronizationStatus(updatedStatus);
+    const completionReadiness =
+      await this.evaluateRfcCompletionReadiness(undefined, updatedStatus);
     const completedRfcLines = updatedStatus.completedRfcs.length > 0
       ? updatedStatus.completedRfcs.map((rfc) => `- ${rfc}`)
       : ["- None"];
@@ -569,6 +776,21 @@ export class ProjectStatusService {
       ...(updatedStatus.pendingRfcHandoff === undefined
         ? []
         : ["", "## Pending RFC Handoff", "", this.renderRfcHandoff(updatedStatus.pendingRfcHandoff)]),
+      "",
+      "## Project Control",
+      "",
+      `- Current RFC: ${updatedStatus.currentRfc}`,
+      `- Pending Handoff: ${updatedStatus.pendingRfcHandoff === undefined ? "No" : "Yes"}`,
+      `- Completion Readiness: ${completionReadiness.status}`,
+      "- Worker Execution: Unsupported",
+      "- Commit Automation: Unsupported",
+      "- Push Approval: User-controlled; MCP does not push",
+      ...(completionReadiness.blockers.length === 0
+        ? []
+        : completionReadiness.blockers.map((blocker) => `- Blocker: ${blocker}`)),
+      ...(completionReadiness.warnings.length === 0
+        ? []
+        : completionReadiness.warnings.map((warning) => `- Warning: ${warning}`)),
       "",
       "## Release Readiness",
       "",

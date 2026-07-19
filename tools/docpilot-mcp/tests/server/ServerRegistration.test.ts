@@ -54,6 +54,8 @@ describe("server registration and existing behavior", () => {
       "loadRfcContext",
       "submitRfcHandoff",
       "getPendingRfcHandoff",
+      "getDocPilotProjectControlContext",
+      "evaluateRfcCompletionReadiness",
       "generateMainPlanningSync",
       "listCompletedRfcs",
       "updateProjectStatus",
