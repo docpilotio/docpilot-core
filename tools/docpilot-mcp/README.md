@@ -16,6 +16,14 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 
 ## Available Tools
 
+### RFC Context and Handoff
+
+- `loadRfcContext` optionally accepts the current `rfcId` and returns deterministic official project context, operating rules, alpha criteria, guidance, synchronization, readiness, and warnings for unavailable RFC metadata. It is read-only.
+- `submitRfcHandoff` accepts `{ "handoff": RfcHandoff }`, validates schema version `1.0` and current-RFC ownership, normalizes file lists, and atomically stores one Pending Handoff. It never advances lifecycle, synchronizes Planning, commits, or pushes.
+- `getPendingRfcHandoff` accepts strict empty input and returns the current Pending Handoff plus deterministic Markdown, or a normal `found: false` result.
+
+Duplicate submission is rejected rather than silently replacing review evidence. No Handoff history, Approval Registry, or Evidence Registry is created.
+
 ### Project Status
 
 - `getProjectStatus` returns the complete current project status.
@@ -82,6 +90,12 @@ The dashboard also exposes the append-only `lifecycleHistory` array, derived `ro
 
 ## Persistence model
 
+`pendingRfcHandoff` is an optional additive field in the existing atomically replaced `project-state.json`. Legacy v0.9 files without it remain valid and are not rewritten by reads. When present, schema version `1.0` is required; unsupported future versions are rejected. Submission changes only this field and preserves project status, lifecycle, readiness, and planning state.
+
+`RfcExecutionContext` is a non-persistent read model. Because Project State does not store RFC title, goal, detailed scope, acceptance criteria, next RFC, or repository baseline, Context returns conservative empty/optional values and a warning instead of inventing data. Default alpha criteria cover build, focused tests, regression, smoke, scope, and review in stable order.
+
+`RfcHandoff` is the structured source for implementation, verification, alpha review, limitations, architecture/API changes, Git reporting, and planning updates. Markdown is rendered from it and never parsed back into official state. Main Planning Markdown includes a Pending Handoff when present.
+
 Runtime state is stored in `project-state.json`, resolved relative to the process working directory. The repository parses and validates the complete status shape on reads and writes. Saves serialize formatted JSON to `project-state.tmp.json` and rename it over `project-state.json`. The runtime state and temporary state files are not source artifacts and must not be committed.
 
 The server expects `project-state.json` to exist and contain string values for `project`, `phase`, `currentRfc`, and `release`, plus a string array named `completedRfcs`. The additive `releaseReadiness` object stores all eight readiness fields. Legacy files without the object, and objects with missing individual fields, load with deterministic `pending` defaults in memory. Reads do not rewrite legacy files; the complete readiness object is serialized on the next normal save. Invalid readiness values are rejected.
@@ -147,6 +161,9 @@ Vitest is the single test framework. Tests live under `tests/`, grouped into `re
 The current suites cover repository serialization and backward compatibility, service workflows and validation, dashboard Resource behavior, the Release Readiness Tool, server registration, and smoke checks for existing Tools, the status Resource, and the planning Prompt. Coverage reporting is not configured, and the planning output details, every error branch of older Tools, and stdio process startup are not exhaustively tested.
 
 ## Current limitations
+
+- Pending Handoff supports one current-RFC item with reject-on-duplicate behavior; consumption, archival history, approval, worker orchestration, Git automation, and automatic RFC advancement are not implemented.
+- Detailed RFC definitions are not persisted, so Context warns about unavailable scope and acceptance metadata.
 
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
 - Planning status detects Documentation Sync mismatch but does not automatically update readiness or enforce a release gate.

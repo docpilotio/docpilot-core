@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createDefaultReleaseReadiness } from "../../src/model/ProjectStatus.js";
 import {
   createProjectStatus,
+  createRfcHandoff,
   createTemporaryState,
   type TemporaryState,
 } from "../support/testState.js";
@@ -241,6 +242,24 @@ describe("ProjectStateRepository", () => {
 
     await expect(temporaryState.repository.load()).rejects.toThrow(
       "project-state.json contains an invalid lifecycleHistory event ID at index 0; expected rfc-event-000001.",
+    );
+  });
+
+  it("round-trips an additive Pending Handoff and keeps legacy state compatible", async () => {
+    temporaryState = await createTemporaryState(createProjectStatus());
+    await expect(temporaryState.repository.load()).resolves.not.toHaveProperty("pendingRfcHandoff");
+    const status = createProjectStatus({ pendingRfcHandoff: createRfcHandoff() });
+    await temporaryState.repository.save(status);
+    await expect(temporaryState.repository.load()).resolves.toEqual(status);
+  });
+
+  it("rejects an unsupported persisted Handoff schemaVersion", async () => {
+    temporaryState = await createTemporaryState({
+      ...createProjectStatus(),
+      pendingRfcHandoff: createRfcHandoff({ schemaVersion: "2.0" }),
+    });
+    await expect(temporaryState.repository.load()).rejects.toThrow(
+      "unsupported pendingRfcHandoff schemaVersion: 2.0",
     );
   });
 });

@@ -10,6 +10,15 @@ import type {
   PlanningSynchronizationState,
 } from "../model/PlanningSynchronizationStatus.js";
 import type { RfcRollbackPreview } from "../model/RfcRollbackPreview.js";
+import {
+  RFC_EXECUTION_CONTEXT_SCHEMA_VERSION,
+  type AlphaCriterion,
+  type RfcExecutionContext,
+} from "../model/RfcExecutionContext.js";
+import {
+  RFC_HANDOFF_SCHEMA_VERSION,
+  type RfcHandoff,
+} from "../model/RfcHandoff.js";
 import type {
   RfcLifecycleEvent,
   RfcLifecycleEventType,
@@ -71,6 +80,18 @@ export type StartNextRfcRequest = {
   release?: string;
 };
 
+export type PendingRfcHandoffResult = {
+  found: boolean;
+  rfcId: string;
+  handoff?: RfcHandoff;
+  markdown?: string;
+};
+
+export type SubmitRfcHandoffResult = {
+  handoff: RfcHandoff;
+  markdown: string;
+};
+
 const START_NEXT_RFC_FIELDS = ["nextRfc", "phase", "release"] as const;
 
 const RELEASE_READINESS_FIELDS = [
@@ -107,6 +128,15 @@ const PLANNING_RELEVANT_EVENT_TYPES: readonly RfcLifecycleEventType[] = [
   "rollbackCompleted",
 ];
 
+const DEFAULT_ALPHA_CRITERIA: readonly AlphaCriterion[] = [
+  { id: "A1", type: "BUILD", required: true, description: "The complete build passes." },
+  { id: "A2", type: "TEST", required: true, description: "Relevant automated tests pass." },
+  { id: "A3", type: "REGRESSION", required: true, description: "The complete regression suite passes." },
+  { id: "A4", type: "SMOKE", required: true, description: "Core smoke scenarios pass." },
+  { id: "A5", type: "SCOPE", required: true, description: "No changes exist outside the authorized scope." },
+  { id: "A6", type: "REVIEW", required: true, description: "Diff review is complete and known limitations are recorded." },
+];
+
 export class ProjectStatusService {
   public constructor(
     private readonly repository: ProjectStateRepository,
@@ -114,6 +144,104 @@ export class ProjectStatusService {
 
   public async getProjectStatus(): Promise<ProjectStatus> {
     return this.repository.load();
+  }
+
+  public async loadRfcContext(rfcId?: string): Promise<RfcExecutionContext> {
+    if (rfcId !== undefined && !this.isValidRfcIdentifier(rfcId)) {
+      throw new Error("rfcId must use the exact format RFC-0000.");
+    }
+
+    const status = await this.repository.load();
+    if (!this.isValidRfcIdentifier(status.currentRfc)) {
+      throw new Error("The current RFC must use the exact format RFC-0000.");
+    }
+    if (rfcId !== undefined && rfcId !== status.currentRfc) {
+      throw new Error(`RFC Context is available only for the current RFC ${status.currentRfc}.`);
+    }
+
+    return {
+      schemaVersion: RFC_EXECUTION_CONTEXT_SCHEMA_VERSION,
+      project: { name: status.project, phase: status.phase, release: status.release },
+      rfc: { id: status.currentRfc },
+      completedRfcs: [...status.completedRfcs],
+      operatingRules: [
+        "Preserve the existing architecture and public contracts.",
+        "Tools call Services; persistence belongs to Repositories.",
+        "Keep command side effects separate from read-only queries.",
+        "Use deterministic output and evidence-first verification.",
+        "Do not automatically complete or advance the current RFC.",
+      ],
+      scope: { inScope: [], outOfScope: [] },
+      acceptanceCriteria: [],
+      alphaCriteria: DEFAULT_ALPHA_CRITERIA.map((criterion) => ({ ...criterion })),
+      changePolicy: {
+        allowedPaths: [],
+        forbiddenPaths: [],
+        refactoringPolicy: "Avoid unrelated refactoring.",
+        publicApiPolicy: "Preserve existing public names and behavior unless explicitly changed.",
+      },
+      verification: {
+        buildCommands: ["npm.cmd run build"],
+        testCommands: ["npm.cmd test"],
+        smokeCommands: [],
+      },
+      lifecycleGuidance: await this.getRfcLifecycleGuidance(status),
+      planningSynchronization: await this.getPlanningSynchronizationStatus(status),
+      releaseReadiness: { ...status.releaseReadiness },
+      warnings: [
+        "RFC title, goal, detailed scope, acceptance criteria, repository baseline, and next RFC are not persisted in Project State.",
+      ],
+    };
+  }
+
+  public async submitRfcHandoff(handoff: RfcHandoff): Promise<SubmitRfcHandoffResult> {
+    const status = await this.repository.load();
+    this.validateHandoffBusinessRules(handoff, status.currentRfc);
+    if (status.pendingRfcHandoff !== undefined) {
+      throw new Error(`A Pending Handoff already exists for ${status.pendingRfcHandoff.rfcId}.`);
+    }
+
+    const normalized = this.normalizeHandoff(handoff);
+    await this.repository.save({ ...status, pendingRfcHandoff: normalized });
+    return { handoff: normalized, markdown: this.renderRfcHandoff(normalized) };
+  }
+
+  public async getPendingRfcHandoff(): Promise<PendingRfcHandoffResult> {
+    const status = await this.repository.load();
+    const handoff = status.pendingRfcHandoff;
+    if (handoff === undefined) return { found: false, rfcId: status.currentRfc };
+    if (handoff.rfcId !== status.currentRfc) {
+      throw new Error(`Pending Handoff RFC ${handoff.rfcId} does not match current RFC ${status.currentRfc}.`);
+    }
+    return {
+      found: true,
+      rfcId: status.currentRfc,
+      handoff,
+      markdown: this.renderRfcHandoff(handoff),
+    };
+  }
+
+  public renderRfcHandoff(handoff: RfcHandoff): string {
+    const list = (items: readonly string[]) => items.length === 0 ? ["- None"] : items.map((item) => `- ${item}`);
+    return [
+      `# RFC Handoff: ${handoff.rfcId}`,
+      "", "## RFC", "", `- ID: ${handoff.rfcId}`, `- Schema Version: ${handoff.schemaVersion}`,
+      "", "## Implementation Summary", "", handoff.implementation.summary,
+      "", "## Implemented", "", ...list(handoff.implementation.implemented),
+      "", "## Not Implemented", "", ...list(handoff.implementation.notImplemented),
+      "", "## Changed Files", "", ...list([...handoff.implementation.changedFiles, ...handoff.implementation.createdFiles, ...handoff.implementation.deletedFiles]),
+      "", "## Verification", "",
+      `- Build: ${handoff.verification.build}`, `- Tests: ${handoff.verification.tests}`,
+      `- Regression: ${handoff.verification.regression}`, `- Smoke: ${handoff.verification.smoke}`, `- Scope: ${handoff.verification.scope}`,
+      "", "## Alpha Review", "", `- Status: ${handoff.alphaReview.status}`, ...list(handoff.alphaReview.findings),
+      "", "## Known Limitations", "", ...list(handoff.alphaReview.knownLimitations),
+      "", "## Architecture Changes", "", ...list(handoff.architectureChanges),
+      "", "## API Changes", "", ...list(handoff.apiChanges),
+      "", "## Git Status", "", `- Commit: ${handoff.git.commitStatus}`, `- Push: ${handoff.git.pushStatus}`,
+      "", "## ADR Candidates", "", ...list(handoff.adrCandidates),
+      "", "## Technical Debt", "", ...list(handoff.technicalDebt),
+      "", "## Planning Update", "", ...list(handoff.planningUpdate.summary),
+    ].join("\n");
   }
 
   public async getRfcLifecycleGuidance(
@@ -438,6 +566,9 @@ export class ProjectStatusService {
       "## Planning Synchronization",
       "",
       ...this.formatPlanningSynchronization(planningSynchronization),
+      ...(updatedStatus.pendingRfcHandoff === undefined
+        ? []
+        : ["", "## Pending RFC Handoff", "", this.renderRfcHandoff(updatedStatus.pendingRfcHandoff)]),
       "",
       "## Release Readiness",
       "",
@@ -551,6 +682,77 @@ export class ProjectStatusService {
     value: unknown,
   ): value is ReleaseReadinessState {
     return value === "pending" || value === "passed" || value === "failed";
+  }
+
+  private validateHandoffBusinessRules(handoff: RfcHandoff, currentRfc: string): void {
+    if (handoff.schemaVersion !== RFC_HANDOFF_SCHEMA_VERSION) {
+      throw new Error(`Unsupported Handoff schemaVersion: ${handoff.schemaVersion}.`);
+    }
+    if (!this.isValidRfcIdentifier(handoff.rfcId)) {
+      throw new Error("Handoff rfcId must use the exact format RFC-0000.");
+    }
+    if (handoff.rfcId !== currentRfc) {
+      throw new Error(`Handoff RFC ${handoff.rfcId} does not match current RFC ${currentRfc}.`);
+    }
+    if (handoff.implementation.summary.trim().length === 0) {
+      throw new Error("Handoff implementation summary must not be empty.");
+    }
+    const implementationStatuses = ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "FAILED", "PASSED_WITH_LIMITATIONS", "PASSED"];
+    const verificationStatuses = ["NOT_RUN", "PASSED", "FAILED", "BLOCKED"];
+    const alphaStatuses = ["NOT_STARTED", "BLOCKED", "FAILED", "PASSED_WITH_LIMITATIONS", "PASSED"];
+    if (!implementationStatuses.includes(handoff.implementation.status)) throw new Error("Invalid Handoff implementation status.");
+    for (const [field, value] of [
+      ["build", handoff.verification.build],
+      ["tests", handoff.verification.tests],
+      ["regression", handoff.verification.regression],
+      ["smoke", handoff.verification.smoke],
+      ["scope", handoff.verification.scope],
+    ] as const) {
+      if (!verificationStatuses.includes(value as string)) throw new Error(`Invalid Handoff verification status for ${field}.`);
+    }
+    if (!alphaStatuses.includes(handoff.alphaReview.status)) throw new Error("Invalid Handoff alpha review status.");
+  }
+
+  private normalizeHandoff(handoff: RfcHandoff): RfcHandoff {
+    const copy = (items: readonly string[]) => [...items];
+    const files = (items: readonly string[]) => [...new Set(items)].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+    return {
+      schemaVersion: handoff.schemaVersion,
+      rfcId: handoff.rfcId,
+      ...(handoff.worker === undefined ? {} : { worker: { ...handoff.worker } }),
+      implementation: {
+        ...handoff.implementation,
+        summary: handoff.implementation.summary.trim(),
+        implemented: copy(handoff.implementation.implemented),
+        notImplemented: copy(handoff.implementation.notImplemented),
+        changedFiles: files(handoff.implementation.changedFiles),
+        createdFiles: files(handoff.implementation.createdFiles),
+        deletedFiles: files(handoff.implementation.deletedFiles),
+      },
+      verification: {
+        ...handoff.verification,
+        commandsExecuted: copy(handoff.verification.commandsExecuted),
+        details: copy(handoff.verification.details),
+      },
+      alphaReview: {
+        ...handoff.alphaReview,
+        findings: copy(handoff.alphaReview.findings),
+        blockers: copy(handoff.alphaReview.blockers),
+        warnings: copy(handoff.alphaReview.warnings),
+        knownLimitations: copy(handoff.alphaReview.knownLimitations),
+        unresolvedItems: copy(handoff.alphaReview.unresolvedItems),
+      },
+      architectureChanges: copy(handoff.architectureChanges),
+      apiChanges: copy(handoff.apiChanges),
+      adrCandidates: copy(handoff.adrCandidates),
+      technicalDebt: copy(handoff.technicalDebt),
+      git: { ...handoff.git },
+      planningUpdate: {
+        summary: copy(handoff.planningUpdate.summary),
+        releaseReadinessChanges: copy(handoff.planningUpdate.releaseReadinessChanges),
+        warnings: copy(handoff.planningUpdate.warnings),
+      },
+    };
   }
 
   private isValidRfcIdentifier(value: string): boolean {

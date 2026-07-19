@@ -15,6 +15,15 @@ import type {
   RfcLifecycleEvent,
   RfcLifecycleEventType,
 } from "../model/RfcLifecycleEvent.js";
+import type {
+  AlphaReviewStatus,
+  CommitStatus,
+  ImplementationStatus,
+  PushStatus,
+  RfcHandoff,
+  VerificationStatus,
+} from "../model/RfcHandoff.js";
+import { RFC_HANDOFF_SCHEMA_VERSION } from "../model/RfcHandoff.js";
 
 const RELEASE_READINESS_FIELDS = [
   "coreBuild",
@@ -95,7 +104,123 @@ export class ProjectStateRepository {
           ? value.lifecycleHistory
           : undefined,
       ),
+      ...("pendingRfcHandoff" in value && value.pendingRfcHandoff !== undefined
+        ? { pendingRfcHandoff: this.validateRfcHandoff(value.pendingRfcHandoff) }
+        : {}),
     };
+  }
+
+  private validateRfcHandoff(value: unknown): RfcHandoff {
+    const handoff = this.requireObject(value, "pendingRfcHandoff");
+    this.rejectUnknown(handoff, [
+      "schemaVersion", "rfcId", "worker", "implementation", "verification",
+      "alphaReview", "architectureChanges", "apiChanges", "adrCandidates",
+      "technicalDebt", "git", "planningUpdate",
+    ], "pendingRfcHandoff");
+    const implementation = this.requireObject(handoff.implementation, "pendingRfcHandoff.implementation");
+    const verification = this.requireObject(handoff.verification, "pendingRfcHandoff.verification");
+    const alphaReview = this.requireObject(handoff.alphaReview, "pendingRfcHandoff.alphaReview");
+    const git = this.requireObject(handoff.git, "pendingRfcHandoff.git");
+    const planningUpdate = this.requireObject(handoff.planningUpdate, "pendingRfcHandoff.planningUpdate");
+    this.rejectUnknown(implementation, ["status", "summary", "implemented", "notImplemented", "changedFiles", "createdFiles", "deletedFiles"], "pendingRfcHandoff.implementation");
+    this.rejectUnknown(verification, ["build", "tests", "regression", "smoke", "scope", "commandsExecuted", "details"], "pendingRfcHandoff.verification");
+    this.rejectUnknown(alphaReview, ["status", "findings", "blockers", "warnings", "knownLimitations", "unresolvedItems"], "pendingRfcHandoff.alphaReview");
+    this.rejectUnknown(git, ["branch", "baseCommit", "resultingCommit", "commitStatus", "pushStatus"], "pendingRfcHandoff.git");
+    this.rejectUnknown(planningUpdate, ["summary", "releaseReadinessChanges", "warnings"], "pendingRfcHandoff.planningUpdate");
+    const worker = handoff.worker === undefined ? undefined : this.requireObject(handoff.worker, "pendingRfcHandoff.worker");
+    if (worker !== undefined) this.rejectUnknown(worker, ["type", "executionMode", "version"], "pendingRfcHandoff.worker");
+
+    const schemaVersion = this.requireString(handoff.schemaVersion, "schemaVersion");
+    const rfcId = this.requireString(handoff.rfcId, "rfcId");
+    if (schemaVersion !== RFC_HANDOFF_SCHEMA_VERSION) throw new Error(`project-state.json contains an unsupported pendingRfcHandoff schemaVersion: ${schemaVersion}.`);
+    if (!/^RFC-[0-9]{4}$/.test(rfcId)) throw new Error("project-state.json contains an invalid pendingRfcHandoff rfcId.");
+
+    return {
+      schemaVersion,
+      rfcId,
+      ...(worker === undefined ? {} : { worker: {
+        type: this.requireString(worker.type, "worker.type"),
+        ...this.optionalString(worker.executionMode, "worker.executionMode"),
+        ...this.optionalString(worker.version, "worker.version"),
+      } }),
+      implementation: {
+        status: this.requireEnum(implementation.status, ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "FAILED", "PASSED_WITH_LIMITATIONS", "PASSED"] as const, "implementation.status") as ImplementationStatus,
+        summary: this.requireString(implementation.summary, "implementation.summary"),
+        implemented: this.requireStringArray(implementation.implemented, "implementation.implemented"),
+        notImplemented: this.requireStringArray(implementation.notImplemented, "implementation.notImplemented"),
+        changedFiles: this.requireStringArray(implementation.changedFiles, "implementation.changedFiles"),
+        createdFiles: this.requireStringArray(implementation.createdFiles, "implementation.createdFiles"),
+        deletedFiles: this.requireStringArray(implementation.deletedFiles, "implementation.deletedFiles"),
+      },
+      verification: {
+        build: this.verificationStatus(verification.build, "verification.build"),
+        tests: this.verificationStatus(verification.tests, "verification.tests"),
+        regression: this.verificationStatus(verification.regression, "verification.regression"),
+        smoke: this.verificationStatus(verification.smoke, "verification.smoke"),
+        scope: this.verificationStatus(verification.scope, "verification.scope"),
+        commandsExecuted: this.requireStringArray(verification.commandsExecuted, "verification.commandsExecuted"),
+        details: this.requireStringArray(verification.details, "verification.details"),
+      },
+      alphaReview: {
+        status: this.requireEnum(alphaReview.status, ["NOT_STARTED", "BLOCKED", "FAILED", "PASSED_WITH_LIMITATIONS", "PASSED"] as const, "alphaReview.status") as AlphaReviewStatus,
+        findings: this.requireStringArray(alphaReview.findings, "alphaReview.findings"),
+        blockers: this.requireStringArray(alphaReview.blockers, "alphaReview.blockers"),
+        warnings: this.requireStringArray(alphaReview.warnings, "alphaReview.warnings"),
+        knownLimitations: this.requireStringArray(alphaReview.knownLimitations, "alphaReview.knownLimitations"),
+        unresolvedItems: this.requireStringArray(alphaReview.unresolvedItems, "alphaReview.unresolvedItems"),
+      },
+      architectureChanges: this.requireStringArray(handoff.architectureChanges, "architectureChanges"),
+      apiChanges: this.requireStringArray(handoff.apiChanges, "apiChanges"),
+      adrCandidates: this.requireStringArray(handoff.adrCandidates, "adrCandidates"),
+      technicalDebt: this.requireStringArray(handoff.technicalDebt, "technicalDebt"),
+      git: {
+        ...this.optionalString(git.branch, "git.branch"),
+        ...this.optionalString(git.baseCommit, "git.baseCommit"),
+        ...this.optionalString(git.resultingCommit, "git.resultingCommit"),
+        commitStatus: this.requireEnum(git.commitStatus, ["NOT_CREATED", "CREATED", "UNKNOWN"] as const, "git.commitStatus") as CommitStatus,
+        pushStatus: this.requireEnum(git.pushStatus, ["NOT_REQUESTED", "PENDING_APPROVAL", "PUSHED", "FAILED", "UNKNOWN"] as const, "git.pushStatus") as PushStatus,
+      },
+      planningUpdate: {
+        summary: this.requireStringArray(planningUpdate.summary, "planningUpdate.summary"),
+        releaseReadinessChanges: this.requireStringArray(planningUpdate.releaseReadinessChanges, "planningUpdate.releaseReadinessChanges"),
+        warnings: this.requireStringArray(planningUpdate.warnings, "planningUpdate.warnings"),
+      },
+    };
+  }
+
+  private verificationStatus(value: unknown, field: string): VerificationStatus {
+    return this.requireEnum(value, ["NOT_RUN", "PASSED", "FAILED", "BLOCKED"] as const, field) as VerificationStatus;
+  }
+
+  private requireObject(value: unknown, field: string): Record<string, unknown> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`project-state.json contains an invalid ${field}.`);
+    return value as Record<string, unknown>;
+  }
+
+  private rejectUnknown(value: Record<string, unknown>, fields: readonly string[], name: string): void {
+    const unknown = Object.keys(value).find((field) => !fields.includes(field));
+    if (unknown !== undefined) throw new Error(`project-state.json contains an unknown ${name} field: ${unknown}.`);
+  }
+
+  private requireString(value: unknown, field: string): string {
+    if (typeof value !== "string" || value.length === 0) throw new Error(`project-state.json contains an invalid ${field}.`);
+    return value;
+  }
+
+  private optionalString(value: unknown, field: string): Record<string, string> {
+    if (value === undefined) return {};
+    const key = field.split(".").at(-1)!;
+    return { [key]: this.requireString(value, field) };
+  }
+
+  private requireStringArray(value: unknown, field: string): string[] {
+    if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new Error(`project-state.json contains an invalid ${field}.`);
+    return [...value];
+  }
+
+  private requireEnum<T extends string>(value: unknown, allowed: readonly T[], field: string): T {
+    if (typeof value !== "string" || !allowed.includes(value as T)) throw new Error(`project-state.json contains an invalid ${field}.`);
+    return value as T;
   }
 
   private validateLifecycleHistory(value: unknown): RfcLifecycleEvent[] {

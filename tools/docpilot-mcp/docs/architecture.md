@@ -16,6 +16,8 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 ## Model
 
+`RfcExecutionContext` is a deterministic, non-persistent query model with schema version `1.0`. `RfcHandoff` is the schema-versioned structured implementation result; verification and reporting states are closed unions. Markdown is renderer output only.
+
 `src/model/ProjectStatus.ts` defines the shared `ProjectStatus` data shape: `project`, `phase`, `currentRfc`, `release`, `completedRfcs`, and `releaseReadiness`. `ReleaseReadinessState` restricts values to `pending`, `passed`, or `failed`, while `ReleaseReadiness` defines the eight supported fields. The model also provides the deterministic all-pending default. It is a TypeScript model rather than an active domain entity; business behavior remains in the service.
 
 `src/model/RfcLifecycleGuidance.ts` defines protocol-independent fixed unions for lifecycle state and recommended action. Guidance is derived at read time and is not part of `ProjectStatus` or the persisted schema.
@@ -28,6 +30,8 @@ Dependencies point inward toward the service and persistence abstractions used b
 
 ## Repository
 
+The optional additive `pendingRfcHandoff` is validated and serialized through the existing Repository and atomic temporary-file replacement. Missing v0.9 data means no Pending Handoff and causes no migration write. Unsupported schema versions and malformed nested values are rejected. No second file or Registry is introduced.
+
 `ProjectStateRepository` is the persistence boundary. It resolves `project-state.json` from the process working directory by default, reads and parses JSON, validates the complete persisted shape, and returns a defensive copy of `completedRfcs`.
 
 On load, the repository defaults a missing `releaseReadiness` object or any missing readiness fields to `pending`. It rejects unknown readiness fields and invalid stored values. This backward-compatible deserialization does not rewrite the file. On save, it validates the model, formats the complete additive schema as JSON, writes `project-state.tmp.json`, and renames that file to `project-state.json`. The repository therefore owns persistence mechanics, persistence-boundary validation, defaulting, and serialization. Callers do not read or write the state file directly.
@@ -35,6 +39,10 @@ On load, the repository defaults a missing `releaseReadiness` object or any miss
 The Repository also defaults a missing `lifecycleHistory` to `[]`, validates every event, exact sequential event ID, RFC field, optional rollback `fromRfc`, and ISO timestamp, reconstructs events in stable field order, and serializes the array without reordering it. A rollback event requires a distinct `fromRfc`; other event types reject that field. It owns no event-creation or workflow rules and never rewrites legacy state during a read.
 
 ## Service
+
+`loadRfcContext` composes current status, lifecycle guidance, Planning Synchronization, Release Readiness, stable operating rules, and default alpha criteria without saving. Missing RFC-definition metadata is represented explicitly rather than inferred.
+
+`submitRfcHandoff` owns schema/current-RFC validation, deterministic file-path normalization, reject-on-duplicate policy, and one complete Repository save. `getPendingRfcHandoff` is read-only and detects mismatched RFC ownership. Neither operation completes or advances an RFC, changes Planning Synchronization, or appends lifecycle events.
 
 `ProjectStatusService` coordinates all current application behavior. It loads and saves state through `ProjectStateRepository`, shapes query results, generates the Main Planning Markdown summary, and owns business validation and RFC workflow rules.
 
@@ -57,6 +65,8 @@ The Service appends lifecycle events using deterministic sequence IDs and expose
 The evaluator predicts `documentationSync=passed` for `current` and `pending` for other states, compares that expectation with persisted readiness, and reports any mismatch without writing it. Repeated calls are deeply deterministic and perform no save, event append, ID allocation, or model mutation.
 
 ## Tool
+
+RFC Context/Handoff Tools are read-only `loadRfcContext`, command `submitRfcHandoff`, and read-only `getPendingRfcHandoff`. Their strict schemas preserve the Command/Query boundary and all call the Service.
 
 Tool modules register MCP operations and adapt MCP inputs and outputs to service calls. They own their published MCP schemas and error response formatting, but do not own business rules or persistence.
 
@@ -88,6 +98,8 @@ The additive `planningSynchronization` dashboard field is calculated from that s
 Resources may read through Services or a dedicated read abstraction.
 
 ## Prompt
+
+Main Planning Markdown additively embeds the deterministic Handoff renderer when a Pending Handoff exists. Structured Handoff remains available through its dedicated query Tool; Planning never parses Markdown or consumes the Handoff.
 
 `GenerateMainPlanningSyncPrompt` registers the `generateMainPlanningSync` Prompt. It accepts optional `completedWork` and `nextWork` arguments, reads current project state through the service, and constructs the existing synchronization message. Prompt behavior and argument schemas are part of the current external contract.
 
@@ -165,6 +177,8 @@ Every persistence test uses a unique directory created beneath the operating sys
 The current foundation does not configure coverage reporting, launch the stdio entry point as a child process, or exhaustively test every legacy Tool error response and planning-output detail.
 
 ## Current architectural boundaries
+
+The v0.10 boundary adds RFC execution Context and one restart-safe Pending Handoff. It excludes Handoff consumption/history, approvals, evidence registries, worker orchestration, Git/PR/CI automation, automatic lifecycle advancement, and DocPilot Core integration.
 
 The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.
 

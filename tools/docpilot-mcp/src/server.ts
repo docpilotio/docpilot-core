@@ -10,6 +10,9 @@ import { registerGenerateMainPlanningSyncTool } from "./tool/GenerateMainPlannin
 import { registerGetCurrentRfcTool } from "./tool/GetCurrentRfcTool.js";
 import { registerGetProjectStatusTool } from "./tool/GetProjectStatusTool.js";
 import { registerGetPlanningSynchronizationStatusTool } from "./tool/GetPlanningSynchronizationStatusTool.js";
+import { registerLoadRfcContextTool } from "./tool/LoadRfcContextTool.js";
+import { registerSubmitRfcHandoffTool } from "./tool/SubmitRfcHandoffTool.js";
+import { registerGetPendingRfcHandoffTool } from "./tool/GetPendingRfcHandoffTool.js";
 import { registerListCompletedRfcsTool } from "./tool/ListCompletedRfcsTool.js";
 import { registerMarkCurrentRfcCompletedTool } from "./tool/MarkCurrentRfcCompletedTool.js";
 import { registerPreviewCurrentRfcRollbackTool } from "./tool/PreviewCurrentRfcRollbackTool.js";
@@ -34,6 +37,9 @@ export function createServer(): McpServer {
   registerRollbackCurrentRfcTool(server, service);
   registerPreviewCurrentRfcRollbackTool(server, service);
   registerGetPlanningSynchronizationStatusTool(server, service);
+  registerLoadRfcContextTool(server, service);
+  registerSubmitRfcHandoffTool(server, service);
+  registerGetPendingRfcHandoffTool(server, service);
   registerGenerateMainPlanningSyncTool(server, service);
   registerListCompletedRfcsTool(server, service);
   registerUpdateProjectStatusTool(server, service);

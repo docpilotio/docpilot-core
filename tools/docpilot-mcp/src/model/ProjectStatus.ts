@@ -1,6 +1,7 @@
 export type ReleaseReadinessState = "pending" | "passed" | "failed";
 
 import type { RfcLifecycleEvent } from "./RfcLifecycleEvent.js";
+import type { RfcHandoff } from "./RfcHandoff.js";
 
 export type ReleaseReadiness = {
   coreBuild: ReleaseReadinessState;
@@ -36,4 +37,5 @@ export type ProjectStatus = {
   completedRfcs: string[];
   releaseReadiness: ReleaseReadiness;
   lifecycleHistory: readonly RfcLifecycleEvent[];
+  pendingRfcHandoff?: RfcHandoff;
 };

@@ -12,6 +12,7 @@ import {
 } from "../../src/model/ProjectStatus.js";
 import { ProjectStateRepository } from "../../src/repository/ProjectStateRepository.js";
 import { ProjectStatusService } from "../../src/service/ProjectStatusService.js";
+import type { RfcHandoff } from "../../src/model/RfcHandoff.js";
 
 export type TemporaryState = {
   directoryPath: string;
@@ -32,6 +33,40 @@ export function createProjectStatus(
     completedRfcs: ["RFC-0037", "RFC-0038"],
     releaseReadiness: createDefaultReleaseReadiness(),
     lifecycleHistory: [],
+    ...overrides,
+  };
+}
+
+export function createRfcHandoff(
+  overrides: Partial<RfcHandoff> = {},
+): RfcHandoff {
+  return {
+    schemaVersion: "1.0",
+    rfcId: "RFC-0039",
+    worker: { type: "Codex", executionMode: "workspace" },
+    implementation: {
+      status: "PASSED",
+      summary: "Implemented the RFC scope.",
+      implemented: ["Structured handoff"],
+      notImplemented: [],
+      changedFiles: ["src/z.ts", "src/a.ts", "src/a.ts"],
+      createdFiles: ["src/new.ts"],
+      deletedFiles: [],
+    },
+    verification: {
+      build: "PASSED", tests: "PASSED", regression: "PASSED",
+      smoke: "PASSED", scope: "PASSED",
+      commandsExecuted: ["npm.cmd run build", "npm.cmd test"],
+      details: ["All checks passed."],
+    },
+    alphaReview: {
+      status: "PASSED", findings: [], blockers: [], warnings: [],
+      knownLimitations: ["No orchestration."], unresolvedItems: [],
+    },
+    architectureChanges: [], apiChanges: ["Added MCP Tools"],
+    adrCandidates: [], technicalDebt: [],
+    git: { commitStatus: "NOT_CREATED", pushStatus: "NOT_REQUESTED" },
+    planningUpdate: { summary: ["Review Pending Handoff."], releaseReadinessChanges: [], warnings: [] },
     ...overrides,
   };
 }
