@@ -1,8 +1,8 @@
 {
-  "name": "docpilot-mcp-tutorial",
-  "version": "1.0.0",
+  "name": "docpilot-mcp",
+  "version": "0.1.0",
   "type": "module",
-  "description": "",
+  "description": "MCP control plane for DocPilot project status, RFC workflow, documentation, and release operations",
   "main": "index.js",
   "scripts": {
     "build": "tsc --noEmit",
