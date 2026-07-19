@@ -109,9 +109,21 @@ export class ProjectStateRepository {
       );
     }
 
-    return value.map((event, index) =>
+    const events = value.map((event, index) =>
       this.validateLifecycleEvent(event, index),
     );
+
+    for (const [index, event] of events.entries()) {
+      const expectedId = `rfc-event-${(index + 1).toString().padStart(6, "0")}`;
+
+      if (event.id !== expectedId) {
+        throw new Error(
+          `project-state.json contains an invalid lifecycleHistory event ID at index ${index}; expected ${expectedId}.`,
+        );
+      }
+    }
+
+    return events;
   }
 
   private validateLifecycleEvent(
@@ -129,6 +141,7 @@ export class ProjectStateRepository {
       "id",
       "type",
       "rfc",
+      "fromRfc",
       "phase",
       "release",
       "timestamp",
@@ -145,6 +158,12 @@ export class ProjectStateRepository {
       !this.isLifecycleEventType(event.type) ||
       typeof event.rfc !== "string" ||
       !/^RFC-[0-9]{4}$/.test(event.rfc) ||
+      (event.fromRfc !== undefined &&
+        (typeof event.fromRfc !== "string" ||
+          !/^RFC-[0-9]{4}$/.test(event.fromRfc))) ||
+      (event.type === "rollbackCompleted" &&
+        (typeof event.fromRfc !== "string" || event.fromRfc === event.rfc)) ||
+      (event.type !== "rollbackCompleted" && event.fromRfc !== undefined) ||
       typeof event.phase !== "string" ||
       typeof event.release !== "string" ||
       typeof timestamp !== "string" ||
@@ -159,6 +178,7 @@ export class ProjectStateRepository {
       id: event.id,
       type: event.type,
       rfc: event.rfc,
+      ...(event.fromRfc !== undefined ? { fromRfc: event.fromRfc } : {}),
       phase: event.phase,
       release: event.release,
       timestamp,
@@ -166,7 +186,10 @@ export class ProjectStateRepository {
   }
 
   private isLifecycleEventType(value: unknown): value is RfcLifecycleEventType {
-    return value === "started" || value === "completed" || value === "planningSynced";
+    return value === "started" ||
+      value === "completed" ||
+      value === "planningSynced" ||
+      value === "rollbackCompleted";
   }
 
   private isIsoTimestamp(value: string): boolean {

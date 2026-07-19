@@ -77,6 +77,18 @@ const RELEASE_READINESS_FIELDS = [
   "releaseCandidate",
 ] as const;
 
+type ActiveRfcContext = {
+  rfc: string;
+  phase: string;
+  release: string;
+};
+
+type RfcTransition = {
+  type: "started" | "rollbackCompleted";
+  from: ActiveRfcContext;
+  to: ActiveRfcContext;
+};
+
 export class ProjectStatusService {
   public constructor(
     private readonly repository: ProjectStateRepository,
@@ -130,6 +142,43 @@ export class ProjectStatusService {
         status.currentRfc,
       ),
       lifecycleHistory: this.appendLifecycleEvent(status, "completed"),
+    };
+
+    await this.repository.save(updatedStatus);
+
+    return updatedStatus;
+  }
+
+  public async rollbackCurrentRfc(): Promise<ProjectStatus> {
+    const status = await this.repository.load();
+
+    if (!this.isValidRfcIdentifier(status.currentRfc)) {
+      throw new Error("The current RFC must use the exact format RFC-0000.");
+    }
+
+    const previous = this.resolvePreviousRfc(status);
+
+    if (previous.rfc === status.currentRfc) {
+      throw new Error("Rollback must restore a different RFC.");
+    }
+
+    const updatedStatus: ProjectStatus = {
+      ...status,
+      phase: previous.phase,
+      currentRfc: previous.rfc,
+      release: previous.release,
+      completedRfcs: [...status.completedRfcs],
+      releaseReadiness: createDefaultReleaseReadiness(),
+      lifecycleHistory: this.appendLifecycleEvent(
+        {
+          ...status,
+          phase: previous.phase,
+          currentRfc: previous.rfc,
+          release: previous.release,
+        },
+        "rollbackCompleted",
+        status.currentRfc,
+      ),
     };
 
     await this.repository.save(updatedStatus);
@@ -515,6 +564,7 @@ export class ProjectStatusService {
   private appendLifecycleEvent(
     status: ProjectStatus,
     type: RfcLifecycleEventType,
+    fromRfc?: string,
   ): readonly RfcLifecycleEvent[] {
     const existingIds = new Set(status.lifecycleHistory.map(({ id }) => id));
     let sequence = status.lifecycleHistory.length + 1;
@@ -529,12 +579,115 @@ export class ProjectStatusService {
       id,
       type,
       rfc: status.currentRfc,
+      ...(fromRfc !== undefined ? { fromRfc } : {}),
       phase: status.phase,
       release: status.release,
       timestamp: new Date().toISOString(),
     };
 
     return [...status.lifecycleHistory, event];
+  }
+
+  private resolvePreviousRfc(status: ProjectStatus): ActiveRfcContext {
+    if (status.lifecycleHistory.length === 0) {
+      throw new Error("Lifecycle history is empty; no previous RFC can be resolved.");
+    }
+
+    let active: ActiveRfcContext | undefined;
+    let latestTransition: RfcTransition | undefined;
+
+    for (const [index, event] of status.lifecycleHistory.entries()) {
+      const expectedId = this.formatLifecycleEventId(index + 1);
+
+      if (event.id !== expectedId) {
+        throw new Error(
+          `Lifecycle event ID sequence is invalid at index ${index}; expected ${expectedId}.`,
+        );
+      }
+
+      if (!this.isValidRfcIdentifier(event.rfc)) {
+        throw new Error(`Lifecycle event at index ${index} has a malformed RFC.`);
+      }
+
+      const eventContext: ActiveRfcContext = {
+        rfc: event.rfc,
+        phase: event.phase,
+        release: event.release,
+      };
+
+      if (active === undefined) {
+        if (event.type === "rollbackCompleted") {
+          throw new Error(
+            "Lifecycle history begins with a rollback and cannot resolve a previous RFC.",
+          );
+        }
+
+        active = eventContext;
+        continue;
+      }
+
+      if (event.type === "started") {
+        if (event.rfc === active.rfc) {
+          throw new Error(
+            `Lifecycle history contains an ambiguous started event at index ${index}.`,
+          );
+        }
+
+        latestTransition = {
+          type: "started",
+          from: active,
+          to: eventContext,
+        };
+        active = eventContext;
+        continue;
+      }
+
+      if (event.type === "rollbackCompleted") {
+        if (event.fromRfc !== active.rfc || event.rfc === active.rfc) {
+          throw new Error(
+            `Lifecycle rollback evidence is inconsistent at index ${index}.`,
+          );
+        }
+
+        latestTransition = {
+          type: "rollbackCompleted",
+          from: active,
+          to: eventContext,
+        };
+        active = eventContext;
+        continue;
+      }
+
+      if (event.rfc !== active.rfc) {
+        throw new Error(
+          `Lifecycle history conflicts with the active RFC at index ${index}.`,
+        );
+      }
+
+      active = eventContext;
+    }
+
+    if (active?.rfc !== status.currentRfc) {
+      throw new Error(
+        "Current project state conflicts with lifecycle history.",
+      );
+    }
+
+    if (latestTransition === undefined) {
+      throw new Error("Lifecycle history does not contain a previous RFC transition.");
+    }
+
+    if (latestTransition.to.rfc !== status.currentRfc) {
+      throw new Error("Lifecycle history does not resolve the current RFC transition.");
+    }
+
+    if (latestTransition.type === "rollbackCompleted") {
+      throw new Error(
+        "Repeated rollback is not supported after the latest rollback event.",
+      );
+    }
+
+    return latestTransition.from;
   }
 
   private formatLifecycleEventId(sequence: number): string {
@@ -548,6 +701,10 @@ export class ProjectStatusService {
 
     if (event.type === "completed") {
       return `Completed ${event.rfc}`;
+    }
+
+    if (event.type === "rollbackCompleted") {
+      return `Rolled back ${event.fromRfc} → ${event.rfc}`;
     }
 
     return `Planning Synced for ${event.rfc}`;

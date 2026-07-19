@@ -21,8 +21,9 @@ export function registerGetProjectStatusTool(
 	  completedRfcs: z.array(z.string()),
 	  lifecycleHistory: z.array(z.object({
 	    id: z.string(),
-	    type: z.enum(["started", "completed", "planningSynced"]),
+	    type: z.enum(["started", "completed", "planningSynced", "rollbackCompleted"]),
 	    rfc: z.string(),
+	    fromRfc: z.string().optional(),
 	    phase: z.string(),
 	    release: z.string(),
 	    timestamp: z.string(),

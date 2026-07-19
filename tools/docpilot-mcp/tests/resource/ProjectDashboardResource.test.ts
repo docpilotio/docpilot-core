@@ -184,4 +184,70 @@ describe("ProjectDashboardResource", () => {
       expect.objectContaining({ type: "started", rfc: "RFC-0040" }),
     ]);
   });
+
+  it("reflects a persisted rollback without rewriting history on read", async () => {
+    const readiness = {
+      ...createDefaultReleaseReadiness(),
+      coreBuild: "passed" as const,
+    };
+    temporaryState = await createTemporaryState(
+      createProjectStatus({
+        currentRfc: "RFC-0040",
+        completedRfcs: ["RFC-0039"],
+        releaseReadiness: readiness,
+        lifecycleHistory: [
+          {
+            id: "rfc-event-000001",
+            type: "completed",
+            rfc: "RFC-0039",
+            phase: "Phase 1 — MVP",
+            release: "v0.6 MVP",
+            timestamp: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "rfc-event-000002",
+            type: "started",
+            rfc: "RFC-0040",
+            phase: "Phase 2",
+            release: "v0.7 MVP",
+            timestamp: "2026-01-02T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    await temporaryState.service.rollbackCurrentRfc();
+    const server = new McpServer({ name: "resource-test", version: "0.0.0" });
+    registerProjectDashboardResource(server, temporaryState.service);
+    const connection = await connectTestClient(server);
+    closeClient = connection.close;
+    const before = await readFile(temporaryState.stateFilePath, "utf-8");
+
+    const result = await connection.client.readResource({
+      uri: "docpilot://project/dashboard",
+    });
+    const content = result.contents[0];
+    const text = content !== undefined && "text" in content ? content.text : "";
+    const dashboard = JSON.parse(text) as Record<string, unknown>;
+
+    expect(dashboard.currentRfc).toBe("RFC-0039");
+    expect(dashboard.completedRfcs).toEqual(["RFC-0039"]);
+    expect(dashboard.releaseReadiness).toEqual(createDefaultReleaseReadiness());
+    expect(dashboard.lifecycleGuidance).toMatchObject({
+      state: "completed_waiting_next",
+      nextAction: "startNextRfc",
+    });
+    expect(dashboard.lifecycleHistory).toEqual([
+      expect.objectContaining({ id: "rfc-event-000001", type: "completed" }),
+      expect.objectContaining({ id: "rfc-event-000002", type: "started" }),
+      expect.objectContaining({
+        id: "rfc-event-000003",
+        type: "rollbackCompleted",
+        rfc: "RFC-0039",
+        fromRfc: "RFC-0040",
+      }),
+    ]);
+    await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(
+      before,
+    );
+  });
 });

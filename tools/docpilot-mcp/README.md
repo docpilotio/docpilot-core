@@ -28,6 +28,7 @@ See [docs/architecture.md](docs/architecture.md) for the detailed architecture a
 
 - `markCurrentRfcCompleted` accepts strict empty input (`{}`), marks the current RFC completed, and leaves the current RFC, phase, release, and Release Readiness unchanged.
 - `startNextRfc` starts an explicitly supplied later RFC, preserves completed history, optionally updates `phase` and `release`, and resets all Release Readiness fields to `pending`. Input is `{ "nextRfc": "RFC-0045", "phase"?: "...", "release"?: "..." }`; no other fields are accepted.
+- `rollbackCurrentRfc` accepts strict empty input (`{}`) and restores the immediately previous active RFC from lifecycle-history evidence. It resets Release Readiness and appends an audit event; it does not roll back Git, source files, branches, or commits.
 - `completeCurrentRfc` is the legacy shortcut that records the current RFC and advances immediately to its required `nextRfc`.
 
 The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `generateMainPlanningSync`. Marking validates the current RFC against exact `RFC-[0-9]{4}` syntax, explicitly rejects an already completed RFC, numerically orders and deduplicates completed history, and performs one Repository save. It does not reset readiness or invoke planning.
@@ -73,11 +74,17 @@ The server expects `project-state.json` to exist and contain string values for `
 
 ## RFC Lifecycle History
 
-`lifecycleHistory` is an additive, append-only array stored alongside project status. Legacy files without it load with an empty history and are not rewritten merely by reading. Each immutable event contains `id`, `type`, `rfc`, `phase`, `release`, and an ISO `timestamp`; event types are `started`, `completed`, and `planningSynced`.
+`lifecycleHistory` is an additive, append-only array stored alongside project status. Legacy files without it load with an empty history and are not rewritten merely by reading. Each immutable event contains `id`, `type`, `rfc`, `phase`, `release`, and an ISO `timestamp`; event types are `started`, `completed`, `planningSynced`, and `rollbackCompleted`. Rollback events additionally contain `fromRfc` so an audit reader can see both sides of the transition. Existing events remain valid without that optional field.
 
 The Service assigns deterministic sequence IDs such as `rfc-event-000001` and preserves array order as event order. `markCurrentRfcCompleted` appends `completed`, `startNextRfc` appends `started`, and the explicit `generateMainPlanningSync` Tool appends `planningSynced`. Each event is included in the same complete state save as its operation. The legacy `completeCurrentRfc` shortcut remains behaviorally unchanged and does not synthesize history events.
 
-Main Planning Markdown includes an RFC Lifecycle Timeline derived from persisted events. The Service exposes full and latest-event queries, and the dashboard returns the full history. Rollback, timeline-specific Resources, and lifecycle automation are future work.
+Main Planning Markdown includes an RFC Lifecycle Timeline derived from persisted events. Rollback entries render as `Rolled back RFC-0048 → RFC-0047`. The Service exposes full and latest-event queries, and the dashboard returns the full history including compensating rollback events.
+
+### Project-state rollback
+
+`rollbackCurrentRfc` is deliberately limited to one project-management transition. The Service validates every event and replays the canonical append order to identify the active RFC immediately before the latest `started` transition. It never guesses by subtracting an RFC number. The current persisted RFC must agree with the replayed active RFC, the latest transition must have activated it, and ambiguous, missing, malformed, or repeated-rollback evidence is rejected before any save.
+
+On success, the prior event context restores the RFC, phase, and release; completed RFCs remain historical completion records; all eight Release Readiness fields reset to `pending`; and one `rollbackCompleted` compensating event is appended in the same single save. Earlier history is never deleted, edited, reordered, or normalized. Lifecycle Guidance remains useful after rollback even when the restored RFC is in completed history. Arbitrary targets, multi-step rollback, generalized event replay, source restoration, and Git rollback are future work.
 
 ## Commands
 
@@ -124,7 +131,7 @@ The current suites cover repository serialization and backward compatibility, se
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
 - The legacy `completeCurrentRfc` operation remains supported, so clients can still bypass the preferred split lifecycle.
 - Lifecycle guidance is derived only from current status; it does not track transition history or distinguish legacy advancement from ordinary in-progress work.
-- Lifecycle history is audit data only; rollback and automatic workflow execution are not implemented.
+- Rollback supports only the immediately previous lifecycle transition; arbitrary targets, consecutive rollback, and generalized replay are not implemented.
 - Documentation operations are not implemented yet.
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.

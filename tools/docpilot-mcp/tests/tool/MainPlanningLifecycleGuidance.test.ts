@@ -144,4 +144,67 @@ describe("Main Planning lifecycle guidance", () => {
       before,
     );
   });
+
+  it("renders rollback evidence in the structured history and timeline", async () => {
+    temporaryState = await createTemporaryState(
+      createProjectStatus({
+        currentRfc: "RFC-0039",
+        completedRfcs: ["RFC-0039"],
+        lifecycleHistory: [
+          {
+            id: "rfc-event-000001",
+            type: "completed",
+            rfc: "RFC-0039",
+            phase: "Phase 1 — MVP",
+            release: "v0.6 MVP",
+            timestamp: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "rfc-event-000002",
+            type: "started",
+            rfc: "RFC-0040",
+            phase: "Phase 2",
+            release: "v0.7 MVP",
+            timestamp: "2026-01-02T00:00:00.000Z",
+          },
+          {
+            id: "rfc-event-000003",
+            type: "rollbackCompleted",
+            rfc: "RFC-0039",
+            fromRfc: "RFC-0040",
+            phase: "Phase 1 — MVP",
+            release: "v0.6 MVP",
+            timestamp: "2026-01-03T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    const server = new McpServer({ name: "planning-test", version: "0.0.0" });
+    registerGenerateMainPlanningSyncTool(server, temporaryState.service);
+    const connection = await connectTestClient(server);
+    closeClient = connection.close;
+
+    const result = await connection.client.callTool({
+      name: "generateMainPlanningSync",
+      arguments: {},
+    });
+    const text = result.content[0] !== undefined && "text" in result.content[0]
+      ? result.content[0].text
+      : "";
+
+    expect(result.structuredContent).toMatchObject({
+      currentRfc: "RFC-0039",
+      lifecycleHistory: [
+        expect.any(Object),
+        expect.any(Object),
+        expect.objectContaining({
+          type: "rollbackCompleted",
+          rfc: "RFC-0039",
+          fromRfc: "RFC-0040",
+        }),
+        expect.objectContaining({ type: "planningSynced", rfc: "RFC-0039" }),
+      ],
+    });
+    expect(text).toContain("Rolled back RFC-0040 → RFC-0039");
+  });
 });

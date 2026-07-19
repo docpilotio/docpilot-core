@@ -5,16 +5,16 @@ import { ProjectStatusService } from "../service/ProjectStatusService.js";
 
 const readinessStateSchema = z.enum(["pending", "passed", "failed"]);
 
-export function registerMarkCurrentRfcCompletedTool(
+export function registerRollbackCurrentRfcTool(
   server: McpServer,
   service: ProjectStatusService,
 ): void {
   server.registerTool(
-    "markCurrentRfcCompleted",
+    "rollbackCurrentRfc",
     {
-      title: "Mark Current RFC Completed",
+      title: "Rollback Current RFC",
       description:
-        "Marks the current RFC completed without starting another RFC.",
+        "Restores the immediately previous RFC using lifecycle evidence.",
       inputSchema: z.object({}).strict(),
       outputSchema: {
         project: z.string(),
@@ -34,7 +34,12 @@ export function registerMarkCurrentRfcCompletedTool(
         }),
         lifecycleHistory: z.array(z.object({
           id: z.string(),
-          type: z.enum(["started", "completed", "planningSynced", "rollbackCompleted"]),
+          type: z.enum([
+            "started",
+            "completed",
+            "planningSynced",
+            "rollbackCompleted",
+          ]),
           rfc: z.string(),
           fromRfc: z.string().optional(),
           phase: z.string(),
@@ -45,13 +50,13 @@ export function registerMarkCurrentRfcCompletedTool(
     },
     async () => {
       try {
-        const result = await service.markCurrentRfcCompleted();
+        const result = await service.rollbackCurrentRfc();
 
         return {
           content: [
             {
               type: "text" as const,
-              text: `Marked ${result.currentRfc} completed.`,
+              text: `Rolled back to ${result.currentRfc}.`,
             },
           ],
           structuredContent: result,
@@ -60,14 +65,14 @@ export function registerMarkCurrentRfcCompletedTool(
         const message =
           error instanceof Error
             ? error.message
-            : "An unknown error occurred while marking the current RFC completed.";
+            : "An unknown error occurred while rolling back the current RFC.";
 
         return {
           isError: true,
           content: [
             {
               type: "text" as const,
-              text: `Failed to mark the current RFC completed: ${message}`,
+              text: `Failed to rollback the current RFC: ${message}`,
             },
           ],
         };

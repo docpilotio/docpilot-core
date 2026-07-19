@@ -48,6 +48,7 @@ describe("server registration and existing behavior", () => {
       "getCurrentRfc",
       "completeCurrentRfc",
       "markCurrentRfcCompleted",
+      "rollbackCurrentRfc",
       "generateMainPlanningSync",
       "listCompletedRfcs",
       "updateProjectStatus",
