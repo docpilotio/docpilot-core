@@ -62,6 +62,7 @@ describe("ProjectDashboardResource", () => {
         nextAction: "markCurrentRfcCompleted",
         reason: "Current RFC has not been marked completed.",
       },
+      lifecycleHistory: [],
     });
     expect(text).toBe(`${JSON.stringify(dashboard, null, 2)}`);
     await expect(readFile(temporaryState.stateFilePath, "utf-8")).resolves.toBe(
@@ -142,6 +143,13 @@ describe("ProjectDashboardResource", () => {
       "RFC-0039",
     ]);
     expect(markedDashboard.releaseReadiness).toEqual(readiness);
+    expect(markedDashboard.lifecycleHistory).toEqual([
+      expect.objectContaining({
+        id: "rfc-event-000001",
+        type: "completed",
+        rfc: "RFC-0039",
+      }),
+    ]);
     expect(markedDashboard.lifecycleGuidance).toEqual({
       state: "completed_waiting_next",
       nextAction: "startNextRfc",
@@ -171,5 +179,9 @@ describe("ProjectDashboardResource", () => {
       nextAction: "markCurrentRfcCompleted",
       reason: "Current RFC has not been marked completed.",
     });
+    expect(startedDashboard.lifecycleHistory).toEqual([
+      expect.objectContaining({ type: "completed", rfc: "RFC-0039" }),
+      expect.objectContaining({ type: "started", rfc: "RFC-0040" }),
+    ]);
   });
 });

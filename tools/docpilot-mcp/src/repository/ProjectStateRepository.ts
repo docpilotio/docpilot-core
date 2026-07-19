@@ -11,6 +11,10 @@ import {
   type ReleaseReadiness,
   type ReleaseReadinessState,
 } from "../model/ProjectStatus.js";
+import type {
+  RfcLifecycleEvent,
+  RfcLifecycleEventType,
+} from "../model/RfcLifecycleEvent.js";
 
 const RELEASE_READINESS_FIELDS = [
   "coreBuild",
@@ -86,7 +90,89 @@ export class ProjectStateRepository {
           ? value.releaseReadiness
           : undefined,
       ),
+      lifecycleHistory: this.validateLifecycleHistory(
+        "lifecycleHistory" in value
+          ? value.lifecycleHistory
+          : undefined,
+      ),
     };
+  }
+
+  private validateLifecycleHistory(value: unknown): RfcLifecycleEvent[] {
+    if (value === undefined) {
+      return [];
+    }
+
+    if (!Array.isArray(value)) {
+      throw new Error(
+        "project-state.json contains an invalid lifecycleHistory array.",
+      );
+    }
+
+    return value.map((event, index) =>
+      this.validateLifecycleEvent(event, index),
+    );
+  }
+
+  private validateLifecycleEvent(
+    value: unknown,
+    index: number,
+  ): RfcLifecycleEvent {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new Error(
+        `project-state.json contains an invalid lifecycleHistory event at index ${index}.`,
+      );
+    }
+
+    const event = value as Record<string, unknown>;
+    const allowedFields = [
+      "id",
+      "type",
+      "rfc",
+      "phase",
+      "release",
+      "timestamp",
+    ];
+    const hasUnknownField = Object.keys(event).some(
+      (field) => !allowedFields.includes(field),
+    );
+    const timestamp = event.timestamp;
+
+    if (
+      hasUnknownField ||
+      typeof event.id !== "string" ||
+      event.id.length === 0 ||
+      !this.isLifecycleEventType(event.type) ||
+      typeof event.rfc !== "string" ||
+      !/^RFC-[0-9]{4}$/.test(event.rfc) ||
+      typeof event.phase !== "string" ||
+      typeof event.release !== "string" ||
+      typeof timestamp !== "string" ||
+      !this.isIsoTimestamp(timestamp)
+    ) {
+      throw new Error(
+        `project-state.json contains an invalid lifecycleHistory event at index ${index}.`,
+      );
+    }
+
+    return {
+      id: event.id,
+      type: event.type,
+      rfc: event.rfc,
+      phase: event.phase,
+      release: event.release,
+      timestamp,
+    };
+  }
+
+  private isLifecycleEventType(value: unknown): value is RfcLifecycleEventType {
+    return value === "started" || value === "completed" || value === "planningSynced";
+  }
+
+  private isIsoTimestamp(value: string): boolean {
+    const parsed = new Date(value);
+
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
   }
 
   private validateReleaseReadiness(value: unknown): ReleaseReadiness {

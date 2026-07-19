@@ -35,6 +35,16 @@ export function registerGenerateMainPlanningSyncTool(
           ]),
           reason: z.string(),
         }),
+        lifecycleHistory: z.array(
+          z.object({
+            id: z.string(),
+            type: z.enum(["started", "completed", "planningSynced"]),
+            rfc: z.string(),
+            phase: z.string(),
+            release: z.string(),
+            timestamp: z.string(),
+          }),
+        ),
       },
     },
     async () => {

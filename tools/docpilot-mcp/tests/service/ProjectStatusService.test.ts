@@ -233,6 +233,16 @@ describe("ProjectStatusService", () => {
       release: status.release,
       completedRfcs: ["RFC-0037", "RFC-0038", "RFC-0039"],
       releaseReadiness: status.releaseReadiness,
+      lifecycleHistory: [
+        expect.objectContaining({
+          id: "rfc-event-000001",
+          type: "completed",
+          rfc: "RFC-0039",
+          phase: status.phase,
+          release: status.release,
+          timestamp: expect.any(String),
+        }),
+      ],
     });
     expect(saveSpy).toHaveBeenCalledTimes(1);
     expect(saveSpy).toHaveBeenCalledWith(updated);
@@ -295,6 +305,57 @@ describe("ProjectStatusService", () => {
     );
   });
 
+  it("appends completed, started, and planningSynced events in order", async () => {
+    vi.useFakeTimers();
+    try {
+      temporaryState = await createTemporaryState(createProjectStatus());
+      vi.setSystemTime(new Date("2026-07-19T10:00:00.000Z"));
+      await temporaryState.service.markCurrentRfcCompleted();
+      vi.setSystemTime(new Date("2026-07-19T10:01:00.000Z"));
+      await temporaryState.service.startNextRfc({ nextRfc: "RFC-0040" });
+      vi.setSystemTime(new Date("2026-07-19T10:02:00.000Z"));
+      const planning = await temporaryState.service.generateMainPlanningSync();
+
+      const history = await temporaryState.service.getRfcLifecycleHistory();
+      expect(history).toEqual([
+        {
+          id: "rfc-event-000001",
+          type: "completed",
+          rfc: "RFC-0039",
+          phase: "Phase 1 — MVP",
+          release: "v0.6 MVP",
+          timestamp: "2026-07-19T10:00:00.000Z",
+        },
+        {
+          id: "rfc-event-000002",
+          type: "started",
+          rfc: "RFC-0040",
+          phase: "Phase 1 — MVP",
+          release: "v0.6 MVP",
+          timestamp: "2026-07-19T10:01:00.000Z",
+        },
+        {
+          id: "rfc-event-000003",
+          type: "planningSynced",
+          rfc: "RFC-0040",
+          phase: "Phase 1 — MVP",
+          release: "v0.6 MVP",
+          timestamp: "2026-07-19T10:02:00.000Z",
+        },
+      ]);
+      await expect(
+        temporaryState.service.getLatestRfcLifecycleEvents(2),
+      ).resolves.toEqual(history.slice(1));
+      expect(planning.lifecycleHistory).toEqual(history);
+      expect(planning.markdown).toContain("## RFC Lifecycle Timeline");
+      expect(planning.markdown).toContain("Completed RFC-0039");
+      expect(planning.markdown).toContain("Started RFC-0040");
+      expect(planning.markdown).toContain("Planning Synced for RFC-0040");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("starts and persists a valid next RFC with one final save", async () => {
     const status = createProjectStatus({
       completedRfcs: ["RFC-0037", "RFC-0038", "RFC-0039"],
@@ -316,6 +377,16 @@ describe("ProjectStatusService", () => {
       currentRfc: "RFC-0040",
       completedRfcs: status.completedRfcs,
       releaseReadiness: createDefaultReleaseReadiness(),
+      lifecycleHistory: [
+        expect.objectContaining({
+          id: "rfc-event-000001",
+          type: "started",
+          rfc: "RFC-0040",
+          phase: status.phase,
+          release: status.release,
+          timestamp: expect.any(String),
+        }),
+      ],
     });
     expect(saveSpy).toHaveBeenCalledTimes(1);
     expect(saveSpy).toHaveBeenCalledWith(updated);

@@ -31,6 +31,7 @@ export function createProjectStatus(
     release: "v0.6 MVP",
     completedRfcs: ["RFC-0037", "RFC-0038"],
     releaseReadiness: createDefaultReleaseReadiness(),
+    lifecycleHistory: [],
     ...overrides,
   };
 }

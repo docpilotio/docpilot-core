@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import type { ReleaseReadiness } from "../model/ProjectStatus.js";
 import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
+import type { RfcLifecycleEvent } from "../model/RfcLifecycleEvent.js";
 import { ProjectStatusService } from "../service/ProjectStatusService.js";
 
 const PROJECT_DASHBOARD_URI = "docpilot://project/dashboard";
@@ -15,6 +16,7 @@ type ProjectDashboard = {
   completedRfcs: string[];
   releaseReadiness: ReleaseReadiness;
   lifecycleGuidance: RfcLifecycleGuidance;
+  lifecycleHistory: readonly RfcLifecycleEvent[];
 };
 
 export function registerProjectDashboardResource(
@@ -41,6 +43,7 @@ export function registerProjectDashboardResource(
         completedRfcs: status.completedRfcs,
         releaseReadiness: status.releaseReadiness,
         lifecycleGuidance,
+        lifecycleHistory: status.lifecycleHistory,
       };
 
       return {

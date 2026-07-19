@@ -5,6 +5,10 @@ import type {
 } from "../model/ProjectStatus.js";
 import { createDefaultReleaseReadiness } from "../model/ProjectStatus.js";
 import type { RfcLifecycleGuidance } from "../model/RfcLifecycleGuidance.js";
+import type {
+  RfcLifecycleEvent,
+  RfcLifecycleEventType,
+} from "../model/RfcLifecycleEvent.js";
 import { ProjectStateRepository } from "../repository/ProjectStateRepository.js";
 
 export type CurrentRfcStatus = {
@@ -45,6 +49,7 @@ export type MainPlanningSyncResult = {
   completedCount: number;
   markdown: string;
   lifecycleGuidance: RfcLifecycleGuidance;
+  lifecycleHistory: readonly RfcLifecycleEvent[];
 };
 
 export type UpdateProjectStatusRequest = {
@@ -89,6 +94,24 @@ export class ProjectStatusService {
     return this.deriveRfcLifecycleGuidance(currentStatus);
   }
 
+  public async getRfcLifecycleHistory(): Promise<readonly RfcLifecycleEvent[]> {
+    const status = await this.repository.load();
+
+    return [...status.lifecycleHistory];
+  }
+
+  public async getLatestRfcLifecycleEvents(
+    limit: number = 5,
+  ): Promise<readonly RfcLifecycleEvent[]> {
+    if (!Number.isInteger(limit) || limit < 1) {
+      throw new Error("Lifecycle history limit must be a positive integer.");
+    }
+
+    const history = await this.getRfcLifecycleHistory();
+
+    return history.slice(-limit);
+  }
+
   public async markCurrentRfcCompleted(): Promise<ProjectStatus> {
     const status = await this.repository.load();
 
@@ -106,6 +129,7 @@ export class ProjectStatusService {
         status.completedRfcs,
         status.currentRfc,
       ),
+      lifecycleHistory: this.appendLifecycleEvent(status, "completed"),
     };
 
     await this.repository.save(updatedStatus);
@@ -176,6 +200,15 @@ export class ProjectStatusService {
       release: release ?? status.release,
       completedRfcs: [...status.completedRfcs],
       releaseReadiness: createDefaultReleaseReadiness(),
+      lifecycleHistory: this.appendLifecycleEvent(
+        {
+          ...status,
+          phase: phase ?? status.phase,
+          currentRfc: input.nextRfc,
+          release: release ?? status.release,
+        },
+        "started",
+      ),
     };
 
     await this.repository.save(updatedStatus);
@@ -245,10 +278,20 @@ export class ProjectStatusService {
 
   public async generateMainPlanningSync(): Promise<MainPlanningSyncResult> {
     const status = await this.repository.load();
-    const lifecycleGuidance = this.deriveRfcLifecycleGuidance(status);
-    const completedRfcLines = status.completedRfcs.length > 0
-      ? status.completedRfcs.map((rfc) => `- ${rfc}`)
+    const updatedStatus: ProjectStatus = {
+      ...status,
+      lifecycleHistory: this.appendLifecycleEvent(status, "planningSynced"),
+    };
+
+    await this.repository.save(updatedStatus);
+
+    const lifecycleGuidance = this.deriveRfcLifecycleGuidance(updatedStatus);
+    const completedRfcLines = updatedStatus.completedRfcs.length > 0
+      ? updatedStatus.completedRfcs.map((rfc) => `- ${rfc}`)
       : ["- None"];
+    const timelineLines = updatedStatus.lifecycleHistory.map(
+      (event) => `- ${this.formatLifecycleEvent(event)} (${event.timestamp})`,
+    );
     const readinessItems = [
       "Core Build",
       "Core Tests",
@@ -264,10 +307,10 @@ export class ProjectStatusService {
       "",
       "## Project Status",
       "",
-      `- Project: ${status.project}`,
-      `- Current Phase: ${status.phase}`,
-      `- Current RFC: ${status.currentRfc}`,
-      `- Next Release: ${status.release}`,
+      `- Project: ${updatedStatus.project}`,
+      `- Current Phase: ${updatedStatus.phase}`,
+      `- Current RFC: ${updatedStatus.currentRfc}`,
+      `- Next Release: ${updatedStatus.release}`,
       "",
       "## Completed RFCs",
       "",
@@ -275,7 +318,7 @@ export class ProjectStatusService {
       "",
       "## Current Work",
       "",
-      `The current RFC, ${status.currentRfc}, is in progress.`,
+      `The current RFC, ${updatedStatus.currentRfc}, is in progress.`,
       "",
       "## RFC Lifecycle",
       "",
@@ -283,20 +326,25 @@ export class ProjectStatusService {
       `- Recommended Tool: \`${lifecycleGuidance.nextAction}\``,
       `- Reason: ${lifecycleGuidance.reason}`,
       "",
+      "## RFC Lifecycle Timeline",
+      "",
+      ...timelineLines,
+      "",
       "## Release Readiness",
       "",
       ...readinessItems.map((item) => `- ${item}: ⏳`),
     ].join("\n");
 
     return {
-      project: status.project,
-      phase: status.phase,
-      currentRfc: status.currentRfc,
-      release: status.release,
-      completedRfcs: status.completedRfcs,
-      completedCount: status.completedRfcs.length,
+      project: updatedStatus.project,
+      phase: updatedStatus.phase,
+      currentRfc: updatedStatus.currentRfc,
+      release: updatedStatus.release,
+      completedRfcs: updatedStatus.completedRfcs,
+      completedCount: updatedStatus.completedRfcs.length,
       markdown,
       lifecycleGuidance,
+      lifecycleHistory: updatedStatus.lifecycleHistory,
     };
   }
 
@@ -462,5 +510,46 @@ export class ProjectStatusService {
 
       return left < right ? -1 : left > right ? 1 : 0;
     });
+  }
+
+  private appendLifecycleEvent(
+    status: ProjectStatus,
+    type: RfcLifecycleEventType,
+  ): readonly RfcLifecycleEvent[] {
+    const existingIds = new Set(status.lifecycleHistory.map(({ id }) => id));
+    let sequence = status.lifecycleHistory.length + 1;
+    let id = this.formatLifecycleEventId(sequence);
+
+    while (existingIds.has(id)) {
+      sequence += 1;
+      id = this.formatLifecycleEventId(sequence);
+    }
+
+    const event: RfcLifecycleEvent = {
+      id,
+      type,
+      rfc: status.currentRfc,
+      phase: status.phase,
+      release: status.release,
+      timestamp: new Date().toISOString(),
+    };
+
+    return [...status.lifecycleHistory, event];
+  }
+
+  private formatLifecycleEventId(sequence: number): string {
+    return `rfc-event-${sequence.toString().padStart(6, "0")}`;
+  }
+
+  private formatLifecycleEvent(event: RfcLifecycleEvent): string {
+    if (event.type === "started") {
+      return `Started ${event.rfc}`;
+    }
+
+    if (event.type === "completed") {
+      return `Completed ${event.rfc}`;
+    }
+
+    return `Planning Synced for ${event.rfc}`;
   }
 }

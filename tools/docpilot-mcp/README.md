@@ -44,7 +44,7 @@ Lifecycle guidance is derived from the current persisted project status and is n
 - `completed_waiting_next` recommends `startNextRfc` when the current RFC is already completed.
 - `inconsistent` recommends `manualReview` when the current RFC or completed history contains malformed identifiers or duplicate completed entries.
 
-The Service owns these decisions and deterministic reason strings. The `generateMainPlanningSync` Tool exposes guidance in structured content and in its Markdown, the Prompt appends the same RFC Lifecycle section, and `docpilot://project/dashboard` includes an additive `lifecycleGuidance` object. These reads do not persist state or execute a recommended Tool.
+The Service owns these decisions and deterministic reason strings. The `generateMainPlanningSync` Tool exposes guidance in structured content and in its Markdown, the Prompt appends the same RFC Lifecycle section, and `docpilot://project/dashboard` includes an additive `lifecycleGuidance` object. Guidance derivation, dashboard reads, and Prompt generation do not persist state or execute a recommended Tool. The explicit planning Tool records its own lifecycle-history event as described below.
 
 Because `completeCurrentRfc` advances directly to a new current RFC without storing transition metadata, its result is structurally identical to ordinary in-progress work. Guidance therefore recommends `markCurrentRfcCompleted` for that new current RFC and does not infer how it became active.
 
@@ -59,6 +59,8 @@ Because `completeCurrentRfc` advances directly to a new current RFC without stor
 
 The `releaseReadiness` object contains `coreBuild`, `coreTests`, `cli`, `incremental`, `reviewWorkflow`, `architectureSamplesValidation`, `documentationSync`, and `releaseCandidate`. Each field is persisted as `pending`, `passed`, or `failed`.
 
+The dashboard also exposes the append-only `lifecycleHistory` array in persisted order.
+
 ## Available Prompts
 
 - `generateMainPlanningSync` creates the existing Main Planning synchronization prompt. Optional `completedWork` and `nextWork` arguments add workflow context; current project data is loaded through the service.
@@ -68,6 +70,14 @@ The `releaseReadiness` object contains `coreBuild`, `coreTests`, `cli`, `increme
 Runtime state is stored in `project-state.json`, resolved relative to the process working directory. The repository parses and validates the complete status shape on reads and writes. Saves serialize formatted JSON to `project-state.tmp.json` and rename it over `project-state.json`. The runtime state and temporary state files are not source artifacts and must not be committed.
 
 The server expects `project-state.json` to exist and contain string values for `project`, `phase`, `currentRfc`, and `release`, plus a string array named `completedRfcs`. The additive `releaseReadiness` object stores all eight readiness fields. Legacy files without the object, and objects with missing individual fields, load with deterministic `pending` defaults in memory. Reads do not rewrite legacy files; the complete readiness object is serialized on the next normal save. Invalid readiness values are rejected.
+
+## RFC Lifecycle History
+
+`lifecycleHistory` is an additive, append-only array stored alongside project status. Legacy files without it load with an empty history and are not rewritten merely by reading. Each immutable event contains `id`, `type`, `rfc`, `phase`, `release`, and an ISO `timestamp`; event types are `started`, `completed`, and `planningSynced`.
+
+The Service assigns deterministic sequence IDs such as `rfc-event-000001` and preserves array order as event order. `markCurrentRfcCompleted` appends `completed`, `startNextRfc` appends `started`, and the explicit `generateMainPlanningSync` Tool appends `planningSynced`. Each event is included in the same complete state save as its operation. The legacy `completeCurrentRfc` shortcut remains behaviorally unchanged and does not synthesize history events.
+
+Main Planning Markdown includes an RFC Lifecycle Timeline derived from persisted events. The Service exposes full and latest-event queries, and the dashboard returns the full history. Rollback, timeline-specific Resources, and lifecycle automation are future work.
 
 ## Commands
 
@@ -114,6 +124,7 @@ The current suites cover repository serialization and backward compatibility, se
 - Release Readiness is manually updated; automated build, test, and release-system integrations are not implemented yet.
 - The legacy `completeCurrentRfc` operation remains supported, so clients can still bypass the preferred split lifecycle.
 - Lifecycle guidance is derived only from current status; it does not track transition history or distinguish legacy advancement from ordinary in-progress work.
+- Lifecycle history is audit data only; rollback and automatic workflow execution are not implemented.
 - Documentation operations are not implemented yet.
 - Persistence is a single local JSON file with no concurrency control, history, migrations, or remote backend.
 - The state file is not initialized automatically and errors are returned when it is missing or invalid.

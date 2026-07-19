@@ -45,7 +45,7 @@ describe("Main Planning lifecycle guidance", () => {
     return { ...connection, markSpy, startSpy };
   }
 
-  it("adds in-progress guidance to the existing Tool output without writes", async () => {
+  it("adds guidance and appends a planningSynced event without workflow execution", async () => {
     const { client, markSpy, startSpy } = await setup();
     const before = await readFile(temporaryState!.stateFilePath, "utf-8");
 
@@ -67,17 +67,34 @@ describe("Main Planning lifecycle guidance", () => {
         nextAction: "markCurrentRfcCompleted",
         reason: "Current RFC has not been marked completed.",
       },
+      lifecycleHistory: [
+        expect.objectContaining({
+          id: "rfc-event-000001",
+          type: "planningSynced",
+          rfc: "RFC-0039",
+        }),
+      ],
     });
     expect(result.content).toEqual([
       expect.objectContaining({
         text: expect.stringContaining("## RFC Lifecycle"),
       }),
     ]);
+    expect(result.content).toEqual([
+      expect.objectContaining({
+        text: expect.stringContaining("## RFC Lifecycle Timeline"),
+      }),
+    ]);
     expect(markSpy).not.toHaveBeenCalled();
     expect(startSpy).not.toHaveBeenCalled();
-    await expect(readFile(temporaryState!.stateFilePath, "utf-8")).resolves.toBe(
-      before,
-    );
+    const after = await readFile(temporaryState!.stateFilePath, "utf-8");
+    expect(after).not.toBe(before);
+    const persisted = JSON.parse(after) as {
+      lifecycleHistory: Array<{ type: string }>;
+    };
+    expect(persisted.lifecycleHistory).toEqual([
+      expect.objectContaining({ type: "planningSynced" }),
+    ]);
   });
 
   it("recommends startNextRfc when the current RFC is completed", async () => {
