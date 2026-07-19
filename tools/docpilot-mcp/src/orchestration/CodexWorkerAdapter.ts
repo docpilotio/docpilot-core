@@ -35,6 +35,7 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
 }
 
 export function validateCodexImplementationResult(value: unknown, workOrder: ImplementationWorkOrder): CodexImplementationResult {
+  if (containsDangerousKey(value)) throw new Error("Codex result contains a prohibited object key.");
   if (typeof value !== "object" || value === null) throw new Error("Codex result must be a JSON object.");
   const result = value as Partial<CodexImplementationResult>;
   if (result.schemaVersion !== workOrder.resultContract.expectedSchemaVersion) throw new Error("Codex result schemaVersion does not match the Work Order.");
@@ -47,4 +48,11 @@ export function validateCodexImplementationResult(value: unknown, workOrder: Imp
   }
   if (typeof result.implementation.summary !== "string" || typeof result.git.commitCreated !== "boolean" || typeof result.git.pushPerformed !== "boolean") throw new Error("Codex result contains invalid scalar fields.");
   return result as CodexImplementationResult;
+}
+
+function containsDangerousKey(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(containsDangerousKey);
+  if (typeof value !== "object" || value === null) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.some(([key, child]) => ["__proto__", "prototype", "constructor"].includes(key) || containsDangerousKey(child));
 }

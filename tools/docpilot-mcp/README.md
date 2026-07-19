@@ -38,6 +38,18 @@ The Capability Manifest reports deterministic Work Order generation, controlled 
 
 The Worker JSON is treated as a claim. MCP independently validates its schema/RFC/Work Order identity, actual Git evidence, verification results, policy review, and twelve ordered Alpha Gates. Only `PASSED` or `PASSED_WITH_LIMITATIONS` creates the official Pending Handoff; failure remains in the Execution Record. Work Order preparation, execution, Handoff generation, and commit never complete or advance an RFC and never mark Planning synchronized.
 
+### v0.12.1 orchestration stabilization
+
+Real execution uses an atomic repository-scoped lock at `.docpilot/orchestration-lock`. The lock directory is acquired with one atomic filesystem operation and contains validated schema, canonical repository identity, Work Order/RFC, PID, process-start identity, acquisition time, and hostname. A live or uncertain owner is never removed. Only a demonstrably dead PID is recovered, and malformed metadata requires manual recovery. Dry-run and read-only queries never create the lock or runtime directory.
+
+A persisted `RUNNING` record remains evidence rather than being silently rewritten. Pending Work Order queries add optional recovery diagnostics based on current lock evidence; execution remains blocked and is never automatically resumed. Missing Work Order/Execution counterparts are rejected as inconsistent state. Existing v0.10-v0.12 state remains loadable without migration.
+
+Process termination distinguishes timeout from cancellation, records exit signal and termination stages, bounds buffers before concatenation, removes listeners, and attempts process-tree termination (POSIX process group; Windows `taskkill /T` plus direct termination). Windows command wrappers retain strict metacharacter rejection. Canonical path resolution follows existing parents to prevent symlink escape for not-yet-created result paths.
+
+Git evidence uses NUL-delimited porcelain and preserves staged, unstaged, untracked, deletion, rename, and type-change categories. Runtime-only `.docpilot` paths do not make Preflight dirty, but cannot authorize product changes. Execution captures evidence after lock acquisition and before Worker start, then blocks if HEAD or non-runtime state changed after Preflight.
+
+Commit creation rejects every pre-existing staged path, rechecks expected HEAD, stages explicit candidate files only, verifies the exact cached path set and cached diff, and validates an actual new commit object. Its own staged paths are restored if commit creation fails. Restart evidence with an unexpected HEAD is blocked as a possible already-created commit; no duplicate commit or push is attempted.
+
 ### RFC Context and Handoff
 
 - `loadRfcContext` optionally accepts the current `rfcId` and returns deterministic official project context, operating rules, alpha criteria, guidance, synchronization, readiness, and warnings for unavailable RFC metadata. It is read-only.
@@ -189,6 +201,8 @@ The current suites cover repository serialization and backward compatibility, se
 - Completion Readiness still evaluates a submitted Handoff, while v0.12 execution independently collects process and Git evidence before generating that Handoff.
 - Project Control does not acknowledge, consume, or archive Pending Handoffs.
 - Local Codex execution depends on a compatible installed CLI. No cloud Worker, retry queue, push, PR, merge, tag, release, or CI/CD execution is implemented.
+- Lock liveness relies on OS process probes. A live PID whose full cross-process start identity cannot be proven is conservatively retained rather than automatically recovered.
+- Recovery is diagnostic and blocking: v0.12.1 does not add retry, cancel, consume, archive, or automatic workspace cleanup operations.
 
 - Pending Handoff supports one current-RFC item with reject-on-duplicate behavior; consumption, archival history, approval, worker orchestration, Git automation, and automatic RFC advancement are not implemented.
 - Detailed RFC definitions are not persisted, so Context warns about unavailable scope and acceptance metadata.

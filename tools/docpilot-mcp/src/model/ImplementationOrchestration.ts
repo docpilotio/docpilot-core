@@ -40,7 +40,8 @@ export type ImplementationPreflightResult = {
 };
 export type ProcessExecutionResult = {
   status: "PASSED" | "FAILED" | "TIMED_OUT" | "CANCELLED";
-  exitCode?: number; stdout: string; stderr: string; outputTruncated: boolean;
+  exitCode?: number; signal?: string; stdout: string; stderr: string; outputTruncated: boolean;
+  timedOut: boolean; cancelled: boolean; terminationSteps: string[];
 };
 export type CodexWorkerExecution = {
   schemaVersion: string; rfcId: string; workOrderId: string;
@@ -60,7 +61,7 @@ export type VerificationExecutionSummary = {
 export type RepositoryEvidence = {
   schemaVersion: string; branch: string; baselineCommit: string; headCommit: string;
   changedFiles: string[]; createdFiles: string[]; deletedFiles: string[]; renamedFiles: string[];
-  stagedFiles: string[]; untrackedFiles: string[]; warnings: string[];
+  stagedFiles: string[]; untrackedFiles: string[]; typeChangedFiles?: string[]; warnings: string[];
 };
 export type RepositoryDiffValidation = {
   schemaVersion: string; status: "PASSED" | "FAILED" | "PASSED_WITH_WARNINGS";
@@ -92,4 +93,6 @@ export type ImplementationExecutionRecord = {
   workerExecution?: CodexWorkerExecution; verification?: VerificationExecutionSummary;
   diffValidation?: RepositoryDiffValidation; review?: WorkerReviewResult; alpha?: WorkerAlphaResult;
   generatedHandoff?: RfcHandoff; commitSha?: string; warnings: string[]; errors: string[];
+  repositoryBefore?: RepositoryEvidence;
+  recoveryDiagnostics?: { status: "NONE" | "INTERRUPTED" | "RECOVERY_REQUIRED"; reason: string; lockState: "ABSENT" | "ACTIVE" | "STALE" | "RECOVERY_REQUIRED" };
 };

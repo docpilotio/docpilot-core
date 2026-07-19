@@ -46,7 +46,13 @@ The Repository also defaults a missing `lifecycleHistory` to `[]`, validates eve
 
 `ImplementationOrchestrationService` is an application service alongside `ProjectStatusService`, not a second Project State aggregate. It owns Work Order rules, ordered preflight, controlled verification orchestration, scope/diff validation, policy review, twelve MCP Alpha gates, Handoff mapping, and commit eligibility. It persists through `ProjectStateRepository`; Tools never access persistence or Git directly.
 
+`RepositoryExecutionLock` is the v0.12.1 multi-process execution boundary. Atomic directory creation at `.docpilot/orchestration-lock` supplies mutual exclusion without a Registry. Metadata validation combines canonical repository identity, Work Order/RFC, PID, process-start identity, acquisition time, and hostname. Inspection is read-only and does not create `.docpilot`. Dead owners may be recovered; live, indeterminate, mismatched, or malformed owners block execution. Acquisition is after the unchanged sixteen Preflight checks, and release is attempted in `finally` for success, failure, timeout, and cancellation.
+
 Process and Git details are isolated behind `ProcessRunner`, `CodexWorkerAdapter`, and `GitRepositoryController`. The controlled runner uses `spawn` with `shell:false`, explicit executable/arguments, an in-repository working directory, timeout/cancellation, allowlisted environment, bounded output, and secret masking. Git operations use fixed non-destructive argument arrays and porcelain output. Reset, clean, stash, checkout, amend, push, force-push, and branch manipulation are absent.
+
+Termination is a stateful boundary: timeout and cancellation are distinct, graceful and forced stages are recorded, POSIX process groups and Windows process trees are targeted, streams/listeners are cleaned, and secret masking also covers diagnostics. Output is truncated while streaming rather than accumulated without bound.
+
+Git evidence is collected immediately before Worker invocation and after it. NUL-delimited porcelain prevents whitespace/path ambiguity and distinguishes index, worktree, untracked, delete, rename, and type-change evidence. Commit candidates require an empty pre-existing index, exact authorized cached paths, unchanged expected HEAD, cached diff validation, and a verifiable new commit object. Failed commit attempts restore only paths staged by that attempt; existing user stages are never touched because they block before staging.
 
 The Work Order ID is `${RFC}-${baseline short SHA}`. Preparation fixes HEAD and branch, normalizes scope, and stores at most one current-RFC Work Order. Preflight evaluates a fixed check order: identity/presence/schema, repository/Git/baseline/HEAD/branch/tree, scope/path, Codex availability, result path, command policy, and Pending Handoff absence. Dry-run performs no save or process execution.
 
@@ -201,6 +207,8 @@ The current foundation does not configure coverage reporting, launch the stdio e
 ## Current architectural boundaries
 
 v0.12 includes one local controlled Worker, deterministic Work Orders, preflight, bounded process execution, actual Git evidence, verification orchestration, policy review, MCP Alpha evaluation, Pending Handoff generation, and an Alpha-gated explicit-file commit candidate. Push approval is represented as a boundary only; actual push is impossible. There is no cloud/multi-worker queue, retry loop, generalized workflow engine, approval/evidence registry, PR/merge/tag/release/CI integration, or automatic RFC completion/advance.
+
+v0.12.1 stabilizes that boundary with repository-scoped locking, conservative stale-lock recovery, read-only restart diagnostics, hardened process-tree termination, before/after repository evidence, and index-safe commit recovery. It deliberately does not provide automatic retry, lock override, workspace cleanup, Work Order lifecycle operations, or delivery automation.
 
 v0.11 selects read-only Pending Handoff evaluation only: acknowledge, consume, archive, and history remain unsupported. The boundary excludes Codex/OpenAI/process execution, Work Orders, retries/queues, Git/PR/release/CI operations, registries, automatic readiness mutation, RFC completion/advance, and DocPilot Core integration.
 

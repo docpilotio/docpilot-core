@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { ControlledProcessRunner } from "../../src/orchestration/ControlledProcessRunner.js";
@@ -11,6 +11,7 @@ import type { ImplementationWorkOrder } from "../../src/model/ImplementationOrch
 import { ProjectStateRepository } from "../../src/repository/ProjectStateRepository.js";
 import { ImplementationOrchestrationService, renderCodexImplementationPrompt, validateRepositoryDiff } from "../../src/service/ImplementationOrchestrationService.js";
 import { ProjectStatusService } from "../../src/service/ProjectStatusService.js";
+import { RepositoryExecutionLock } from "../../src/orchestration/RepositoryExecutionLock.js";
 import { createProjectStatus } from "../support/testState.js";
 
 const exec = promisify(execFile);
@@ -107,5 +108,59 @@ describe("ImplementationOrchestrationService", () => {
     const result = { reportedFiles: { changed: [], created: [], deleted: [] } } as never;
     const validation = validateRepositoryDiff(order, evidence, result);
     expect(validation.status).toBe("FAILED"); expect(validation.forbiddenFiles).toEqual(["docs/secret/key.md"]); expect(validation.unexpectedFiles).toEqual(["src/out.ts"]); expect(validation.warnings).toHaveLength(1);
+  });
+
+  it("releases the repository lock after Worker failure and timeout", async () => {
+    for (const workerStatus of ["throw", "timeout"] as const) {
+      const fake: CodexWorkerAdapter = { execute: async (order) => {
+        if (workerStatus === "throw") throw new Error("fake worker failure");
+        return { schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "TIMED_OUT", stdout: "", stderr: "", outputTruncated: false, resultFileFound: false, warnings: [], errors: [] };
+      } };
+      const state = await fixture(fake);
+      const order = await state.service.prepareWorkOrder({ repositoryRoot: state.gitRoot, approvedPlan: ["Implement"], allowedPaths: ["docs/**"] });
+      await state.repository.save({ ...(await state.repository.load()), pendingImplementationWorkOrder: { ...order, execution: { ...order.execution, codexCommand: process.execPath } } });
+      await expect(state.service.execute()).rejects.toThrow();
+      expect((await new RepositoryExecutionLock().inspect(state.gitRoot)).state).toBe("ABSENT");
+      expect((await state.repository.load()).implementationExecutionRecord?.status).toBe("FAILED");
+    }
+  });
+
+  it("releases the repository lock after cancellation", async () => {
+    const fake: CodexWorkerAdapter = { execute: async (_order, _prompt, signal) => new Promise((_resolve, reject) => {
+      if (signal?.aborted === true) { reject(new Error("fake cancellation")); return; }
+      signal?.addEventListener("abort", () => reject(new Error("fake cancellation")), { once: true });
+    }) };
+    const state = await fixture(fake); const order = await state.service.prepareWorkOrder({ repositoryRoot: state.gitRoot, approvedPlan: ["Implement"], allowedPaths: ["docs/**"] });
+    await state.repository.save({ ...(await state.repository.load()), pendingImplementationWorkOrder: { ...order, execution: { ...order.execution, codexCommand: process.execPath } } });
+    const controller = new AbortController(); const execution = state.service.execute(false, controller.signal); setTimeout(() => controller.abort(), 200);
+    await expect(execution).rejects.toThrow("fake cancellation"); expect((await new RepositoryExecutionLock().inspect(state.gitRoot)).state).toBe("ABSENT");
+  });
+
+  it("diagnoses persisted RUNNING state without writing or automatic retry", async () => {
+    const state = await fixture(); const order = await state.service.prepareWorkOrder({ repositoryRoot: state.gitRoot, approvedPlan: ["Implement"], allowedPaths: ["docs/**"] });
+    await state.repository.save({ ...(await state.repository.load()), implementationExecutionRecord: { schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "RUNNING", baselineCommit: order.repository.baselineCommit, warnings: [], errors: [] } });
+    const before = await readFile(join(state.directory, "state.json"), "utf8");
+    const query = await state.service.getPendingWorkOrder();
+    expect(query.recoveryDiagnostics).toMatchObject({ status: "INTERRUPTED", lockState: "ABSENT" });
+    expect(await readFile(join(state.directory, "state.json"), "utf8")).toBe(before);
+    await expect(state.service.execute()).rejects.toThrow("requires recovery review");
+    expect((await state.project.getProjectStatus()).currentRfc).toBe("RFC-0039");
+    expect((await state.project.getProjectStatus()).pendingRfcHandoff).toBeUndefined();
+  });
+
+  it("reports a live lock for persisted RUNNING state and rejects orphan records", async () => {
+    const state = await fixture(); const order = await state.service.prepareWorkOrder({ repositoryRoot: state.gitRoot, approvedPlan: ["Implement"], allowedPaths: ["docs/**"] });
+    await state.repository.save({ ...(await state.repository.load()), implementationExecutionRecord: { schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "RUNNING", baselineCommit: order.repository.baselineCommit, warnings: [], errors: [] } });
+    const lock = await new RepositoryExecutionLock().acquire(state.gitRoot, order.id, order.rfcId);
+    expect((await state.service.getPendingWorkOrder()).recoveryDiagnostics).toMatchObject({ status: "NONE", lockState: "ACTIVE" }); await lock.release();
+    await state.repository.save({ ...createProjectStatus(), implementationExecutionRecord: { schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "FAILED", baselineCommit: order.repository.baselineCommit, warnings: [], errors: [] } });
+    await expect(state.service.getPendingWorkOrder()).rejects.toThrow("without its Pending Work Order");
+  });
+
+  it("reports orphan Worker result files without changing state", async () => {
+    const state = await fixture(); const order = await state.service.prepareWorkOrder({ repositoryRoot: state.gitRoot, approvedPlan: ["Implement"], allowedPaths: ["docs/**"] });
+    const loaded = await state.repository.load(); const { implementationExecutionRecord: _record, ...withoutRecord } = loaded; await state.repository.save(withoutRecord);
+    const resultPath = join(state.gitRoot, order.resultContract.resultFile); await mkdir(dirname(resultPath), { recursive: true }); await writeFile(resultPath, "{}");
+    const before = await readFile(join(state.directory, "state.json"), "utf8"); expect((await state.service.getPendingWorkOrder()).recoveryDiagnostics).toMatchObject({ status: "RECOVERY_REQUIRED" }); expect(await readFile(join(state.directory, "state.json"), "utf8")).toBe(before);
   });
 });

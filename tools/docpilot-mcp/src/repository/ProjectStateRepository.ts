@@ -166,9 +166,6 @@ export class ProjectStateRepository {
   private validateExecutionRecord(value: unknown): ImplementationExecutionRecord {
     const record = this.requireObject(value, "implementationExecutionRecord");
     if (record.schemaVersion !== IMPLEMENTATION_EXECUTION_SCHEMA_VERSION || typeof record.rfcId !== "string" || typeof record.workOrderId !== "string" || typeof record.baselineCommit !== "string" || !["CREATED", "PREFLIGHT_FAILED", "READY", "RUNNING", "SUCCEEDED", "FAILED", "BLOCKED", "TIMED_OUT", "CANCELLED"].includes(String(record.status)) || !Array.isArray(record.warnings) || !Array.isArray(record.errors)) throw new Error("project-state.json contains an invalid Implementation Execution Record.");
-    if (record.status === "RUNNING") {
-      return { ...(record as unknown as ImplementationExecutionRecord), status: "BLOCKED", warnings: [...record.warnings as string[], "Recovered an untracked RUNNING execution after restart; automatic retry is disabled."] };
-    }
     return record as unknown as ImplementationExecutionRecord;
   }
 

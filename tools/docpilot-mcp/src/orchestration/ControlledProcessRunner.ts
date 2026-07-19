@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import type { ProcessExecutionResult } from "../model/ImplementationOrchestration.js";
 
 export type ProcessRequest = {
@@ -26,7 +26,7 @@ export function maskSensitiveOutput(value: string): string {
 export async function assertPathInside(root: string, candidate: string, label: string): Promise<string> {
   const canonicalRoot = await realpath(root);
   const resolvedCandidate = resolve(candidate);
-  const canonicalCandidate = await realpath(resolvedCandidate).catch(() => resolvedCandidate);
+  const canonicalCandidate = await canonicalizePotentialPath(resolvedCandidate);
   const relation = relative(canonicalRoot, canonicalCandidate);
   if (relation === ".." || relation.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(relation)) {
     throw new Error(`${label} must be inside the repository root.`);
@@ -39,7 +39,7 @@ export class ControlledProcessRunner implements ProcessRunner {
     const cwd = await assertPathInside(request.repositoryRoot, request.workingDirectory, "workingDirectory");
     if (!Number.isInteger(request.timeoutSeconds) || request.timeoutSeconds <= 0) throw new Error("timeoutSeconds must be a positive integer.");
     if (!Number.isInteger(request.maxOutputCharacters) || request.maxOutputCharacters <= 0) throw new Error("maxOutputCharacters must be a positive integer.");
-    if (/[\r\n\0]/.test(request.executable) || request.args.some((arg) => /[\0]/.test(arg))) throw new Error("Process arguments contain prohibited control characters.");
+    if (/[\r\n\0]/.test(request.executable) || request.args.some((arg) => /[\r\n\0]/.test(arg))) throw new Error("Process arguments contain prohibited control characters.");
     const windowsScript = process.platform === "win32" && /\.(cmd|bat)$/i.test(request.executable);
     if (windowsScript && [request.executable, ...request.args].some((part) => /["&|<>^%\r\n]/.test(part))) throw new Error("Windows command wrapper rejected shell metacharacters.");
 
@@ -54,27 +54,81 @@ export class ControlledProcessRunner implements ProcessRunner {
       let stderr = "";
       let outputTruncated = false;
       let settled = false;
+      let terminationKind: "TIMED_OUT" | "CANCELLED" | undefined;
+      const terminationSteps: string[] = [];
       const append = (current: string, chunk: Buffer): string => {
-        const combined = current + chunk.toString("utf8");
-        if (combined.length <= request.maxOutputCharacters) return combined;
+        const remaining = request.maxOutputCharacters - current.length;
+        if (remaining <= 0) { outputTruncated = true; return current; }
+        const text = chunk.toString("utf8");
+        if (text.length <= remaining) return current + text;
         outputTruncated = true;
-        return combined.slice(0, request.maxOutputCharacters);
+        return current + text.slice(0, remaining);
       };
-      const child = spawn(windowsScript ? process.env.ComSpec ?? "cmd.exe" : request.executable, windowsScript ? ["/d", "/c", request.executable, ...request.args] : [...request.args], { cwd, env: environment, shell: false, windowsHide: true });
+      const child = spawn(windowsScript ? process.env.ComSpec ?? "cmd.exe" : request.executable, windowsScript ? ["/d", "/c", request.executable, ...request.args] : [...request.args], { cwd, env: environment, shell: false, windowsHide: true, detached: process.platform !== "win32" });
       child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
       child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
-      const finish = (result: ProcessExecutionResult): void => {
+      const finish = (result: Omit<ProcessExecutionResult, "timedOut" | "cancelled" | "terminationSteps">): void => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
+        clearTimeout(forceTimer);
+        clearTimeout(finalTimer);
         signal?.removeEventListener("abort", abort);
-        completion({ ...result, stdout: maskSensitiveOutput(stdout), stderr: maskSensitiveOutput(stderr), outputTruncated });
+        child.stdout.removeAllListeners(); child.stderr.removeAllListeners();
+        child.stdout.destroy(); child.stderr.destroy();
+        completion({ ...result, stdout: maskSensitiveOutput(stdout), stderr: maskSensitiveOutput(stderr), outputTruncated, timedOut: result.status === "TIMED_OUT", cancelled: result.status === "CANCELLED", terminationSteps: [...terminationSteps] });
       };
-      const abort = (): void => { child.kill(); finish({ status: "CANCELLED", stdout: "", stderr: "", outputTruncated }); };
+      let forceTimer: NodeJS.Timeout | undefined;
+      let finalTimer: NodeJS.Timeout | undefined;
+      const terminate = (kind: "TIMED_OUT" | "CANCELLED"): void => {
+        if (terminationKind !== undefined || settled) return;
+        terminationKind = kind;
+        terminationSteps.push("GRACEFUL_REQUESTED");
+        if (process.platform === "win32") terminateTree(child.pid, true, terminationSteps);
+        try { child.kill("SIGTERM"); terminationSteps.push("DIRECT_SIGTERM"); } catch (error: unknown) { terminationSteps.push(`DIRECT_TERMINATION_ERROR:${error instanceof Error ? maskSensitiveOutput(error.message) : "unknown"}`); }
+        if (process.platform !== "win32") terminateTree(child.pid, false, terminationSteps);
+        forceTimer = setTimeout(() => { terminationSteps.push("FORCE_REQUESTED"); try { child.kill("SIGKILL"); terminationSteps.push("DIRECT_SIGKILL"); } catch (error: unknown) { terminationSteps.push(`DIRECT_FORCE_ERROR:${error instanceof Error ? maskSensitiveOutput(error.message) : "unknown"}`); } terminateTree(child.pid, true, terminationSteps); finalTimer = setTimeout(() => finish({ status: kind, stdout: "", stderr: "", outputTruncated }), 1000); }, 500);
+      };
+      const abort = (): void => terminate("CANCELLED");
       signal?.addEventListener("abort", abort, { once: true });
-      const timeout = setTimeout(() => { child.kill(); finish({ status: "TIMED_OUT", stdout: "", stderr: "", outputTruncated }); }, request.timeoutSeconds * 1000);
+      const timeout = setTimeout(() => terminate("TIMED_OUT"), request.timeoutSeconds * 1000);
       child.on("error", (error) => { stderr = append(stderr, Buffer.from(error.message)); finish({ status: "FAILED", stdout: "", stderr: "", outputTruncated }); });
-      child.on("close", (code) => finish({ status: code === 0 ? "PASSED" : "FAILED", ...(code === null ? {} : { exitCode: code }), stdout: "", stderr: "", outputTruncated }));
+      child.on("close", (code, signalName) => {
+        const result = { status: terminationKind ?? (code === 0 ? "PASSED" as const : "FAILED" as const), ...(code === null ? {} : { exitCode: code }), ...(signalName === null ? {} : { signal: signalName }), stdout: "", stderr: "", outputTruncated };
+        if (terminationKind !== undefined) { terminateTree(child.pid, true, terminationSteps); setTimeout(() => finish(result), 150); }
+        else finish(result);
+      });
     });
+  }
+}
+
+async function canonicalizePotentialPath(candidate: string): Promise<string> {
+  let existing = candidate; const missing: string[] = [];
+  while (true) {
+    try { return resolve(await realpath(existing), ...missing.reverse()); }
+    catch {
+      const parent = dirname(existing);
+      if (parent === existing) return candidate;
+      missing.push(candidateSegment(existing)); existing = parent;
+    }
+  }
+}
+
+function candidateSegment(path: string): string { const parent = dirname(path); return path.slice(parent.length).replace(/^[/\\]/, ""); }
+
+function terminateTree(pid: number | undefined, force: boolean, diagnostics: string[]): void {
+  if (pid === undefined) { diagnostics.push("PROCESS_ID_UNAVAILABLE"); return; }
+  try {
+    if (process.platform === "win32") {
+      const child = spawn("taskkill.exe", ["/PID", String(pid), "/T", ...(force ? ["/F"] : [])], { shell: false, windowsHide: true, stdio: "ignore" });
+      child.unref();
+      diagnostics.push(force ? "WINDOWS_TREE_FORCE" : "WINDOWS_TREE_GRACEFUL");
+    } else {
+      process.kill(-pid, force ? "SIGKILL" : "SIGTERM");
+      diagnostics.push(force ? "POSIX_GROUP_SIGKILL" : "POSIX_GROUP_SIGTERM");
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? maskSensitiveOutput(error.message) : "unknown termination error";
+    diagnostics.push(`TERMINATION_ERROR:${message}`);
   }
 }

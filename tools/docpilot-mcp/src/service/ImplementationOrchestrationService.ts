@@ -11,9 +11,10 @@ import {
 } from "../model/ImplementationOrchestration.js";
 import { ProjectStateRepository } from "../repository/ProjectStateRepository.js";
 import type { ProjectStatusService } from "./ProjectStatusService.js";
-import { assertPathInside, type ProcessRunner } from "../orchestration/ControlledProcessRunner.js";
+import { assertPathInside, maskSensitiveOutput, type ProcessRunner } from "../orchestration/ControlledProcessRunner.js";
 import { GitRepositoryController, normalizeGitPath } from "../orchestration/GitRepositoryController.js";
 import { type CodexWorkerAdapter, validateCodexImplementationResult } from "../orchestration/CodexWorkerAdapter.js";
+import { RepositoryExecutionLock } from "../orchestration/RepositoryExecutionLock.js";
 
 export type ControlledCommandInput = Omit<ControlledCommand, "workingDirectory"> & { workingDirectory?: string };
 export type PrepareImplementationWorkOrderInput = {
@@ -22,7 +23,7 @@ export type PrepareImplementationWorkOrderInput = {
   verification?: { targetedCommands?: ControlledCommandInput[]; moduleCommands?: ControlledCommandInput[]; buildCommands?: ControlledCommandInput[]; regressionCommands?: ControlledCommandInput[]; smokeCommands?: ControlledCommandInput[] };
   gitPolicy?: { allowCommit?: boolean };
 };
-export type PendingImplementationWorkOrderResult = { found: boolean; rfcId: string; workOrder?: ImplementationWorkOrder };
+export type PendingImplementationWorkOrderResult = { found: boolean; rfcId: string; workOrder?: ImplementationWorkOrder; recoveryDiagnostics?: ImplementationExecutionRecord["recoveryDiagnostics"] };
 export type ExecuteImplementationResult = { dryRun: boolean; preflight: ImplementationPreflightResult; prompt: string; command: { executable: string; args: string[]; workingDirectory: string }; execution?: ImplementationExecutionRecord };
 
 const PROCESS_ENVIRONMENT = ["ComSpec", "PATH", "PATHEXT", "Path", "SystemRoot", "TEMP", "TMP"];
@@ -37,12 +38,14 @@ export class ImplementationOrchestrationService {
     private readonly runner: ProcessRunner,
     private readonly git: GitRepositoryController,
     private readonly worker: CodexWorkerAdapter,
+    private readonly executionLock: RepositoryExecutionLock = new RepositoryExecutionLock(),
   ) {}
 
   public async prepareWorkOrder(input: PrepareImplementationWorkOrderInput): Promise<ImplementationWorkOrder> {
     const status = await this.repository.load();
     if (status.pendingRfcHandoff !== undefined) throw new Error("A Pending RFC Handoff already exists; a new implementation run is not allowed.");
     if (status.pendingImplementationWorkOrder !== undefined) throw new Error("A Pending Implementation Work Order already exists for the current RFC.");
+    if (status.implementationExecutionRecord !== undefined) throw new Error("An orphaned Implementation Execution Record requires recovery review before preparing a Work Order.");
     if (input.approvedPlan.length === 0) throw new Error("approvedPlan must contain at least one step.");
     if (input.allowedPaths.length === 0) throw new Error("allowedPaths must contain at least one repository-relative path.");
     const root = await realpath(input.repositoryRoot).catch(() => { throw new Error("repositoryRoot does not exist."); });
@@ -90,9 +93,20 @@ export class ImplementationOrchestrationService {
   public async getPendingWorkOrder(): Promise<PendingImplementationWorkOrderResult> {
     const status = await this.repository.load();
     const workOrder = status.pendingImplementationWorkOrder;
-    if (workOrder === undefined) return { found: false, rfcId: status.currentRfc };
+    if (workOrder === undefined) {
+      if (status.implementationExecutionRecord !== undefined) throw new Error("Implementation Execution Record exists without its Pending Work Order; manual recovery is required.");
+      return { found: false, rfcId: status.currentRfc };
+    }
     if (workOrder.rfcId !== status.currentRfc) throw new Error("Pending Implementation Work Order does not match the current RFC.");
-    return { found: true, rfcId: status.currentRfc, workOrder };
+    const resultPath = await assertPathInside(workOrder.repository.rootPath, resolve(workOrder.repository.rootPath, workOrder.resultContract.resultFile), "resultFile");
+    const resultExists = await access(resultPath).then(() => true, () => false);
+    const record = status.implementationExecutionRecord;
+    if (record === undefined && resultExists) return { found: true, rfcId: status.currentRfc, workOrder, recoveryDiagnostics: { status: "RECOVERY_REQUIRED", reason: "Worker result exists without an Implementation Execution Record.", lockState: "ABSENT" } };
+    if (record?.workerExecution?.resultFileFound === true && !resultExists) return { found: true, rfcId: status.currentRfc, workOrder, recoveryDiagnostics: { status: "RECOVERY_REQUIRED", reason: "Execution Record references a missing Worker result file.", lockState: "ABSENT" } };
+    if (record !== undefined && record.workerExecution === undefined && resultExists) return { found: true, rfcId: status.currentRfc, workOrder, recoveryDiagnostics: { status: "RECOVERY_REQUIRED", reason: "Orphan Worker result requires manual recovery review.", lockState: "ABSENT" } };
+    if (status.implementationExecutionRecord?.status !== "RUNNING") return { found: true, rfcId: status.currentRfc, workOrder };
+    const inspection = await this.executionLock.inspect(workOrder.repository.rootPath);
+    return { found: true, rfcId: status.currentRfc, workOrder, recoveryDiagnostics: { status: inspection.state === "ACTIVE" ? "NONE" : inspection.state === "STALE" || inspection.state === "ABSENT" ? "INTERRUPTED" : "RECOVERY_REQUIRED", reason: inspection.state === "ACTIVE" ? "The persisted RUNNING execution still has a live lock owner." : `The persisted RUNNING execution cannot be resumed automatically: ${inspection.reason}`, lockState: inspection.state } };
   }
 
   public async preflight(status?: ProjectStatus): Promise<ImplementationPreflightResult> {
@@ -131,6 +145,10 @@ export class ImplementationOrchestrationService {
     const status = await this.repository.load();
     const order = status.pendingImplementationWorkOrder;
     if (order === undefined) throw new Error("No Pending Implementation Work Order exists.");
+    if (status.implementationExecutionRecord?.status === "RUNNING") {
+      const inspection = await this.executionLock.inspect(order.repository.rootPath);
+      throw new Error(`The previous execution is still RUNNING and requires recovery review (${inspection.state}): ${inspection.reason}`);
+    }
     if (status.implementationExecutionRecord !== undefined && !["CREATED", "PREFLIGHT_FAILED", "READY"].includes(status.implementationExecutionRecord.status)) throw new Error("The Pending Implementation Work Order has already been executed; automatic retry is disabled.");
     const preflight = await this.preflight(status);
     const prompt = renderCodexImplementationPrompt(order);
@@ -142,8 +160,14 @@ export class ImplementationOrchestrationService {
       return { ...responseBase, execution: record };
     }
     this.running = true;
+    let acquiredLock: Awaited<ReturnType<RepositoryExecutionLock["acquire"]>> | undefined;
+    let primaryError: Error | undefined;
     try {
-      const running: ImplementationExecutionRecord = { ...this.createdRecord(order), status: "RUNNING", preflight };
+      acquiredLock = await this.executionLock.acquire(order.repository.rootPath, order.id, order.rfcId);
+      const repositoryBefore = await this.git.collectEvidence(order.repository.rootPath, order.repository.baselineCommit);
+      const nonRuntimeBefore = allEvidenceFiles(repositoryBefore).filter((file) => !isRuntimeFile(file));
+      if (repositoryBefore.headCommit !== order.repository.baselineCommit || repositoryBefore.stagedFiles.length > 0 || nonRuntimeBefore.length > 0) throw new Error("Repository changed after Preflight; Worker execution was not started.");
+      const running: ImplementationExecutionRecord = { ...this.createdRecord(order), status: "RUNNING", preflight, repositoryBefore, warnings: acquiredLock.staleLockRecovered ? ["A stale execution lock was recovered before this run."] : [] };
       await this.repository.save({ ...status, implementationExecutionRecord: running });
       const workerExecution = await this.worker.execute(order, prompt, signal);
       const result = await this.readWorkerResult(order, workerExecution.resultFileFound);
@@ -157,16 +181,25 @@ export class ImplementationOrchestrationService {
       const record: ImplementationExecutionRecord = {
         schemaVersion: IMPLEMENTATION_EXECUTION_SCHEMA_VERSION, rfcId: order.rfcId, workOrderId: order.id, status: executionStatus,
         baselineCommit: order.repository.baselineCommit, resultingHead: evidence.headCommit, preflight, workerExecution, verification,
-        diffValidation, review, alpha, ...(handoff === undefined ? {} : { generatedHandoff: handoff }), warnings: [...alpha.warnings], errors: [...alpha.blockers],
+        diffValidation, review, alpha, repositoryBefore, ...(handoff === undefined ? {} : { generatedHandoff: handoff }), warnings: stable([...(acquiredLock.staleLockRecovered ? ["A stale execution lock was recovered before this run."] : []), ...alpha.warnings]), errors: [...alpha.blockers],
       };
       await this.repository.save({ ...status, implementationExecutionRecord: record, ...(handoff === undefined ? {} : { pendingRfcHandoff: handoff }) });
       return { ...responseBase, execution: record };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Implementation execution failed unexpectedly.";
+      const message = maskSensitiveOutput(error instanceof Error ? error.message : "Implementation execution failed unexpectedly.");
+      primaryError = error instanceof Error ? error : new Error(message);
       const failed: ImplementationExecutionRecord = { ...this.createdRecord(order), status: "FAILED", preflight, errors: [message] };
       await this.repository.save({ ...status, implementationExecutionRecord: failed });
-      throw error;
-    } finally { this.running = false; }
+      throw primaryError;
+    } finally {
+      try { await acquiredLock?.release(); }
+      catch (releaseError: unknown) {
+        const diagnostic = maskSensitiveOutput(releaseError instanceof Error ? releaseError.message : "unknown lock release failure");
+        if (primaryError !== undefined) primaryError.message = `${primaryError.message} Lock release also failed: ${diagnostic}`;
+        else throw new Error(`Implementation completed but lock release failed: ${diagnostic}`);
+      }
+      finally { this.running = false; }
+    }
   }
 
   public async createCommit(message: string): Promise<{ commitSha: string; pushStatus: "PENDING_APPROVAL" }> {
@@ -179,8 +212,9 @@ export class ImplementationOrchestrationService {
     if (record.commitSha !== undefined) throw new Error("An Implementation Commit already exists for this Work Order.");
     if (record.diffValidation?.status === "FAILED") throw new Error("Diff Validation must pass before a commit can be created.");
     const evidence = await this.git.collectEvidence(order.repository.rootPath, order.repository.baselineCommit);
+    if (evidence.headCommit !== order.repository.baselineCommit) throw new Error("Repository HEAD already changed; possible prior commit requires recovery review.");
     const files = allEvidenceFiles(evidence).filter((file) => isAllowed(file, order.scope.allowedPaths) && !isRuntimeFile(file));
-    const commitSha = await this.git.createCommit(order.repository.rootPath, files, message);
+    const commitSha = await this.git.createCommit(order.repository.rootPath, files, message, order.repository.baselineCommit);
     const updatedHandoff = status.pendingRfcHandoff === undefined ? undefined : { ...status.pendingRfcHandoff, git: { ...status.pendingRfcHandoff.git, resultingCommit: commitSha, commitStatus: "CREATED" as const, pushStatus: "PENDING_APPROVAL" as const } };
     await this.repository.save({ ...status, implementationExecutionRecord: { ...record, commitSha }, ...(updatedHandoff === undefined ? {} : { pendingRfcHandoff: updatedHandoff }) });
     return { commitSha, pushStatus: "PENDING_APPROVAL" };
@@ -309,7 +343,7 @@ function pathInside(root: string, value: string): boolean { const relation = rel
 function pathMatches(file: string, scope: string): boolean { const prefix = scope.replace(/\/\*\*$/, "").replace(/\/$/, ""); return file === prefix || file.startsWith(`${prefix}/`); }
 function isAllowed(file: string, scopes: readonly string[]): boolean { return scopes.some((scope) => pathMatches(file, scope)); }
 function isRuntimeFile(file: string): boolean { return file === "project-state.json" || file.startsWith(".docpilot/"); }
-function allEvidenceFiles(evidence: RepositoryEvidence): string[] { return stable([...evidence.changedFiles, ...evidence.createdFiles, ...evidence.deletedFiles, ...evidence.renamedFiles, ...evidence.untrackedFiles]); }
+function allEvidenceFiles(evidence: RepositoryEvidence): string[] { return stable([...evidence.changedFiles, ...evidence.createdFiles, ...evidence.deletedFiles, ...evidence.renamedFiles, ...(evidence.typeChangedFiles ?? []), ...evidence.untrackedFiles]); }
 function stable(values: readonly string[]): string[] { return [...new Set(values)].sort((left, right) => left < right ? -1 : left > right ? 1 : 0); }
 function equalArrays(left: readonly string[], right: readonly string[]): boolean { return left.length === right.length && left.every((value, index) => value === right[index]); }
 function requiredCategoryPassed(commands: readonly CommandExecutionResult[]): boolean { return commands.some((item) => item.required) && commands.every((item) => !item.required || item.status === "PASSED"); }
