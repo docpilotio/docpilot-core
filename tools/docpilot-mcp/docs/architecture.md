@@ -46,7 +46,11 @@ All Tools call `ProjectStatusService`; none accesses `ProjectStateRepository` di
 
 `ProjectStatusResource` registers the existing `project-status` Resource at the stable URI `docpilot://project/status`. It reads current state through `ProjectStatusService` and returns formatted JSON with the `application/json` media type.
 
-Resources may read through Services or a dedicated read abstraction. No project dashboard Resource exists yet.
+`ProjectDashboardResource` registers the read-only `project-dashboard` Resource at `docpilot://project/dashboard`. It calls `ProjectStatusService.getProjectStatus()` and returns `project`, `phase`, `currentRfc`, `release`, the ordered `completedRfcs`, a derived `completedCount`, and `releaseReadiness` as formatted JSON with the `application/json` media type. Its dependency path remains Resource → Service → Repository.
+
+The dashboard's eight Release Readiness fields are fixed to `pending`. They are a deterministic, non-persistent read-model placeholder: the Resource does not write state, and the fields are not part of the `project-state.json` schema. Persistent Release Readiness and its workflow remain future work.
+
+Resources may read through Services or a dedicated read abstraction.
 
 ## Prompt
 
@@ -98,6 +102,6 @@ This overlap at external boundaries is intentional. Business rules must remain e
 
 ## Current architectural boundaries
 
-The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, one status Resource, and one planning Prompt.
+The package is a local, single-process control plane backed by one JSON document. It covers project status queries and updates, RFC completion, completed RFC reporting, Main Planning generation, project status and dashboard Resources, and one planning Prompt.
 
-The current boundary excludes a `ProjectDashboardResource`, Release Readiness implementation, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.
+The current boundary excludes persistent Release Readiness and its workflow, dedicated documentation operations, additional transports, authentication, concurrent-writer coordination, persistence migrations, and remote storage. Those are follow-up product capabilities and should be introduced without bypassing the established layers or changing existing MCP contracts unintentionally.

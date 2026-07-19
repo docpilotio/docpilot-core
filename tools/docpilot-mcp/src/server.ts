@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { registerGenerateMainPlanningSyncPrompt } from "./prompt/GenerateMainPlanningSyncPrompt.js";
 import { ProjectStateRepository } from "./repository/ProjectStateRepository.js";
+import { registerProjectDashboardResource } from "./resource/ProjectDashboardResource.js";
 import { registerProjectStatusResource } from "./resource/ProjectStatusResource.js";
 import { ProjectStatusService } from "./service/ProjectStatusService.js";
 import { registerCompleteCurrentRfcTool } from "./tool/CompleteCurrentRfcTool.js";
@@ -28,6 +29,7 @@ export function createServer(): McpServer {
   registerUpdateProjectStatusTool(server, service);
 
   registerProjectStatusResource(server, service);
+  registerProjectDashboardResource(server, service);
   registerGenerateMainPlanningSyncPrompt(server, service);
 
   return server;
