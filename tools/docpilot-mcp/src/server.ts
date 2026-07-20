@@ -40,7 +40,7 @@ export function createServer(): McpServer {
 
   const server = new McpServer({
     name: "docpilot-project-control",
-    version: "0.12.1",
+    version: "0.12.2",
   });
 
   registerGetProjectStatusTool(server, service);
