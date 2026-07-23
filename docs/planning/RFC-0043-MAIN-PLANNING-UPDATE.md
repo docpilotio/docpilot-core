@@ -3,6 +3,12 @@
 ## Project Dashboard
 
 ```text
+Current Version
+DocPilot MCP v0.12.3
+
+Current Status
+Controlled Implementation Orchestration Windows real-environment stabilization complete
+
 Current Phase
 Phase 1 — MVP / POC
 
@@ -24,6 +30,77 @@ Source → Project Analysis → Knowledge Model → ProjectSpecification(DIR)
 ```
 
 The `Phase 2 — Post-MVP Evolution` label in the earlier RFC-0042 planning update is superseded by the user-confirmed Phase 1 MVP / POC definition. The first goal and validation target are unchanged.
+
+## DocPilot MCP v0.12.3 Completed Work
+
+- Transport the multiline deterministic Codex Worker prompt through stdin instead of process arguments while retaining process-argument control-character validation.
+- Resolve executables through Windows `PATH` and `PATHEXT`, preferring `npm.cmd` over extensionless `npm`.
+- Execute `.cmd` and `.bat` files through a constrained `cmd.exe /d /c` wrapper.
+- Persist Worker failure diagnostics: `workerExecution`, `exitCode`, `stdout`, `stderr`, `resultFileFound`, and `repositoryBefore`.
+- Prohibit Worker-side `git add`, `git commit`, and HEAD changes in the Worker prompt.
+- Capture structured results with Codex CLI `--output-last-message` and enforce an RFC/Work Order identity-bound schema with `--output-schema`.
+- Remove stale Worker results before execution and clean up the runtime output schema afterward.
+- Separate control-plane runtime results from implementation scope evidence.
+- Make every CLI output-schema property required for Structured Outputs compatibility while retaining the runtime model's optional `git.commit` contract outside the CLI schema.
+- Generate the Pending Handoff after successful verification and Alpha review.
+
+## DocPilot MCP v0.12.3 Validation Evidence
+
+```text
+Focused Tests
+PASS — 2 files / 2 tests
+
+Typecheck
+PASS
+
+Build
+PASS
+
+Full Tests
+PASS — 25 files / 183 tests
+
+git diff --check
+PASS
+
+Actual Windows E2E
+SUCCEEDED — Work Order RFC-9001-b3434741c2a1
+
+Verification
+PASSED
+
+Alpha
+PASSED_WITH_LIMITATIONS
+
+Worker exit code
+0
+
+resultFileFound
+true
+
+Pending Handoff
+created
+
+Worker commit attempt
+none
+
+Git HEAD
+unchanged — b3434741c2a1f969fd1ad48c4e4fb1e3fd510298
+
+Orchestration lock released
+true
+```
+
+The actual Windows E2E passed targeted, module, build, regression, smoke, and verification checks. It changed only `tools/docpilot-mcp/docs/e2e-orchestration-smoke.md` in the E2E worktree, created no commit, performed no push, left no staged files, and released the orchestration lock. Evidence is retained at `C:\WorkSpace\docpilot-core-orchestration-e2e.codex\evidence\v0.12.3-client-timeout-20260720-205348`.
+
+## DocPilot MCP v0.12.3 Known Limitation
+
+- Alpha is `PASSED_WITH_LIMITATIONS` because the `.docpilot` control-plane runtime artifact appears as untracked Repository Evidence.
+- This is neither an implementation-scope violation nor a release blocker.
+- Repository Evidence should later distinguish implementation diffs, control-plane runtime artifacts, verification caches, and user-authored repository changes structurally.
+
+## Current Position
+
+DocPilot MCP v0.12.3 implementation and actual Windows E2E stabilization are complete. Git commit, push, PR, merge, tag, and release are not complete. The existing Roadmap and RFC-0044 handoff remain unchanged.
 
 ## RFC-0043 Purpose
 

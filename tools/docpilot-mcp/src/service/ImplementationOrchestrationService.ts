@@ -152,7 +152,7 @@ export class ImplementationOrchestrationService {
     if (status.implementationExecutionRecord !== undefined && !["CREATED", "PREFLIGHT_FAILED", "READY"].includes(status.implementationExecutionRecord.status)) throw new Error("The Pending Implementation Work Order has already been executed; automatic retry is disabled.");
     const preflight = await this.preflight(status);
     const prompt = renderCodexImplementationPrompt(order);
-    const responseBase = { dryRun, preflight, prompt, command: { executable: order.execution.codexCommand, args: [...order.execution.codexArguments, "<deterministic-prompt>"], workingDirectory: order.repository.workingDirectory } };
+    const responseBase = { dryRun, preflight, prompt, command: { executable: order.execution.codexCommand, args: [...order.execution.codexArguments, "-"], workingDirectory: order.repository.workingDirectory } };
     if (dryRun) return responseBase;
     if (preflight.status !== "PASSED") {
       const record = { ...this.createdRecord(order), status: "PREFLIGHT_FAILED" as const, preflight, errors: [...preflight.blockers] };
@@ -170,6 +170,13 @@ export class ImplementationOrchestrationService {
       const running: ImplementationExecutionRecord = { ...this.createdRecord(order), status: "RUNNING", preflight, repositoryBefore, warnings: acquiredLock.staleLockRecovered ? ["A stale execution lock was recovered before this run."] : [] };
       await this.repository.save({ ...status, implementationExecutionRecord: running });
       const workerExecution = await this.worker.execute(order, prompt, signal);
+      await this.repository.save({
+        ...status,
+        implementationExecutionRecord: {
+          ...running,
+          workerExecution,
+        },
+      });
       const result = await this.readWorkerResult(order, workerExecution.resultFileFound);
       const verification = await this.runVerification(order);
       const evidence = await this.git.collectEvidence(order.repository.rootPath, order.repository.baselineCommit);
@@ -188,8 +195,25 @@ export class ImplementationOrchestrationService {
     } catch (error: unknown) {
       const message = maskSensitiveOutput(error instanceof Error ? error.message : "Implementation execution failed unexpectedly.");
       primaryError = error instanceof Error ? error : new Error(message);
-      const failed: ImplementationExecutionRecord = { ...this.createdRecord(order), status: "FAILED", preflight, errors: [message] };
-      await this.repository.save({ ...status, implementationExecutionRecord: failed });
+      const latest = await this.repository.load();
+      const previous = latest.implementationExecutionRecord;
+      const failed: ImplementationExecutionRecord = {
+        ...this.createdRecord(order),
+        status: "FAILED",
+        preflight,
+        ...(previous?.repositoryBefore === undefined
+          ? {}
+          : { repositoryBefore: previous.repositoryBefore }),
+        ...(previous?.workerExecution === undefined
+          ? {}
+          : { workerExecution: previous.workerExecution }),
+        warnings: stable(previous?.warnings ?? []),
+        errors: stable([...(previous?.errors ?? []), message]),
+      };
+      await this.repository.save({
+        ...latest,
+        implementationExecutionRecord: failed,
+      });
       throw primaryError;
     } finally {
       try { await acquiredLock?.release(); }
@@ -279,8 +303,11 @@ export function renderCodexImplementationPrompt(order: ImplementationWorkOrder):
     "Alpha criteria:", ...order.objective.alphaCriteria.map((item) => `- ${item.id}: ${item.description}`),
     "Verification commands:", ...commands.map((item) => `- ${item}`),
     `Baseline commit: ${order.repository.baselineCommit}`,
-    `Result JSON: ${order.resultContract.resultFile} (schemaVersion ${order.resultContract.expectedSchemaVersion}, rfcId ${order.rfcId}, workOrderId ${order.id}).`,
-    "Do not push, force-push, change branches, complete or advance the RFC, or modify paths outside scope. Implement, verify, review, and write the structured result without requesting confirmation.",
+    `Result JSON capture target: ${order.resultContract.resultFile} (schemaVersion ${order.resultContract.expectedSchemaVersion}, rfcId ${order.rfcId}, workOrderId ${order.id}).`,
+    "The result is a control-plane runtime artifact. It is exempt from implementation allowed-path restrictions and Codex CLI captures it from your final message; do not create or edit the result file with repository tools.",
+    "Your final assistant message must contain only the JSON object required by the output schema. Do not use Markdown fences or explanatory text in the final message.",
+    "Do not run git add, git commit, or any command that changes repository HEAD. Only MCP may create the implementation commit after Alpha passes.",
+    "Do not push, force-push, change branches, complete or advance the RFC, or modify implementation paths outside scope. Implement, verify, review, and return the structured result without requesting confirmation.",
   ].join("\n");
 }
 

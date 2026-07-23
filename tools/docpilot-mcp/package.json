@@ -1,27 +1,31 @@
 {
-  "name": "docpilot-mcp",
-  "version": "0.12.1",
-  "type": "module",
-  "description": "MCP control plane for DocPilot project status, RFC workflow, documentation, and release operations",
-  "main": "index.js",
-  "scripts": {
-    "build": "tsc --noEmit",
-    "dev": "tsx src/index.ts",
-    "inspector": "npx -y @modelcontextprotocol/inspector tsx src/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@types/node": "^26.1.1",
-    "tsx": "^4.23.1",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
-  }
+    "name": "docpilot-mcp",
+    "version": "0.12.3",
+    "type": "module",
+    "description": "MCP control plane for DocPilot project status, RFC workflow, documentation, and release operations",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "npm run clean && npm run typecheck && tsc -p tsconfig.build.json",
+        "dev": "tsx src/index.ts",
+        "inspector": "npx -y @modelcontextprotocol/inspector node dist/index.js",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "typecheck": "tsc --noEmit",
+        "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+        "start:mcp": "node dist/index.js",
+        "inspector:dev": "npx -y @modelcontextprotocol/inspector tsx src/index.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "zod": "^4.4.3"
+    },
+    "devDependencies": {
+        "@types/node": "^26.1.1",
+        "tsx": "^4.23.1",
+        "typescript": "^7.0.2",
+        "vitest": "^4.1.10"
+    }
 }

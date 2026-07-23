@@ -143,7 +143,7 @@ Both surfaces also add Planning Synchronization status. Prompt evaluation is ful
 
 `src/index.ts` creates the server, connects `StdioServerTransport`, and reports startup or fatal startup errors on standard error. `src/server.ts` is the composition root: it creates one repository, injects it into one service, constructs the MCP server, and registers every Tool, Resource, and Prompt.
 
-The MCP server identity is `docpilot-project-control` at version `0.12.0`.
+The MCP server identity is `docpilot-project-control` at version `0.12.3`.
 
 The preferred lifecycle is `markCurrentRfcCompleted` → `startNextRfc` → `generateMainPlanningSync`. The existing `completeCurrentRfc` contract remains a combined completion-and-advancement operation with its required input and response shape for compatibility. Both completion methods use the same Service-owned numeric ordering and duplicate removal. The Repository remains unaware of workflow semantics, and Main Planning synchronization remains an explicit follow-up Tool or Prompt operation.
 

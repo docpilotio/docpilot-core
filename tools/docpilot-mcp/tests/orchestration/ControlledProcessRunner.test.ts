@@ -18,6 +18,59 @@ describe("ControlledProcessRunner", () => {
     expect(result).toMatchObject({ status: "PASSED", exitCode: 0, stdout: "ok", stderr: "note", outputTruncated: false });
   });
 
+  it("writes multiline stdin and closes the input stream", async () => {
+    const root = await directory();
+    const script = [
+      "process.stdin.setEncoding('utf8')",
+      "let input = ''",
+      "process.stdin.on('data', (chunk) => { input += chunk })",
+      "process.stdin.on('end', () => process.stdout.write(input))",
+    ].join(";");
+
+    const result = await new ControlledProcessRunner().execute({
+      executable: process.execPath,
+      args: ["-e", script],
+      stdin: "first line\nsecond line\n",
+      workingDirectory: root,
+      repositoryRoot: root,
+      timeoutSeconds: 5,
+      maxOutputCharacters: 100,
+      environmentAllowlist: [],
+    });
+
+    expect(result).toMatchObject({
+      status: "PASSED",
+      exitCode: 0,
+      stdout: "first line\nsecond line\n",
+      timedOut: false,
+      cancelled: false,
+    });
+  });
+
+  it("retains argument control-character rejection and rejects NUL stdin", async () => {
+    const root = await directory();
+    const runner = new ControlledProcessRunner();
+    const base = {
+      executable: process.execPath,
+      workingDirectory: root,
+      repositoryRoot: root,
+      timeoutSeconds: 5,
+      maxOutputCharacters: 100,
+      environmentAllowlist: [],
+    };
+
+    await expect(runner.execute({
+      ...base,
+      args: ["line-one\nline-two"],
+    })).rejects.toThrow("Process arguments contain prohibited control characters.");
+
+    await expect(runner.execute({
+      ...base,
+      args: ["-e", ""],
+      stdin: "unsafe\0input",
+    })).rejects.toThrow("Process stdin contains prohibited NUL characters.");
+  });
+
   it("limits output and masks secrets", async () => {
     const root = await directory();
     const result = await new ControlledProcessRunner().execute({
@@ -58,6 +111,67 @@ describe("ControlledProcessRunner", () => {
   it("masks common credential formats deterministically", () => {
     expect(maskSensitiveOutput("Authorization=abc Bearer xyz password: nope")).toBe("Authorization=[REDACTED] Bearer [REDACTED] password: [REDACTED]");
   });
+
+  it.runIf(process.platform === "win32")(
+    "resolves an extensionless Windows command wrapper through PATH",
+    async () => {
+      const root = await directory();
+      const commandName = "docpilot-test-wrapper";
+      const extensionlessDecoy = join(root, commandName);
+      const commandPath = join(root, `${commandName}.cmd`);
+
+      await writeFile(
+        extensionlessDecoy,
+        "#!/bin/sh\necho wrong-launcher\n",
+      );
+
+      await writeFile(
+        commandPath,
+        "@echo off\r\necho resolved-%1\r\n",
+      );
+
+      const previousPath = process.env.PATH;
+      const previousPathExt = process.env.PATHEXT;
+
+      try {
+        process.env.PATH = root;
+        process.env.PATHEXT = ".CMD";
+
+        const result = await new ControlledProcessRunner().execute({
+          executable: commandName,
+          args: ["value"],
+          workingDirectory: root,
+          repositoryRoot: root,
+          timeoutSeconds: 5,
+          maxOutputCharacters: 100,
+          environmentAllowlist: [
+            "PATH",
+            "PATHEXT",
+            "SystemRoot",
+            "ComSpec",
+          ],
+        });
+
+        expect(result).toMatchObject({
+          status: "PASSED",
+          exitCode: 0,
+        });
+        expect(result.stdout.trim()).toBe("resolved-value");
+      } finally {
+        if (previousPath === undefined) {
+          delete process.env.PATH;
+        } else {
+          process.env.PATH = previousPath;
+        }
+
+        if (previousPathExt === undefined) {
+          delete process.env.PATHEXT;
+        } else {
+          process.env.PATHEXT = previousPathExt;
+        }
+      }
+    },
+  );
 
   it.runIf(process.platform === "win32")("runs a constrained Windows command wrapper and rejects metacharacters", async () => {
     const root = await directory(); const script = join(root, "safe.cmd"); await writeFile(script, "@echo off\r\necho %1\r\n");
