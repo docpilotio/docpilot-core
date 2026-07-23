@@ -12,6 +12,7 @@ import { ProjectStateRepository } from "../../src/repository/ProjectStateReposit
 import { ImplementationOrchestrationService, renderCodexImplementationPrompt, validateRepositoryDiff } from "../../src/service/ImplementationOrchestrationService.js";
 import { ProjectStatusService } from "../../src/service/ProjectStatusService.js";
 import { RepositoryExecutionLock } from "../../src/orchestration/RepositoryExecutionLock.js";
+import { OrchestrationRuntime } from "../../src/orchestration/OrchestrationRuntime.js";
 import { createProjectStatus } from "../support/testState.js";
 
 const exec = promisify(execFile);
@@ -20,7 +21,7 @@ describe("ImplementationOrchestrationService", () => {
   const directories: string[] = [];
   afterEach(async () => { await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 
-  async function fixture(worker?: CodexWorkerAdapter) {
+  async function fixture(worker?: CodexWorkerAdapter, useExternalRuntime = false) {
     const directory = await mkdtemp(join(tmpdir(), "docpilot-orchestration-")); directories.push(directory);
     const gitRoot = join(directory, "repository"); await mkdir(gitRoot);
     await exec("git", ["init", "-b", "feature/rfc", gitRoot]);
@@ -32,7 +33,8 @@ describe("ImplementationOrchestrationService", () => {
     const repository = new ProjectStateRepository(statePath); await repository.save(createProjectStatus());
     const project = new ProjectStatusService(repository); const runner = new ControlledProcessRunner(); const git = new GitRepositoryController(runner);
     const fallback: CodexWorkerAdapter = { execute: async (order) => ({ schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "FAILED", stdout: "", stderr: "", outputTruncated: false, resultFileFound: false, warnings: [], errors: [] }) };
-    return { directory, gitRoot, repository, project, service: new ImplementationOrchestrationService(repository, project, runner, git, worker ?? fallback) };
+    const runtime = useExternalRuntime ? new OrchestrationRuntime(join(directory, "runtime")) : new OrchestrationRuntime();
+    return { directory, gitRoot, repository, project, runtime, service: new ImplementationOrchestrationService(repository, project, runner, git, worker ?? fallback, undefined, runtime) };
   }
 
   it("creates a deterministic persisted Work Order and restores it after restart", async () => {
@@ -41,12 +43,80 @@ describe("ImplementationOrchestrationService", () => {
     const order = await state.service.prepareWorkOrder(input);
     expect(order.id).toMatch(/^RFC-0039-[0-9a-f]{12}$/);
     expect(order.objective.approvedPlan).toEqual(["First", "Second"]);
+    expect(order.mode).toBe("IMPLEMENTATION");
+    expect(order.execution.codexArguments).toContain("workspace-write");
     expect(order.scope.allowedPaths).toEqual(["docs/**"]);
     expect(order.gitPolicy).toMatchObject({ requireCleanWorkingTree: true, allowMainBranchPush: false, allowForcePush: false, requireUserApprovalForPush: true });
     await expect(state.service.prepareWorkOrder(input)).rejects.toThrow("already exists");
     const restored = new ProjectStatusService(new ProjectStateRepository(join(state.directory, "state.json")));
     expect((await restored.getProjectStatus()).pendingImplementationWorkOrder).toEqual(order);
     expect(renderCodexImplementationPrompt(order)).toBe(renderCodexImplementationPrompt(order));
+  });
+
+  it("completes an analysis work order without implementation gates or repository writes", async () => {
+    const fake: CodexWorkerAdapter = { execute: async (order) => {
+      if (order.runtime === undefined) throw new Error("Expected external runtime artifacts.");
+      await mkdir(dirname(order.runtime.resultFile), { recursive: true });
+      await writeFile(order.runtime.resultFile, JSON.stringify({
+        schemaVersion: "1.0",
+        rfcId: order.rfcId,
+        workOrderId: order.id,
+        implementation: { status: "PASSED", summary: "Read-only repository analysis completed.", implemented: [], notImplemented: [] },
+        reportedFiles: { changed: [], created: [], deleted: [] },
+        verification: { commandsAttempted: [], findings: ["Repository content inspected without execution."] },
+        review: { findings: [], blockers: [], warnings: [], knownLimitations: [], unresolvedItems: [] },
+        git: { commitCreated: false, pushPerformed: false },
+      }));
+      return {
+        schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "SUCCEEDED", exitCode: 0,
+        stdout: '{"type":"turn.completed"}\n', stderr: "", outputTruncated: false, resultFileFound: true,
+        resultFile: order.runtime.resultFile, jsonlEventsSaved: true, jsonlFile: order.runtime.jsonlFile,
+        schemaFile: order.runtime.schemaFile, diagnosticsFile: order.runtime.diagnosticsFile, warnings: [], errors: [],
+      };
+    } };
+    const state = await fixture(fake, true);
+    const order = await state.service.prepareWorkOrder({
+      mode: "ANALYSIS", repositoryRoot: state.gitRoot, approvedPlan: ["Inspect tracked repository content."], allowedPaths: ["**"],
+      verification: { buildCommands: [{ id: "must-not-run", executable: process.execPath, args: ["-e", "process.exit(99)"], timeoutSeconds: 5, required: true, category: "BUILD" }] },
+      gitPolicy: { allowCommit: true },
+    });
+    expect(order.mode).toBe("ANALYSIS");
+    expect(order.gitPolicy.allowCommit).toBe(false);
+    expect(order.execution.codexArguments).toContain("read-only");
+    expect(order.runtime?.rootPath).toBe(join(state.directory, "runtime"));
+    const before = await exec("git", ["-C", state.gitRoot, "status", "--porcelain=v1", "--ignored"]);
+    const result = await state.service.execute();
+    const after = await exec("git", ["-C", state.gitRoot, "status", "--porcelain=v1", "--ignored"]);
+    expect(result.execution?.analysis).toMatchObject({ status: "PASSED", filesystemUnchanged: true, gitUnchanged: true, jsonlSaved: true, resultSaved: true });
+    expect(result.execution?.verification).toMatchObject({ targeted: [], module: [], build: [], regression: [], smoke: [] });
+    expect(result.execution?.alpha?.status).toBe("PASSED");
+    expect(after.stdout).toBe(before.stdout);
+    expect((await state.repository.load()).pendingRfcHandoff).toBeUndefined();
+    expect((await new RepositoryExecutionLock().inspect(state.gitRoot, order.runtime?.lockDirectory)).state).toBe("ABSENT");
+    expect(renderCodexImplementationPrompt(order)).toContain("Implementation acceptance, Alpha, build, test, regression, and smoke gates do not apply");
+  });
+
+  it("fails analysis completion when the repository filesystem changes", async () => {
+    const fake: CodexWorkerAdapter = { execute: async (order) => {
+      if (order.runtime === undefined) throw new Error("Expected external runtime artifacts.");
+      await writeFile(join(order.repository.rootPath, "unexpected.txt"), "violation");
+      await mkdir(dirname(order.runtime.resultFile), { recursive: true });
+      await writeFile(order.runtime.resultFile, JSON.stringify({
+        schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id,
+        implementation: { status: "PASSED", summary: "Analysis.", implemented: [], notImplemented: [] },
+        reportedFiles: { changed: [], created: [], deleted: [] }, verification: { commandsAttempted: [], findings: [] },
+        review: { findings: [], blockers: [], warnings: [], knownLimitations: [], unresolvedItems: [] },
+        git: { commitCreated: false, pushPerformed: false },
+      }));
+      return { schemaVersion: "1.0", rfcId: order.rfcId, workOrderId: order.id, status: "SUCCEEDED", exitCode: 0, stdout: "{}\n", stderr: "", outputTruncated: false, resultFileFound: true, resultFile: order.runtime.resultFile, jsonlEventsSaved: true, warnings: [], errors: [] };
+    } };
+    const state = await fixture(fake, true);
+    const order = await state.service.prepareWorkOrder({ mode: "ANALYSIS", repositoryRoot: state.gitRoot, approvedPlan: ["Inspect."], allowedPaths: ["**"] });
+    const result = await state.service.execute();
+    expect(result.execution?.analysis).toMatchObject({ status: "FAILED", filesystemUnchanged: false, gitUnchanged: false });
+    expect(result.execution?.errors).toContain("Repository filesystem changed during analysis.");
+    expect((await new RepositoryExecutionLock().inspect(state.gitRoot, order.runtime?.lockDirectory)).state).toBe("ABSENT");
+    expect((await state.repository.load()).implementationExecutionRecord?.status).toBe("FAILED");
   });
 
   it("rejects missing plans, unsafe scope, dirty trees, and baseline mismatch", async () => {

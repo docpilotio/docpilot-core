@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import {
   dirname,
   join,
+  resolve,
 } from "node:path";
 import {
   afterEach,
@@ -130,6 +131,49 @@ describe("LocalCodexWorkerAdapter result capture", () => {
       expect(result.workOrderId).toBe(order.id);
     },
   );
+
+  it("uses read-only JSONL execution and external artifacts for analysis work orders", async () => {
+    const root = await mkdtemp(join(tmpdir(), "docpilot-codex-analysis-"));
+    const runtimeRoot = await mkdtemp(join(tmpdir(), "docpilot-codex-runtime-"));
+    directories.push(root, runtimeRoot);
+    const order = createWorkOrder(root);
+    order.mode = "ANALYSIS";
+    order.gitPolicy.allowCommit = false;
+    order.execution.codexArguments = ["exec", "--sandbox", "read-only", "--cd", root];
+    order.runtime = {
+      rootPath: runtimeRoot,
+      repositoryKey: "repository-key",
+      lockDirectory: join(runtimeRoot, "locks", "repository-key", "orchestration-lock"),
+      jsonlFile: join(runtimeRoot, "logs", "repository-key", `${order.id}.jsonl`),
+      resultFile: join(runtimeRoot, "results", "repository-key", `${order.id}.json`),
+      schemaFile: join(runtimeRoot, "schemas", "repository-key", `${order.id}.json`),
+      diagnosticsFile: join(runtimeRoot, "diagnostics", "repository-key", `${order.id}.json`),
+    };
+    const runner = new CapturingRunner(order, '{"type":"thread.started"}\n{"type":"turn.completed"}\n');
+
+    const execution = await new LocalCodexWorkerAdapter(runner).execute(
+      order,
+      renderCodexImplementationPrompt(order),
+    );
+
+    expect(runner.request?.args).toEqual(expect.arrayContaining(["--sandbox", "read-only", "--json", "--ephemeral"]));
+    expect(execution).toMatchObject({
+      status: "SUCCEEDED",
+      resultFile: resolve(order.runtime.resultFile),
+      resultFileFound: true,
+      jsonlEventsSaved: true,
+      jsonlFile: resolve(order.runtime.jsonlFile),
+      schemaFile: resolve(order.runtime.schemaFile),
+      diagnosticsFile: resolve(order.runtime.diagnosticsFile),
+    });
+    expect(await readFile(order.runtime.jsonlFile, "utf8")).toBe('{"type":"thread.started"}\n{"type":"turn.completed"}\n');
+    expect(JSON.parse(await readFile(order.runtime.diagnosticsFile, "utf8"))).toMatchObject({
+      workOrderId: order.id,
+      outputTruncated: false,
+      exitCode: 0,
+    });
+    await expect(readFile(join(root, ".docpilot", "results", `${order.id}.json`), "utf8")).rejects.toThrow();
+  });
 });
 
 function expectEveryObjectPropertyToBeRequired(
@@ -159,6 +203,7 @@ class CapturingRunner implements ProcessRunner {
 
   public constructor(
     private readonly order: ImplementationWorkOrder,
+    private readonly stdout = "",
   ) {}
 
   public async execute(
@@ -242,11 +287,12 @@ class CapturingRunner implements ProcessRunner {
       ),
       "utf8",
     );
+    if (this.stdout !== "") this.request.onStdoutChunk?.(Buffer.from(this.stdout, "utf8"));
 
     return {
       status: "PASSED",
       exitCode: 0,
-      stdout: "",
+      stdout: this.stdout,
       stderr: "",
       outputTruncated: false,
       timedOut: false,

@@ -3,7 +3,7 @@ import {
   rename,
   writeFile,
 } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import {
   createDefaultReleaseReadiness,
@@ -44,11 +44,14 @@ const RELEASE_READINESS_FIELDS = [
 
 export class ProjectStateRepository {
   public constructor(
-    private readonly stateFilePath: string = resolve(
+    stateFilePath?: string,
+  ) {
+    this.stateFilePath = stateFilePath ?? resolve(
       process.cwd(),
       "project-state.json",
-    ),
-  ) {}
+    );
+  }
+  private readonly stateFilePath: string;
 
   public async load(): Promise<ProjectStatus> {
     const content = await readFile(this.stateFilePath, "utf-8");
@@ -131,6 +134,18 @@ export class ProjectStateRepository {
     const verification = this.requireObject(order.verification, "pendingImplementationWorkOrder.verification");
     const gitPolicy = this.requireObject(order.gitPolicy, "pendingImplementationWorkOrder.gitPolicy");
     const resultContract = this.requireObject(order.resultContract, "pendingImplementationWorkOrder.resultContract");
+    const mode = order.mode === undefined ? "IMPLEMENTATION" : this.requireEnum(order.mode, ["ANALYSIS", "IMPLEMENTATION"] as const, "pendingImplementationWorkOrder.mode");
+    const runtime = order.runtime === undefined ? undefined : this.requireObject(order.runtime, "pendingImplementationWorkOrder.runtime");
+    const runtimeArtifacts = runtime === undefined ? undefined : {
+      rootPath: this.requireString(runtime.rootPath, "runtime.rootPath"),
+      repositoryKey: this.requireString(runtime.repositoryKey, "runtime.repositoryKey"),
+      lockDirectory: this.requireString(runtime.lockDirectory, "runtime.lockDirectory"),
+      jsonlFile: this.requireString(runtime.jsonlFile, "runtime.jsonlFile"),
+      resultFile: this.requireString(runtime.resultFile, "runtime.resultFile"),
+      schemaFile: this.requireString(runtime.schemaFile, "runtime.schemaFile"),
+      diagnosticsFile: this.requireString(runtime.diagnosticsFile, "runtime.diagnosticsFile"),
+    };
+    if (runtimeArtifacts !== undefined) this.validateRuntimeArtifacts(runtimeArtifacts);
     if (order.schemaVersion !== IMPLEMENTATION_WORK_ORDER_SCHEMA_VERSION) throw new Error(`project-state.json contains an unsupported Work Order schemaVersion: ${String(order.schemaVersion)}.`);
     if (typeof order.id !== "string" || typeof order.rfcId !== "string" || !/^RFC-[0-9]{4}$/.test(order.rfcId)) throw new Error("project-state.json contains an invalid Pending Work Order identity.");
     const commands = (input: unknown, field: string) => {
@@ -146,6 +161,7 @@ export class ProjectStateRepository {
       schemaVersion: IMPLEMENTATION_WORK_ORDER_SCHEMA_VERSION,
       id: order.id,
       rfcId: order.rfcId,
+      mode,
       repository: repository as ImplementationWorkOrder["repository"],
       objective: objective as ImplementationWorkOrder["objective"],
       scope: scope as ImplementationWorkOrder["scope"],
@@ -159,8 +175,21 @@ export class ProjectStateRepository {
       },
       gitPolicy: gitPolicy as ImplementationWorkOrder["gitPolicy"],
       resultContract: resultContract as ImplementationWorkOrder["resultContract"],
+      ...(runtimeArtifacts === undefined ? {} : { runtime: runtimeArtifacts }),
       warnings: [...order.warnings] as string[],
     };
+  }
+
+  private validateRuntimeArtifacts(runtime: NonNullable<ImplementationWorkOrder["runtime"]>): void {
+    if (!isAbsolute(runtime.rootPath)) throw new Error("project-state.json runtime.rootPath must be absolute.");
+    const root = resolve(runtime.rootPath);
+    for (const [field, candidate] of Object.entries(runtime).filter(([field]) => !["rootPath", "repositoryKey"].includes(field))) {
+      if (typeof candidate !== "string" || !isAbsolute(candidate)) throw new Error(`project-state.json runtime.${field} must be absolute.`);
+      const relation = relative(root, resolve(candidate));
+      if (relation === ".." || relation.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(relation)) {
+        throw new Error(`project-state.json runtime.${field} must remain below runtime.rootPath.`);
+      }
+    }
   }
 
   private validateExecutionRecord(value: unknown): ImplementationExecutionRecord {

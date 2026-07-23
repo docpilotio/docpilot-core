@@ -1,9 +1,14 @@
 import {
+  createWriteStream,
+} from "node:fs";
+import {
   mkdir,
   readFile,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
+import { finished } from "node:stream/promises";
 import {
   dirname,
   resolve,
@@ -34,7 +39,7 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
     prompt: string,
     signal?: AbortSignal,
   ): Promise<CodexWorkerExecution> {
-    const resultPath = await assertPathInside(
+    const resultPath = workOrder.runtime?.resultFile ?? await assertPathInside(
       workOrder.repository.rootPath,
       resolve(
         workOrder.repository.rootPath,
@@ -44,7 +49,7 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
     );
 
     const resultDirectory = dirname(resultPath);
-    const schemaPath = await assertPathInside(
+    const schemaPath = workOrder.runtime?.schemaFile ?? await assertPathInside(
       workOrder.repository.rootPath,
       resolve(
         resultDirectory,
@@ -52,8 +57,13 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
       ),
       "resultSchema",
     );
+    const jsonlPath = workOrder.runtime?.jsonlFile;
+    const diagnosticsPath = workOrder.runtime?.diagnosticsFile;
 
     await mkdir(resultDirectory, { recursive: true });
+    if (jsonlPath !== undefined) await mkdir(dirname(jsonlPath), { recursive: true });
+    if (diagnosticsPath !== undefined) await mkdir(dirname(diagnosticsPath), { recursive: true });
+    await mkdir(dirname(schemaPath), { recursive: true });
     await rm(resultPath, { force: true });
     await writeFile(
       schemaPath,
@@ -66,6 +76,8 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
     );
 
     let processResult;
+    let streamedJsonl = false;
+    const jsonlStream = jsonlPath === undefined ? undefined : createWriteStream(jsonlPath, { flags: "w" });
 
     try {
       processResult = await this.runner.execute(
@@ -84,17 +96,38 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
             workOrder.execution.maxOutputCharacters,
           environmentAllowlist:
             workOrder.execution.environmentAllowlist,
+          ...(jsonlStream === undefined ? {} : {
+            onStdoutChunk: (chunk: Buffer) => {
+              streamedJsonl = true;
+              jsonlStream.write(chunk);
+            },
+          }),
         },
         signal,
       );
     } finally {
-      await rm(schemaPath, { force: true });
+      if (jsonlStream !== undefined) {
+        jsonlStream.end();
+        await finished(jsonlStream);
+      }
+      if (workOrder.runtime === undefined) await rm(schemaPath, { force: true });
     }
 
     const resultFileFound = await readFile(resultPath, "utf8").then(
       () => true,
       () => false,
     );
+
+    if (jsonlPath !== undefined && !streamedJsonl) await atomicWrite(jsonlPath, processResult.stdout);
+    const jsonlContent = jsonlPath === undefined ? processResult.stdout : await readFile(jsonlPath, "utf8");
+    const jsonl = validateJsonLines(jsonlContent);
+    if (diagnosticsPath !== undefined) await atomicWrite(diagnosticsPath, `${JSON.stringify({
+      schemaVersion: "1.0", workOrderId: workOrder.id, status: processResult.status,
+      exitCode: processResult.exitCode, signal: processResult.signal,
+      stderr: processResult.stderr, outputTruncated: processResult.outputTruncated,
+      timedOut: processResult.timedOut, cancelled: processResult.cancelled,
+      terminationSteps: processResult.terminationSteps, invalidJsonlLines: jsonl.invalidLines,
+    }, null, 2)}\n`);
 
     return {
       schemaVersion: "1.0",
@@ -116,8 +149,11 @@ export class LocalCodexWorkerAdapter implements CodexWorkerAdapter {
       outputTruncated: processResult.outputTruncated,
       resultFileFound,
       ...(resultFileFound
-        ? { resultFile: workOrder.resultContract.resultFile }
+        ? { resultFile: workOrder.runtime === undefined ? workOrder.resultContract.resultFile : resultPath }
         : {}),
+      ...(jsonlPath === undefined ? {} : { jsonlEventsSaved: jsonl.valid && jsonl.eventCount > 0, jsonlFile: jsonlPath }),
+      ...(workOrder.runtime === undefined ? {} : { schemaFile: schemaPath }),
+      ...(diagnosticsPath === undefined ? {} : { diagnosticsFile: diagnosticsPath }),
       warnings: resultFileFound
         ? []
         : [
@@ -154,7 +190,9 @@ export function buildCodexResultCaptureArguments(
       (argument) =>
         argument === "--output-last-message" ||
         argument === "-o" ||
-        argument === "--output-schema",
+        argument === "--output-schema" ||
+        argument === "--json" ||
+        argument === "--ephemeral",
     )
   ) {
     throw new Error(
@@ -169,12 +207,34 @@ export function buildCodexResultCaptureArguments(
 
   return [
     ...baseArguments,
+    "--json",
+    "--ephemeral",
     "--output-last-message",
     resultPath,
     "--output-schema",
     schemaPath,
     "-",
   ];
+}
+
+function validateJsonLines(value: string): { valid: boolean; eventCount: number; invalidLines: number[] } {
+  const lines = value.split(/\r?\n/).filter((line) => line.trim() !== "");
+  const invalidLines: number[] = [];
+  for (const [index, line] of lines.entries()) {
+    try {
+      const event: unknown = JSON.parse(line);
+      if (typeof event !== "object" || event === null || Array.isArray(event)) invalidLines.push(index + 1);
+    } catch {
+      invalidLines.push(index + 1);
+    }
+  }
+  return { valid: invalidLines.length === 0, eventCount: lines.length, invalidLines };
+}
+
+async function atomicWrite(path: string, content: string): Promise<void> {
+  const temporary = `${path}.tmp-${process.pid}`;
+  await writeFile(temporary, content, "utf8");
+  await rename(temporary, path);
 }
 
 export function createCodexImplementationResultSchema(
