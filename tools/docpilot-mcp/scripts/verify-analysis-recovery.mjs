@@ -18,10 +18,13 @@ const coreRoot = resolve(coreArgument);
 const runtime = new OrchestrationRuntime(resolve(runtimeArgument));
 const stateFile = await runtime.stateFilePath();
 if (stateFile === undefined) throw new Error("An explicit runtime root is required.");
-const baselineState = JSON.parse(await readFile(resolve("project-state.json"), "utf8"));
-delete baselineState.pendingImplementationWorkOrder;
-delete baselineState.implementationExecutionRecord;
-delete baselineState.pendingRfcHandoff;
+const baselineState = {
+  project: "DocPilot",
+  phase: "Phase 1 - MVP / POC",
+  currentRfc: "RFC-0044",
+  release: "v0.5 MVP",
+  completedRfcs: Array.from({ length: 43 }, (_, index) => `RFC-${String(index + 1).padStart(4, "0")}`),
+};
 await writeFile(stateFile, `${JSON.stringify(baselineState, null, 2)}\n`, "utf8");
 
 const repository = new ProjectStateRepository(stateFile);
