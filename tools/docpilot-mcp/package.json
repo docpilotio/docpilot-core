@@ -1,6 +1,6 @@
 {
     "name": "docpilot-mcp",
-    "version": "0.12.2",
+    "version": "0.12.3",
     "type": "module",
     "description": "MCP control plane for DocPilot project status, RFC workflow, documentation, and release operations",
     "main": "dist/index.js",

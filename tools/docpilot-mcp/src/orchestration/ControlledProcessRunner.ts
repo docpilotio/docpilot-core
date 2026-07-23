@@ -1,11 +1,12 @@
 import { spawn } from "node:child_process";
-import { realpath } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import type { ProcessExecutionResult } from "../model/ImplementationOrchestration.js";
 
 export type ProcessRequest = {
   executable: string;
   args: readonly string[];
+  stdin?: string;
   workingDirectory: string;
   repositoryRoot: string;
   timeoutSeconds: number;
@@ -18,6 +19,7 @@ export interface ProcessRunner {
 }
 
 const SECRET_PATTERN = /((?:api[_-]?key|token|password|authorization)\s*[:=]\s*)([^\s]+)/gi;
+const MAX_STDIN_CHARACTERS = 1_000_000;
 
 export function maskSensitiveOutput(value: string): string {
   return value.replace(SECRET_PATTERN, "$1[REDACTED]").replace(/Bearer\s+[^\s]+/gi, "Bearer [REDACTED]");
@@ -40,13 +42,34 @@ export class ControlledProcessRunner implements ProcessRunner {
     if (!Number.isInteger(request.timeoutSeconds) || request.timeoutSeconds <= 0) throw new Error("timeoutSeconds must be a positive integer.");
     if (!Number.isInteger(request.maxOutputCharacters) || request.maxOutputCharacters <= 0) throw new Error("maxOutputCharacters must be a positive integer.");
     if (/[\r\n\0]/.test(request.executable) || request.args.some((arg) => /[\r\n\0]/.test(arg))) throw new Error("Process arguments contain prohibited control characters.");
-    const windowsScript = process.platform === "win32" && /\.(cmd|bat)$/i.test(request.executable);
-    if (windowsScript && [request.executable, ...request.args].some((part) => /["&|<>^%\r\n]/.test(part))) throw new Error("Windows command wrapper rejected shell metacharacters.");
-
+    if (request.stdin !== undefined) {
+      if (request.stdin.includes("\0")) throw new Error("Process stdin contains prohibited NUL characters.");
+      if (request.stdin.length > MAX_STDIN_CHARACTERS) throw new Error(`Process stdin exceeds the ${MAX_STDIN_CHARACTERS}-character limit.`);
+    }
     const environment: NodeJS.ProcessEnv = {};
     for (const name of [...new Set(request.environmentAllowlist)].sort()) {
       const value = process.env[name];
       if (value !== undefined) environment[name] = value;
+    }
+
+    const executable = await resolveExecutableForSpawn(
+      request.executable,
+      environment,
+    );
+
+    const windowsScript =
+      process.platform === "win32" &&
+      /\.(cmd|bat)$/i.test(executable);
+
+    if (
+      windowsScript &&
+      [executable, ...request.args].some((part) =>
+        /["&|<>^%\r\n]/.test(part)
+      )
+    ) {
+      throw new Error(
+        "Windows command wrapper rejected shell metacharacters.",
+      );
     }
 
     return new Promise((completion) => {
@@ -55,6 +78,7 @@ export class ControlledProcessRunner implements ProcessRunner {
       let outputTruncated = false;
       let settled = false;
       let terminationKind: "TIMED_OUT" | "CANCELLED" | undefined;
+      let inputFailed = false;
       const terminationSteps: string[] = [];
       const append = (current: string, chunk: Buffer): string => {
         const remaining = request.maxOutputCharacters - current.length;
@@ -64,7 +88,26 @@ export class ControlledProcessRunner implements ProcessRunner {
         outputTruncated = true;
         return current + text.slice(0, remaining);
       };
-      const child = spawn(windowsScript ? process.env.ComSpec ?? "cmd.exe" : request.executable, windowsScript ? ["/d", "/c", request.executable, ...request.args] : [...request.args], { cwd, env: environment, shell: false, windowsHide: true, detached: process.platform !== "win32" });
+      const commandInterpreter =
+        environment.ComSpec ??
+        environment.COMSPEC ??
+        process.env.ComSpec ??
+        process.env.COMSPEC ??
+        "cmd.exe";
+
+      const child = spawn(
+        windowsScript ? commandInterpreter : executable,
+        windowsScript
+          ? ["/d", "/c", executable, ...request.args]
+          : [...request.args],
+        {
+          cwd,
+          env: environment,
+          shell: false,
+          windowsHide: true,
+          detached: process.platform !== "win32",
+        },
+      );
       child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
       child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
       const finish = (result: Omit<ProcessExecutionResult, "timedOut" | "cancelled" | "terminationSteps">): void => {
@@ -74,8 +117,8 @@ export class ControlledProcessRunner implements ProcessRunner {
         clearTimeout(forceTimer);
         clearTimeout(finalTimer);
         signal?.removeEventListener("abort", abort);
-        child.stdout.removeAllListeners(); child.stderr.removeAllListeners();
-        child.stdout.destroy(); child.stderr.destroy();
+        child.stdin.removeAllListeners(); child.stdout.removeAllListeners(); child.stderr.removeAllListeners();
+        child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
         completion({ ...result, stdout: maskSensitiveOutput(stdout), stderr: maskSensitiveOutput(stderr), outputTruncated, timedOut: result.status === "TIMED_OUT", cancelled: result.status === "CANCELLED", terminationSteps: [...terminationSteps] });
       };
       let forceTimer: NodeJS.Timeout | undefined;
@@ -92,14 +135,84 @@ export class ControlledProcessRunner implements ProcessRunner {
       const abort = (): void => terminate("CANCELLED");
       signal?.addEventListener("abort", abort, { once: true });
       const timeout = setTimeout(() => terminate("TIMED_OUT"), request.timeoutSeconds * 1000);
+      child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+        if (settled || error.code === "EPIPE") return;
+        inputFailed = true;
+        stderr = append(stderr, Buffer.from(error.message));
+        try { child.kill("SIGTERM"); } catch { /* close/error handlers complete the result */ }
+      });
+      child.stdin.end(request.stdin);
       child.on("error", (error) => { stderr = append(stderr, Buffer.from(error.message)); finish({ status: "FAILED", stdout: "", stderr: "", outputTruncated }); });
       child.on("close", (code, signalName) => {
-        const result = { status: terminationKind ?? (code === 0 ? "PASSED" as const : "FAILED" as const), ...(code === null ? {} : { exitCode: code }), ...(signalName === null ? {} : { signal: signalName }), stdout: "", stderr: "", outputTruncated };
+        const result = { status: terminationKind ?? (code === 0 && !inputFailed ? "PASSED" as const : "FAILED" as const), ...(code === null ? {} : { exitCode: code }), ...(signalName === null ? {} : { signal: signalName }), stdout: "", stderr: "", outputTruncated };
         if (terminationKind !== undefined) { terminateTree(child.pid, true, terminationSteps); setTimeout(() => finish(result), 150); }
         else finish(result);
       });
     });
   }
+}
+
+async function resolveExecutableForSpawn(
+  executable: string,
+  environment: NodeJS.ProcessEnv,
+): Promise<string> {
+  if (
+    process.platform !== "win32" ||
+    isAbsolute(executable) ||
+    /[\\/]/.test(executable) ||
+    /\.[^\\/]+$/.test(executable)
+  ) {
+    return executable;
+  }
+
+  const pathValue =
+    environment.PATH ??
+    environment.Path ??
+    process.env.PATH ??
+    process.env.Path ??
+    "";
+
+  const pathExtensions = (
+    environment.PATHEXT ??
+    process.env.PATHEXT ??
+    ".COM;.EXE;.BAT;.CMD"
+  )
+    .split(";")
+    .map((extension) => extension.trim())
+    .filter((extension) => extension !== "")
+    .map((extension) =>
+      extension.startsWith(".") ? extension : `.${extension}`
+    );
+
+  const candidateNames = [
+    ...pathExtensions.map(
+      (extension) => `${executable}${extension}`
+    ),
+    executable,
+  ];
+
+  for (const rawDirectory of pathValue.split(";")) {
+    const directory = rawDirectory
+      .trim()
+      .replace(/^"(.*)"$/, "$1");
+
+    if (directory === "") continue;
+
+    for (const candidateName of candidateNames) {
+      const candidate = resolve(directory, candidateName);
+
+      if (
+        await access(candidate).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        return candidate;
+      }
+    }
+  }
+
+  return executable;
 }
 
 async function canonicalizePotentialPath(candidate: string): Promise<string> {
