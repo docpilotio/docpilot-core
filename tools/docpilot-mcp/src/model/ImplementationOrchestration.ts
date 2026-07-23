@@ -3,6 +3,13 @@ import type { RfcHandoff } from "./RfcHandoff.js";
 
 export const IMPLEMENTATION_WORK_ORDER_SCHEMA_VERSION = "1.0";
 export const IMPLEMENTATION_EXECUTION_SCHEMA_VERSION = "1.0";
+export type WorkOrderMode = "ANALYSIS" | "IMPLEMENTATION";
+
+export type OrchestrationRuntimeArtifacts = {
+  rootPath: string; repositoryKey: string; lockDirectory: string;
+  jsonlFile: string; resultFile: string; schemaFile: string;
+  diagnosticsFile: string;
+};
 
 export type ControlledCommandCategory =
   | "TARGETED_TEST" | "MODULE_TEST" | "BUILD" | "REGRESSION_TEST" | "SMOKE";
@@ -12,6 +19,7 @@ export type ControlledCommand = {
 };
 export type ImplementationWorkOrder = {
   schemaVersion: string; id: string; rfcId: string;
+  mode?: WorkOrderMode;
   repository: { rootPath: string; baselineBranch?: string; baselineCommit: string; workingDirectory: string };
   objective: { goal: string; approvedPlan: string[]; acceptanceCriteria: string[]; alphaCriteria: AlphaCriterion[] };
   scope: {
@@ -31,6 +39,7 @@ export type ImplementationWorkOrder = {
     requireUserApprovalForPush: boolean; allowMainBranchPush: boolean; allowForcePush: boolean;
   };
   resultContract: { resultFile: string; expectedSchemaVersion: string };
+  runtime?: OrchestrationRuntimeArtifacts;
   warnings: string[];
 };
 export type PreflightCheck = { id: string; required: boolean; status: "PASSED" | "FAILED" | "WARNING"; details: string[] };
@@ -48,6 +57,7 @@ export type CodexWorkerExecution = {
   status: "SUCCEEDED" | "FAILED" | "BLOCKED" | "TIMED_OUT" | "CANCELLED";
   exitCode?: number; stdout: string; stderr: string; outputTruncated: boolean;
   resultFileFound: boolean; resultFile?: string; warnings: string[]; errors: string[];
+  jsonlEventsSaved?: boolean; jsonlFile?: string; schemaFile?: string; diagnosticsFile?: string;
 };
 export type CommandExecutionResult = ControlledCommand & {
   status: "PASSED" | "FAILED" | "BLOCKED" | "TIMED_OUT" | "SKIPPED";
@@ -94,5 +104,10 @@ export type ImplementationExecutionRecord = {
   diffValidation?: RepositoryDiffValidation; review?: WorkerReviewResult; alpha?: WorkerAlphaResult;
   generatedHandoff?: RfcHandoff; commitSha?: string; warnings: string[]; errors: string[];
   repositoryBefore?: RepositoryEvidence;
+  analysis?: {
+    status: "PASSED" | "FAILED"; filesystemUnchanged: boolean;
+    gitUnchanged: boolean; jsonlSaved: boolean; resultSaved: boolean;
+    blockers: string[];
+  };
   recoveryDiagnostics?: { status: "NONE" | "INTERRUPTED" | "RECOVERY_REQUIRED"; reason: string; lockState: "ABSENT" | "ACTIVE" | "STALE" | "RECOVERY_REQUIRED" };
 };

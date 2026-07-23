@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 
@@ -14,6 +15,7 @@ export type ExecutionLockMetadata = {
   processStartedAt: string;
   acquiredAt: string;
   hostname: string;
+  ownerToken?: string;
 };
 
 export type ExecutionLockInspection = {
@@ -29,8 +31,8 @@ export type AcquiredExecutionLock = {
 };
 
 export class RepositoryExecutionLock {
-  public async acquire(repositoryRoot: string, workOrderId: string, rfcId: string): Promise<AcquiredExecutionLock> {
-    const paths = await this.paths(repositoryRoot);
+  public async acquire(repositoryRoot: string, workOrderId: string, rfcId: string, externalLockDirectory?: string): Promise<AcquiredExecutionLock> {
+    const paths = await this.paths(repositoryRoot, externalLockDirectory);
     let staleLockRecovered = false;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
@@ -41,7 +43,7 @@ export class RepositoryExecutionLock {
         return { metadata, staleLockRecovered, release: () => this.release(paths.lockDirectory, paths.metadataFile, metadata) };
       } catch (error: unknown) {
         if (!isAlreadyExists(error)) throw error;
-        const inspection = await this.inspect(repositoryRoot);
+        const inspection = await this.inspect(repositoryRoot, externalLockDirectory);
         if (inspection.state !== "STALE") throw new Error(`Implementation execution lock is unavailable: ${inspection.reason}`);
         const metadata = inspection.metadata;
         if (metadata === undefined) throw new Error("Stale lock recovery requires validated metadata.");
@@ -55,8 +57,11 @@ export class RepositoryExecutionLock {
     throw new Error("Implementation execution lock could not be acquired after stale-lock recovery.");
   }
 
-  public async inspect(repositoryRoot: string): Promise<ExecutionLockInspection> {
+  public async inspect(repositoryRoot: string, externalLockDirectory?: string): Promise<ExecutionLockInspection> {
     const root = await realpath(repositoryRoot);
+    if (externalLockDirectory !== undefined) {
+      return this.inspectPaths(root, resolve(externalLockDirectory), resolve(externalLockDirectory, "lock.json"));
+    }
     const runtimePath = resolve(root, ".docpilot");
     const canonicalRuntime = await realpath(runtimePath).catch((error: unknown) => {
       if (isMissing(error)) return undefined;
@@ -65,7 +70,11 @@ export class RepositoryExecutionLock {
     if (canonicalRuntime === undefined) return { state: "ABSENT", reason: "No execution lock is present." };
     const relation = relative(root, canonicalRuntime);
     if (relation === ".." || relation.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)) return { state: "RECOVERY_REQUIRED", reason: "DocPilot runtime path escapes the repository root." };
-    const paths = { root, lockDirectory: resolve(canonicalRuntime, "orchestration-lock"), metadataFile: resolve(canonicalRuntime, "orchestration-lock", "lock.json") };
+    return this.inspectPaths(root, resolve(canonicalRuntime, "orchestration-lock"), resolve(canonicalRuntime, "orchestration-lock", "lock.json"));
+  }
+
+  private async inspectPaths(root: string, lockDirectory: string, metadataFile: string): Promise<ExecutionLockInspection> {
+    const paths = { root, lockDirectory, metadataFile };
     let raw: string;
     try { raw = await readFile(paths.metadataFile, "utf8"); }
     catch (error: unknown) {
@@ -91,8 +100,12 @@ export class RepositoryExecutionLock {
     return { state: "ACTIVE", reason: "A live process owns the execution lock.", metadata };
   }
 
-  private async paths(repositoryRoot: string) {
+  private async paths(repositoryRoot: string, externalLockDirectory?: string) {
     const root = await realpath(repositoryRoot);
+    if (externalLockDirectory !== undefined) {
+      await mkdir(resolve(externalLockDirectory, ".."), { recursive: true });
+      return { root, lockDirectory: resolve(externalLockDirectory), metadataFile: resolve(externalLockDirectory, "lock.json") };
+    }
     const runtime = resolve(root, ".docpilot");
     await mkdir(runtime, { recursive: true });
     const canonicalRuntime = await realpath(runtime);
@@ -103,7 +116,7 @@ export class RepositoryExecutionLock {
   }
 
   private currentMetadata(repositoryIdentity: string, workOrderId: string, rfcId: string): ExecutionLockMetadata {
-    return { schemaVersion: EXECUTION_LOCK_SCHEMA_VERSION, repositoryIdentity, workOrderId, rfcId, pid: process.pid, processStartedAt: currentProcessStartedAt(), acquiredAt: new Date().toISOString(), hostname: hostname() };
+    return { schemaVersion: EXECUTION_LOCK_SCHEMA_VERSION, repositoryIdentity, workOrderId, rfcId, pid: process.pid, processStartedAt: currentProcessStartedAt(), acquiredAt: new Date().toISOString(), hostname: hostname(), ownerToken: randomUUID() };
   }
 
   private async release(lockDirectory: string, metadataFile: string, owner: ExecutionLockMetadata): Promise<void> {
@@ -111,7 +124,7 @@ export class RepositoryExecutionLock {
     try { current = JSON.parse(await readFile(metadataFile, "utf8")); }
     catch (error: unknown) { if (isMissing(error)) return; throw new Error("Execution lock release requires manual recovery because metadata is unreadable."); }
     const validated = validateMetadata(current, owner.repositoryIdentity);
-    if (validated instanceof Error || validated.pid !== owner.pid || validated.workOrderId !== owner.workOrderId || validated.acquiredAt !== owner.acquiredAt) throw new Error("Execution lock ownership changed; refusing to remove another owner's lock.");
+    if (validated instanceof Error || validated.pid !== owner.pid || validated.workOrderId !== owner.workOrderId || validated.acquiredAt !== owner.acquiredAt || validated.ownerToken !== owner.ownerToken) throw new Error("Execution lock ownership changed; refusing to remove another owner's lock.");
     await rm(lockDirectory, { recursive: true, force: false });
   }
 }
@@ -120,8 +133,9 @@ function validateMetadata(value: unknown, repositoryIdentity: string): Execution
   if (typeof value !== "object" || value === null || Array.isArray(value)) return new Error("Execution lock metadata must be an object.");
   const item = value as Record<string, unknown>;
   const keys = Object.keys(item).sort();
-  const expected = ["acquiredAt", "hostname", "pid", "processStartedAt", "repositoryIdentity", "rfcId", "schemaVersion", "workOrderId"];
-  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) return new Error("Execution lock metadata contains missing or unknown fields.");
+  const expected = ["acquiredAt", "hostname", "ownerToken", "pid", "processStartedAt", "repositoryIdentity", "rfcId", "schemaVersion", "workOrderId"];
+  const legacy = expected.filter((key) => key !== "ownerToken");
+  if (!sameKeys(keys, expected) && !sameKeys(keys, legacy)) return new Error("Execution lock metadata contains missing or unknown fields.");
   if (item.schemaVersion !== EXECUTION_LOCK_SCHEMA_VERSION) return new Error("Execution lock schemaVersion is unsupported.");
   if (item.repositoryIdentity !== repositoryIdentity) return new Error("Execution lock repository identity does not match the canonical repository root.");
   if (typeof item.workOrderId !== "string" || item.workOrderId === "" || typeof item.rfcId !== "string" || !/^RFC-[0-9]{4}$/.test(item.rfcId)) return new Error("Execution lock identity is invalid.");
@@ -129,6 +143,7 @@ function validateMetadata(value: unknown, repositoryIdentity: string): Execution
   for (const field of ["processStartedAt", "acquiredAt"] as const) if (typeof item[field] !== "string" || !isCanonicalIsoTimestamp(item[field])) return new Error(`Execution lock ${field} is invalid.`);
   if (Date.parse(item.acquiredAt as string) > Date.now() + 60_000) return new Error("Execution lock acquisition time is in the future.");
   if (typeof item.hostname !== "string" || item.hostname === "") return new Error("Execution lock hostname is invalid.");
+  if (item.ownerToken !== undefined && (typeof item.ownerToken !== "string" || item.ownerToken === "")) return new Error("Execution lock owner token is invalid.");
   return item as ExecutionLockMetadata;
 }
 
@@ -138,3 +153,4 @@ function processIsAlive(pid: number): boolean | undefined { try { process.kill(p
 function isAlreadyExists(error: unknown): boolean { return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST"; }
 function isMissing(error: unknown): boolean { return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"; }
 function dirnameOf(path: string): string { return resolve(path, ".."); }
+function sameKeys(left: readonly string[], right: readonly string[]): boolean { return left.length === right.length && left.every((value, index) => value === right[index]); }

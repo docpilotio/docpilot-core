@@ -24,6 +24,18 @@ describe("RepositoryExecutionLock", () => {
     await first.release(); await second.release();
   });
 
+  it("stores an owner-bound lock in an external runtime directory", async () => {
+    const repository = await root(); const runtime = await root(); const external = join(runtime, "locks", "repository-key", "orchestration-lock");
+    const manager = new RepositoryExecutionLock(); const acquired = await manager.acquire(repository, "analysis", "RFC-0039", external);
+    const metadata = JSON.parse(await readFile(join(external, "lock.json"), "utf8")) as { ownerToken?: string; repositoryIdentity: string };
+    expect(metadata.ownerToken).toMatch(/^[0-9a-f-]{36}$/);
+    expect(metadata.repositoryIdentity).toBe(await import("node:fs/promises").then(({ realpath }) => realpath(repository)));
+    expect((await manager.inspect(repository, external)).state).toBe("ACTIVE");
+    expect((await manager.inspect(repository)).state).toBe("ABSENT");
+    await acquired.release();
+    expect((await manager.inspect(repository, external)).state).toBe("ABSENT");
+  });
+
   it("recovers only a demonstrably dead owner and records recovery", async () => {
     const repository = await root(); const runtime = join(repository, ".docpilot", "orchestration-lock"); await mkdir(runtime, { recursive: true });
     const now = new Date().toISOString();

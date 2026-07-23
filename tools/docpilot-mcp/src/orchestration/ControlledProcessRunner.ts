@@ -12,6 +12,7 @@ export type ProcessRequest = {
   timeoutSeconds: number;
   maxOutputCharacters: number;
   environmentAllowlist: readonly string[];
+  onStdoutChunk?: (chunk: Buffer) => void;
 };
 
 export interface ProcessRunner {
@@ -108,7 +109,10 @@ export class ControlledProcessRunner implements ProcessRunner {
           detached: process.platform !== "win32",
         },
       );
-      child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
+      child.stdout.on("data", (chunk: Buffer) => {
+        request.onStdoutChunk?.(chunk);
+        stdout = append(stdout, chunk);
+      });
       child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
       const finish = (result: Omit<ProcessExecutionResult, "timedOut" | "cancelled" | "terminationSteps">): void => {
         if (settled) return;

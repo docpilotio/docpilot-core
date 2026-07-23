@@ -9,6 +9,7 @@ import { ImplementationOrchestrationService } from "./service/ImplementationOrch
 import { ControlledProcessRunner } from "./orchestration/ControlledProcessRunner.js";
 import { GitRepositoryController } from "./orchestration/GitRepositoryController.js";
 import { LocalCodexWorkerAdapter } from "./orchestration/CodexWorkerAdapter.js";
+import { OrchestrationRuntime } from "./orchestration/OrchestrationRuntime.js";
 import { registerCompleteCurrentRfcTool } from "./tool/CompleteCurrentRfcTool.js";
 import { registerGenerateMainPlanningSyncTool } from "./tool/GenerateMainPlanningSyncTool.js";
 import { registerGetCurrentRfcTool } from "./tool/GetCurrentRfcTool.js";
@@ -31,12 +32,14 @@ import { registerGetPendingImplementationWorkOrderTool } from "./tool/GetPending
 import { registerExecutePendingImplementationWorkOrderTool } from "./tool/ExecutePendingImplementationWorkOrderTool.js";
 import { registerCreateImplementationCommitTool } from "./tool/CreateImplementationCommitTool.js";
 
-export function createServer(): McpServer {
-  const repository = new ProjectStateRepository();
+export async function createServer(): Promise<McpServer> {
+  const runtime = OrchestrationRuntime.fromEnvironment();
+  const stateFile = await runtime.stateFilePath();
+  const repository = new ProjectStateRepository(stateFile);
   const service = new ProjectStatusService(repository);
   const runner = new ControlledProcessRunner();
   const git = new GitRepositoryController(runner);
-  const orchestration = new ImplementationOrchestrationService(repository, service, runner, git, new LocalCodexWorkerAdapter(runner));
+  const orchestration = new ImplementationOrchestrationService(repository, service, runner, git, new LocalCodexWorkerAdapter(runner), undefined, runtime);
 
   const server = new McpServer({
     name: "docpilot-project-control",

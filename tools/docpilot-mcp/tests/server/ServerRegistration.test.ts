@@ -30,7 +30,7 @@ describe("server registration and existing behavior", () => {
   });
 
   it("registers every existing Tool, Resource, and Prompt", async () => {
-    const connection = await connectTestClient(createServer());
+    const connection = await connectTestClient(await createServer());
     closers.push(connection.close);
 
     const tools = (await connection.client.listTools()).tools.map(

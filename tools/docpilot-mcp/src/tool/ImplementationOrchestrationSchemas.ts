@@ -7,6 +7,7 @@ const commandSchema = z.object({
 }).strict();
 
 export const prepareWorkOrderInputSchema = z.object({
+  mode: z.enum(["ANALYSIS", "IMPLEMENTATION"]).optional(),
   repositoryRoot: z.string().min(1), baselineBranch: z.string().min(1).optional(), baselineCommit: z.string().min(1).optional(),
   approvedPlan: z.array(z.string().min(1)).min(1), allowedPaths: z.array(z.string().min(1)).min(1), forbiddenPaths: z.array(z.string().min(1)).optional(),
   verification: z.object({ targetedCommands: z.array(commandSchema).optional(), moduleCommands: z.array(commandSchema).optional(), buildCommands: z.array(commandSchema).optional(), regressionCommands: z.array(commandSchema).optional(), smokeCommands: z.array(commandSchema).optional() }).strict().optional(),
