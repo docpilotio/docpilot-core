@@ -70,6 +70,7 @@ public class DefaultPersistentDocumentationReviewWorkflow(
     private val repository: ReviewBundleRepository,
     private val codec: JsonReviewBundleCodec = JsonReviewBundleCodec(),
     private val reviewer: DocumentationDiffReviewer = DefaultDocumentationDiffReviewer(),
+    private val lifecycleRepository: ReviewLifecycleRepository? = null,
 ) : PersistentDocumentationReviewWorkflow {
     override fun prepareAndSave(request: AiIncrementalGenerationRequest): PersistentReviewPreparationResult {
         val generation = generator.generate(request)
@@ -91,7 +92,14 @@ public class DefaultPersistentDocumentationReviewWorkflow(
             )
             val bundle = codec.create(request.previousSpecification, request.currentSpecification, proposal)
             when (val saved = repository.saveNew(bundle)) {
-                is ReviewBundleSaveResult.Saved -> PersistentReviewPreparationResult.Saved(saved.bundle)
+                is ReviewBundleSaveResult.Saved -> {
+                    val lifecycle = lifecycleRepository?.initialize(saved.bundle)
+                    if (lifecycle is ReviewLifecycleResult.Failure) {
+                        PersistentReviewPreparationResult.Failed(lifecycle.message)
+                    } else {
+                        PersistentReviewPreparationResult.Saved(saved.bundle)
+                    }
+                }
                 ReviewBundleSaveResult.AlreadyExists -> PersistentReviewPreparationResult.Failed(
                     "Review bundle already exists: ${bundle.proposalId}",
                 )
@@ -129,7 +137,29 @@ public class DefaultPersistentDocumentationReviewWorkflow(
                 decisions.associateBy { it.targetId }).values.sortedBy { it.targetId }
             val updated = codec.withDecisions(loaded.bundle, merged)
             when (val saved = repository.replace(updated, expectedPayloadSha256)) {
-                is ReviewBundleSaveResult.Saved -> PersistentReviewUpdateResult.Saved(saved.bundle)
+                is ReviewBundleSaveResult.Saved -> {
+                    val lifecycle = lifecycleRepository
+                    if (lifecycle == null) {
+                        PersistentReviewUpdateResult.Saved(saved.bundle)
+                    } else {
+                        val current = lifecycle.load(expectedProjectId, proposalId)
+                        if (current is ReviewLifecycleResult.Failure &&
+                            current.reason == ReviewLifecycleFailure.NOT_FOUND
+                        ) {
+                            when (val adopted = lifecycle.initialize(saved.bundle)) {
+                                is ReviewLifecycleResult.Success -> PersistentReviewUpdateResult.Saved(saved.bundle)
+                                is ReviewLifecycleResult.Failure -> PersistentReviewUpdateResult.Failed(adopted.message)
+                            }
+                        } else if (current !is ReviewLifecycleResult.Success) {
+                            PersistentReviewUpdateResult.Failed("Review lifecycle is invalid.")
+                        } else {
+                            when (val observed = lifecycle.observeBundle(current.value.metadata, saved.bundle)) {
+                                is ReviewLifecycleResult.Success -> PersistentReviewUpdateResult.Saved(saved.bundle)
+                                is ReviewLifecycleResult.Failure -> PersistentReviewUpdateResult.Failed(observed.message)
+                            }
+                        }
+                    }
+                }
                 is ReviewBundleSaveResult.Conflict ->
                     PersistentReviewUpdateResult.Conflict(saved.expectedPayloadSha256, saved.actualPayloadSha256)
                 is ReviewBundleSaveResult.Invalid -> PersistentReviewUpdateResult.Failed(saved.message)

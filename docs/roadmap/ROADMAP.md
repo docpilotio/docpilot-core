@@ -43,10 +43,17 @@ integrity, deterministic JSON/Markdown reporting, atomic evidence storage,
 offline verification, and a fail-closed binary release gate in an independent
 module. Final evidence collection must run after an exact clean feature commit.
 
-After RFC-0049, Review Bundle Lifecycle and Apply Receipt is the recommended
-RFC-0050 candidate for the path from v0.5 release trust to v1.0 auditability and
-long-term operation. Signed Release Evidence and External Attestation is the
-release-security alternative. RFC-0050 is not yet formally approved.
+RFC-0050 Plan A, Review Bundle Lifecycle and Apply Receipt, is implemented and
+locally verified for the path from v0.5 release trust to v1.0 auditability and
+long-term operation. Review Bundle format 1 remains unchanged. Separate
+Lifecycle Metadata, Apply Receipt, and Apply Transaction Journal format 1
+contracts provide Core-owned transitions, atomic Receipt/APPLIED visibility,
+recoverable documentation apply, idempotency, crash recovery, and offline
+verification. The clean build and 291-test regression suite pass; Git integration
+and remote synchronization are pending.
+
+Signed Release Evidence and External Attestation remains a later
+release-security candidate.
 
 Future work must preserve Clean Architecture, Evidence First, deterministic core
 outputs, the separation between Snapshot Incremental and Specification
