@@ -1,5 +1,7 @@
 # RFC-0051 Two-plan Sync Packet
 
+Decision: Plan A selected for RFC-0051. Plan B remains deferred.
+
 ## Baseline
 
 - Pre-integration baseline: `d674463c078125b3d113823a90a49c26cb77b139`
@@ -30,7 +32,7 @@
 - Risk: MEDIUM_HIGH.
 - Recommendation: CONDITIONAL.
 
-## Recommended next RFC
+## Selected RFC
 
 - Candidate: Plan A
 - Proposed RFC: RFC-0051
@@ -41,15 +43,19 @@
 - Expected non-goals: UI/TUI, MCP, remote sync, automatic recovery, retention,
   Bundle/Receipt format changes.
 
+All mutation commands default to a Core-generated dry-run Plan. Actual mutation
+requires explicit `--confirm`; automation may also bind confirmation to the
+reported Plan SHA.
+
 ## Alternative
 
 - Candidate: Plan B
 - Reason not selected first: it improves scale and hardening but delivers less
   immediate product value than exposing already-complete recovery operations.
 
-## Decisions required
+## Remaining implementation decisions
 
-1. RFC-0051 Plan A or Plan B selection.
-2. CLI command naming and stable exit-code allocation if Plan A is selected.
-3. Whether lifecycle recovery must require an explicit confirmation flag.
-4. Whether cross-process automation is urgent enough to prioritize Plan B.
+1. Final public Core operations type names.
+2. Exact help text and stable JSON field ordering.
+3. Whether `--plan-sha256` remains optional for manual `--confirm`.
+4. Crash-injection fixture boundaries used for CLI smoke.

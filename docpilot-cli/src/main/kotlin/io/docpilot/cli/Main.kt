@@ -35,6 +35,10 @@ private fun printUsage() {
           docpilot review inspect|status --project <path> (--proposal <id> | --bundle <file>) [--documentation <file>] [--json]
           docpilot review decide --project <path> (--proposal <id> | --bundle <file>) --target <id> (--accept | --reject) [--comment <text> | --comment-file <file>] [--payload-sha256 <sha>] [--json]
           docpilot review apply --project <path> (--proposal <id> | --bundle <file>) --documentation <file> [--payload-sha256 <sha>] [--json]
+          docpilot review lifecycle status|verify --project <path> (--proposal <id> | --bundle <file>) [--documentation <file>] [--json]
+          docpilot review lifecycle recover --project <path> (--proposal <id> | --bundle <file>) --documentation <file> [--dry-run | --confirm] [--plan-sha256 <sha>] [--json]
+          docpilot review lifecycle supersede --project <path> (--proposal <id> | --bundle <file>) --replacement-proposal <id> [--dry-run | --confirm] [--plan-sha256 <sha>] [--json]
+          docpilot review lifecycle archive --project <path> (--proposal <id> | --bundle <file>) [--dry-run | --confirm] [--plan-sha256 <sha>] [--json]
 
         Providers bundled by the distribution: ollama, openai
         ADR statuses: proposed, accepted, deprecated, superseded
