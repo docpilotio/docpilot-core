@@ -2,6 +2,9 @@
 
 # Official Review Lifecycle Operations and Recovery CLI
 
+Status: SELECTED for RFC-0051. Detailed contract:
+`docs/rfc/RFC-0051-Official-Review-Lifecycle-Operations-and-Recovery-CLI.md`.
+
 ## Type
 
 PRODUCT_CAPABILITY
@@ -27,6 +30,10 @@ review lifecycle archive
 
 Every mutation delegates transition validation, integrity checks, recovery
 classification, and Receipt handling to Core.
+
+Mutation commands are dry-run by default. Durable mutation requires explicit
+`--confirm`, and automation can bind confirmation to the Core-generated
+`--plan-sha256`.
 
 ## Goals
 

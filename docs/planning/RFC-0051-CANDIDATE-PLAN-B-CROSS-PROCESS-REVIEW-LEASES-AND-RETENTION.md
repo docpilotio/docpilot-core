@@ -2,6 +2,8 @@
 
 # Cross-process Review Leases and Audit-safe Retention
 
+Status: DEFERRED. Plan A was selected for RFC-0051.
+
 ## Type
 
 ARCHITECTURE_ENABLER

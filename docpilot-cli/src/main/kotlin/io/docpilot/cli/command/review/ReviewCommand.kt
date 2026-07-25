@@ -28,23 +28,272 @@ class ReviewCommand(
     fun execute(tokens: List<String>): Int {
         if (tokens.isEmpty()) return renderFailure("review", 2, "CLI_USAGE_ERROR", "Missing review subcommand.", false)
         val subcommand = tokens.first()
+        val commandName = if (subcommand == "lifecycle" && tokens.size > 1) {
+            "review lifecycle ${tokens[1]}"
+        } else {
+            "review $subcommand"
+        }
         return try {
-            val arguments = ReviewArguments.parse(tokens.drop(1))
-            when (subcommand) {
-                "prepare" -> prepare(arguments)
-                "inspect" -> inspect(arguments)
-                "status" -> status(arguments)
-                "decide" -> decide(arguments)
-                "apply" -> apply(arguments)
-                else -> renderFailure("review $subcommand", 2, "CLI_USAGE_ERROR", "Unknown review subcommand.", arguments.json)
+            if (subcommand == "lifecycle") {
+                lifecycle(tokens.drop(1))
+            } else {
+                val arguments = ReviewArguments.parse(tokens.drop(1))
+                when (subcommand) {
+                    "prepare" -> prepare(arguments)
+                    "inspect" -> inspect(arguments)
+                    "status" -> status(arguments)
+                    "decide" -> decide(arguments)
+                    "apply" -> apply(arguments)
+                    else -> renderFailure(commandName, 2, "CLI_USAGE_ERROR", "Unknown review subcommand.", arguments.json)
+                }
             }
         } catch (error: ReviewCliFailure) {
-            renderFailure("review $subcommand", error.exitCode, error.status, error.message.orEmpty(), error.json)
+            renderFailure(commandName, error.exitCode, error.status, error.message.orEmpty(), error.json)
         } catch (error: IllegalArgumentException) {
-            renderFailure("review $subcommand", 2, "CLI_USAGE_ERROR", error.message.orEmpty(), tokens.contains("--json"))
+            renderFailure(commandName, 2, "CLI_USAGE_ERROR", error.message.orEmpty(), tokens.contains("--json"))
         } catch (error: Exception) {
-            renderFailure("review $subcommand", 70, "INTERNAL_ERROR", error.message ?: "Unexpected CLI failure.", tokens.contains("--json"))
+            renderFailure(commandName, 70, "INTERNAL_ERROR", error.message ?: "Unexpected CLI failure.", tokens.contains("--json"))
         }
+    }
+
+    private fun lifecycle(tokens: List<String>): Int {
+        require(tokens.isNotEmpty()) { "Missing lifecycle subcommand." }
+        val subcommand = tokens.first()
+        val args = ReviewArguments.parse(tokens.drop(1))
+        return when (subcommand) {
+            "status" -> lifecycleStatus(args)
+            "verify" -> lifecycleVerify(args)
+            "recover" -> lifecycleRecover(args)
+            "supersede" -> lifecycleSupersede(args)
+            "archive" -> lifecycleArchive(args)
+            else -> renderFailure(
+                "review lifecycle $subcommand",
+                2,
+                "CLI_USAGE_ERROR",
+                "Unknown lifecycle subcommand.",
+                args.json,
+            )
+        }
+    }
+
+    private fun lifecycleStatus(args: ReviewArguments): Int {
+        args.requireOnly(setOf("project", "proposal", "bundle", "documentation"), setOf("json"))
+        val context = load(args)
+        val result = lifecycleOperations(context).status(
+            LifecycleStatusRequest(
+                context.projectId,
+                context.bundle.proposalId,
+                args.optional("documentation")?.let { FileDocumentationResource(regularFile(it)) },
+            ),
+        )
+        return when (result) {
+            is LifecycleStatusResult.Available -> render(
+                "review lifecycle status",
+                "LIFECYCLE_STATUS",
+                0,
+                context.bundle,
+                context.path,
+                args.json,
+                statusData(result.status),
+            )
+            is LifecycleStatusResult.Failure -> renderLifecycleFailure(
+                "review lifecycle status", result.reason, result.message, context, args.json,
+            )
+        }
+    }
+
+    private fun lifecycleVerify(args: ReviewArguments): Int {
+        args.requireOnly(setOf("project", "proposal", "bundle", "documentation"), setOf("json"))
+        val context = load(args)
+        return when (val result = lifecycleOperations(context).verify(
+            LifecycleStatusRequest(
+                context.projectId,
+                context.bundle.proposalId,
+                args.optional("documentation")?.let { FileDocumentationResource(regularFile(it)) },
+            ),
+        )) {
+            is LifecycleVerificationResult.Verified -> render(
+                "review lifecycle verify", "VERIFIED", 0, context.bundle, context.path, args.json,
+                statusData(result.status),
+            )
+            is LifecycleVerificationResult.Invalid -> renderFailure(
+                "review lifecycle verify", 5, "INTEGRITY_FAILURE", result.message, args.json,
+                context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
+            )
+        }
+    }
+
+    private fun lifecycleRecover(args: ReviewArguments): Int {
+        args.requireOnly(
+            setOf("project", "proposal", "bundle", "documentation", "plan-sha256"),
+            setOf("json", "dry-run", "confirm"),
+        )
+        requireMutationMode(args)
+        val context = load(args)
+        val request = LifecycleOperationRequest(
+            context.projectId,
+            context.bundle.proposalId,
+            documentation = FileDocumentationResource(regularFile(args.required("documentation"))),
+        )
+        return lifecycleMutation(
+            "review lifecycle recover",
+            context,
+            args,
+            request,
+            lifecycleOperations(context)::planRecovery,
+            lifecycleOperations(context)::confirmRecovery,
+            "RECOVERED",
+        )
+    }
+
+    private fun lifecycleSupersede(args: ReviewArguments): Int {
+        args.requireOnly(
+            setOf("project", "proposal", "bundle", "replacement-proposal", "plan-sha256"),
+            setOf("json", "dry-run", "confirm"),
+        )
+        requireMutationMode(args)
+        val context = load(args)
+        val request = LifecycleOperationRequest(
+            context.projectId,
+            context.bundle.proposalId,
+            replacementProposalId = args.required("replacement-proposal"),
+        )
+        val operations = lifecycleOperations(context)
+        return lifecycleMutation(
+            "review lifecycle supersede", context, args, request,
+            operations::planSupersede, operations::confirmSupersede, "SUPERSEDED",
+        )
+    }
+
+    private fun lifecycleArchive(args: ReviewArguments): Int {
+        args.requireOnly(
+            setOf("project", "proposal", "bundle", "plan-sha256"),
+            setOf("json", "dry-run", "confirm"),
+        )
+        requireMutationMode(args)
+        val context = load(args)
+        val request = LifecycleOperationRequest(context.projectId, context.bundle.proposalId)
+        val operations = lifecycleOperations(context)
+        return lifecycleMutation(
+            "review lifecycle archive", context, args, request,
+            operations::planArchive, operations::confirmArchive, "ARCHIVED",
+        )
+    }
+
+    private fun lifecycleMutation(
+        command: String,
+        context: BundleContext,
+        args: ReviewArguments,
+        request: LifecycleOperationRequest,
+        planner: (LifecycleOperationRequest) -> LifecycleOperationPlanResult,
+        confirmer: (ConfirmLifecycleOperationRequest) -> LifecycleOperationResult,
+        changedStatus: String,
+    ): Int {
+        if (!args.flag("confirm")) {
+            return when (val result = planner(request)) {
+                is LifecycleOperationPlanResult.Ready ->
+                    render(command, "DRY_RUN_READY", 0, context.bundle, context.path, args.json, planData(result.plan, false))
+                is LifecycleOperationPlanResult.NoChange ->
+                    render(command, "DRY_RUN_NO_CHANGE", 0, context.bundle, context.path, args.json, planData(result.plan, false))
+                is LifecycleOperationPlanResult.Blocked -> renderFailure(
+                    command, exitCode(result.reason), "DRY_RUN_BLOCKED", result.message, args.json,
+                    context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
+                    result.plan?.let { planData(it, false) } ?: emptyMap(),
+                )
+                is LifecycleOperationPlanResult.Failure -> renderLifecycleFailure(
+                    command, result.reason, result.message, context, args.json,
+                )
+            }
+        }
+        val expected = args.optional("plan-sha256")
+        if (expected != null) require(expected.matches(Regex("[0-9a-f]{64}"))) { "Invalid --plan-sha256." }
+        return when (val result = confirmer(ConfirmLifecycleOperationRequest(request, expected))) {
+            is LifecycleOperationResult.Changed -> render(
+                command, changedStatus, 0, context.bundle, context.path, args.json,
+                planData(result.plan, true) + mapOf(
+                    "resultGeneration" to result.aggregate.metadata.generation,
+                    "resultState" to result.aggregate.metadata.state.name,
+                    "resultReceiptId" to result.aggregate.receipt?.receiptId,
+                ),
+            )
+            is LifecycleOperationResult.NoChange -> render(
+                command, "ALREADY_APPLIED", 0, context.bundle, context.path, args.json,
+                planData(result.plan, false) + mapOf(
+                    "resultGeneration" to result.aggregate.metadata.generation,
+                    "resultState" to result.aggregate.metadata.state.name,
+                ),
+            )
+            is LifecycleOperationResult.Failure -> renderFailure(
+                command, exitCode(result.reason), statusName(result.reason), result.message, args.json,
+                context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
+                result.plan?.let { planData(it, false) } ?: emptyMap(),
+            )
+        }
+    }
+
+    private fun requireMutationMode(args: ReviewArguments) {
+        require(!(args.flag("dry-run") && args.flag("confirm"))) {
+            "--dry-run and --confirm are mutually exclusive."
+        }
+        require(args.optional("plan-sha256") == null || args.flag("confirm")) {
+            "--plan-sha256 requires --confirm."
+        }
+    }
+
+    private fun lifecycleOperations(context: BundleContext): ReviewLifecycleOperations =
+        DefaultReviewLifecycleOperations(
+            context.repository,
+            FileReviewLifecycleRepository(context.projectRoot),
+        )
+
+    private fun statusData(status: ReviewLifecycleStatus): Map<String, Any?> = mapOf(
+        "documentationRelation" to status.documentationRelation.name,
+        "lifecycleGeneration" to status.generation,
+        "lifecycleState" to status.state.name,
+        "receiptId" to status.receiptId,
+        "resultDocumentationSha256" to status.resultDocumentationSha256,
+        "transactionId" to status.transactionId,
+        "transactionPhase" to status.transactionPhase?.name,
+    )
+
+    private fun planData(plan: ReviewLifecycleOperationPlan, mutationPerformed: Boolean): Map<String, Any?> = mapOf(
+        "action" to plan.action.name,
+        "expectedResultState" to plan.expectedResultState.name,
+        "lifecycleGeneration" to plan.observedLifecycleGeneration,
+        "lifecycleState" to plan.observedLifecycleState.name,
+        "mutationPerformed" to mutationPerformed,
+        "planSha256" to plan.planSha256,
+        "receiptId" to plan.receiptId,
+        "recoveryDisposition" to plan.recoveryDisposition?.name,
+        "replacementProposalId" to plan.replacementProposalId,
+        "transactionId" to plan.transactionId,
+    )
+
+    private fun renderLifecycleFailure(
+        command: String,
+        reason: LifecycleOperationFailure,
+        message: String,
+        context: BundleContext,
+        json: Boolean,
+    ): Int = renderFailure(
+        command, exitCode(reason), statusName(reason), message, json,
+        context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
+    )
+
+    private fun exitCode(reason: LifecycleOperationFailure): Int = when (reason) {
+        LifecycleOperationFailure.NOT_FOUND, LifecycleOperationFailure.INVALID -> 5
+        LifecycleOperationFailure.CONFLICT -> 4
+        LifecycleOperationFailure.BLOCKED -> 3
+        LifecycleOperationFailure.RECOVERY_REQUIRED -> 9
+        LifecycleOperationFailure.STORAGE_FAILURE -> 8
+    }
+
+    private fun statusName(reason: LifecycleOperationFailure): String = when (reason) {
+        LifecycleOperationFailure.NOT_FOUND, LifecycleOperationFailure.INVALID -> "INVALID_LIFECYCLE"
+        LifecycleOperationFailure.CONFLICT -> "STALE_PLAN"
+        LifecycleOperationFailure.BLOCKED -> "DRY_RUN_BLOCKED"
+        LifecycleOperationFailure.RECOVERY_REQUIRED -> "RECOVERY_REQUIRED"
+        LifecycleOperationFailure.STORAGE_FAILURE -> "STORAGE_FAILURE"
     }
 
     private fun prepare(args: ReviewArguments): Int {
@@ -323,15 +572,17 @@ class ReviewCommand(
         proposalId: String? = null,
         bundlePath: Path? = null,
         payloadSha256: String? = null,
+        data: Map<String, Any?> = emptyMap(),
     ): Int {
         if (json) {
-            println(jsonEnvelope(command, status, exitCode, proposalId, bundlePath, payloadSha256, emptyMap(), message))
+            println(jsonEnvelope(command, status, exitCode, proposalId, bundlePath, payloadSha256, data, message))
         } else {
             println("Command: $command")
             println("Status: $status")
             println("Proposal ID: ${proposalId ?: "unavailable"}")
             println("Bundle Path: ${bundlePath?.toAbsolutePath()?.normalize() ?: "unavailable"}")
             println("Payload SHA-256: ${payloadSha256 ?: "unavailable"}")
+            data.toSortedMap().forEach { (key, value) -> println("${key.toDisplayName()}: $value") }
             System.err.println("[ERROR] $message")
         }
         return exitCode
@@ -424,7 +675,7 @@ private class ReviewArguments private constructor(
         fun parse(tokens: List<String>): ReviewArguments {
             val values = linkedMapOf<String, String>()
             val flags = linkedSetOf<String>()
-            val booleanFlags = setOf("json", "accept", "reject")
+            val booleanFlags = setOf("json", "accept", "reject", "dry-run", "confirm")
             var index = 0
             while (index < tokens.size) {
                 val token = tokens[index]

@@ -55,6 +55,14 @@ integration is complete at `0f6b15d`. Remote synchronization is pending.
 Signed Release Evidence and External Attestation remains a later
 release-security candidate.
 
+RFC-0051 Plan A, Official Review Lifecycle Operations and Recovery CLI, is
+implemented and locally verified. It exposes Core-owned status, offline
+verification, recovery, supersession, and archive through thin-adapter CLI
+commands. Every mutation defaults to a deterministic Core dry-run Plan and
+requires explicit confirmation; automation may bind confirmation to the Plan
+SHA. The clean build and 301-test regression suite pass. Main integration is
+pending. Cross-process Review Leases and Audit-safe Retention remains deferred.
+
 Future work must preserve Clean Architecture, Evidence First, deterministic core
 outputs, the separation between Snapshot Incremental and Specification
 Incremental, and complete-review-before-merge. The primary POC target remains

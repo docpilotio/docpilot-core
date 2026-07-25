@@ -94,10 +94,193 @@ class ReviewCommandWorkflowTest {
         assertTrue(loaded.decisions.isEmpty())
     }
 
+    @Test
+    fun `lifecycle status and verify expose Core aggregate through json`() {
+        val fixture = fixture()
+        initializeLifecycle(fixture)
+        val statusOutput = ByteArrayOutputStream()
+        val original = System.out
+        val statusExit = try {
+            System.setOut(PrintStream(statusOutput, true, StandardCharsets.UTF_8))
+            ReviewCommand().execute(
+                lifecycleArguments("status", fixture) + listOf(
+                    "--documentation", fixture.documentationPath.toString(), "--json",
+                ),
+            )
+        } finally {
+            System.setOut(original)
+        }
+
+        val statusJson = statusOutput.toString(StandardCharsets.UTF_8)
+        assertEquals(0, statusExit)
+        assertTrue(statusJson.contains("\"status\":\"LIFECYCLE_STATUS\""))
+        assertTrue(statusJson.contains("\"lifecycleState\":\"ACTIVE\""))
+        assertTrue(statusJson.contains("\"lifecycleGeneration\":1"))
+        assertEquals(
+            0,
+            ReviewCommand().execute(lifecycleArguments("verify", fixture) + "--json"),
+        )
+    }
+
+    @Test
+    fun `archive defaults to dry run and requires explicit confirm`() {
+        val fixture = fixture()
+        initializeLifecycle(fixture)
+        val dryOutput = ByteArrayOutputStream()
+        val original = System.out
+        val dryExit = try {
+            System.setOut(PrintStream(dryOutput, true, StandardCharsets.UTF_8))
+            ReviewCommand().execute(lifecycleArguments("archive", fixture) + "--json")
+        } finally {
+            System.setOut(original)
+        }
+        val dryJson = dryOutput.toString(StandardCharsets.UTF_8)
+        val planSha = Regex("\"planSha256\":\"([0-9a-f]{64})\"").find(dryJson)!!.groupValues[1]
+
+        assertEquals(0, dryExit)
+        assertTrue(dryJson.contains("\"status\":\"DRY_RUN_READY\""))
+        assertEquals(ReviewLifecycleState.ACTIVE, lifecycle(fixture).metadata.state)
+
+        val confirmExit = ReviewCommand().execute(
+            lifecycleArguments("archive", fixture) + listOf("--confirm", "--plan-sha256", planSha, "--json"),
+        )
+
+        assertEquals(0, confirmExit)
+        assertEquals(ReviewLifecycleState.ARCHIVED, lifecycle(fixture).metadata.state)
+    }
+
+    @Test
+    fun `lifecycle mutation mode rejects ambiguous approval and stale plan`() {
+        val fixture = fixture()
+        initializeLifecycle(fixture)
+
+        assertEquals(
+            2,
+            ReviewCommand().execute(lifecycleArguments("archive", fixture) + listOf("--dry-run", "--confirm")),
+        )
+        assertEquals(
+            4,
+            ReviewCommand().execute(
+                lifecycleArguments("archive", fixture) +
+                    listOf("--confirm", "--plan-sha256", "0".repeat(64), "--json"),
+            ),
+        )
+        assertEquals(ReviewLifecycleState.ACTIVE, lifecycle(fixture).metadata.state)
+    }
+
+    @Test
+    fun `supersede dry run and confirm use Core operation plan`() {
+        val fixture = fixture()
+        initializeLifecycle(fixture)
+        val replacement = "review:${"d".repeat(64)}"
+        val dryOutput = ByteArrayOutputStream()
+        val original = System.out
+        try {
+            System.setOut(PrintStream(dryOutput, true, StandardCharsets.UTF_8))
+            assertEquals(
+                0,
+                ReviewCommand().execute(
+                    lifecycleArguments("supersede", fixture) +
+                        listOf("--replacement-proposal", replacement, "--json"),
+                ),
+            )
+        } finally {
+            System.setOut(original)
+        }
+        val planSha = Regex("\"planSha256\":\"([0-9a-f]{64})\"")
+            .find(dryOutput.toString(StandardCharsets.UTF_8))!!.groupValues[1]
+        assertEquals(ReviewLifecycleState.ACTIVE, lifecycle(fixture).metadata.state)
+
+        assertEquals(
+            0,
+            ReviewCommand().execute(
+                lifecycleArguments("supersede", fixture) +
+                    listOf(
+                        "--replacement-proposal", replacement,
+                        "--confirm", "--plan-sha256", planSha, "--json",
+                    ),
+            ),
+        )
+        assertEquals(ReviewLifecycleState.SUPERSEDED, lifecycle(fixture).metadata.state)
+    }
+
+    @Test
+    fun `recover dry run and confirm roll forward incomplete apply`() {
+        val fixture = fixture()
+        val bundle = assertTrueLoad(fixture)
+        val lifecycleRepository = FileReviewLifecycleRepository(projectRoot)
+        val initial = assertTrue(
+            lifecycleRepository.initialize(bundle) is ReviewLifecycleResult.Success<ReviewLifecycleAggregate>,
+        ).let { lifecycle(fixture).metadata }
+        val lifecycleCodec = ReviewLifecycleCodec()
+        val resultDocumentation = "recovered result"
+        val resultSha = sha256(resultDocumentation)
+        val receipt = lifecycleCodec.receipt(bundle, resultSha)
+        val transaction = lifecycleCodec.transaction(
+            bundle, initial.generation, resultSha, receipt.receiptId, ReviewApplyTransactionPhase.PREPARED,
+        )
+        assertTrue(
+            lifecycleRepository.beginApply(initial, transaction, receipt) is
+                ReviewLifecycleResult.Success<ReviewLifecycleAggregate>,
+        )
+        Files.writeString(fixture.documentationPath, resultDocumentation, StandardCharsets.UTF_8)
+        val dryOutput = ByteArrayOutputStream()
+        val original = System.out
+        try {
+            System.setOut(PrintStream(dryOutput, true, StandardCharsets.UTF_8))
+            assertEquals(
+                0,
+                ReviewCommand().execute(
+                    lifecycleArguments("recover", fixture) +
+                        listOf("--documentation", fixture.documentationPath.toString(), "--json"),
+                ),
+            )
+        } finally {
+            System.setOut(original)
+        }
+        val dryJson = dryOutput.toString(StandardCharsets.UTF_8)
+        assertTrue(dryJson.contains("\"recoveryDisposition\":\"ROLL_FORWARD_APPLIED\""))
+        val planSha = Regex("\"planSha256\":\"([0-9a-f]{64})\"").find(dryJson)!!.groupValues[1]
+        assertEquals(ReviewLifecycleState.APPLYING, lifecycle(fixture).metadata.state)
+
+        assertEquals(
+            0,
+            ReviewCommand().execute(
+                lifecycleArguments("recover", fixture) +
+                    listOf(
+                        "--documentation", fixture.documentationPath.toString(),
+                        "--confirm", "--plan-sha256", planSha, "--json",
+                    ),
+            ),
+        )
+        assertEquals(ReviewLifecycleState.APPLIED, lifecycle(fixture).metadata.state)
+    }
+
     private fun statusArguments(fixture: Fixture) = listOf(
         "status", "--project", projectRoot.toString(), "--bundle", fixture.bundlePath.toString(),
         "--documentation", fixture.documentationPath.toString(),
     )
+
+    private fun lifecycleArguments(subcommand: String, fixture: Fixture) = listOf(
+        "lifecycle", subcommand,
+        "--project", projectRoot.toString(),
+        "--bundle", fixture.bundlePath.toString(),
+    )
+
+    private fun initializeLifecycle(fixture: Fixture) {
+        val bundle = assertTrueLoad(fixture)
+        assertTrue(
+            FileReviewLifecycleRepository(projectRoot).initialize(bundle) is
+                ReviewLifecycleResult.Success<ReviewLifecycleAggregate>,
+        )
+    }
+
+    private fun lifecycle(fixture: Fixture): ReviewLifecycleAggregate {
+        val loaded = FileReviewLifecycleRepository(projectRoot)
+            .load(projectRoot.fileName.toString().lowercase(), fixture.proposalId)
+        assertTrue(loaded is ReviewLifecycleResult.Success<ReviewLifecycleAggregate>)
+        return loaded.value
+    }
 
     private fun fixture(): Fixture {
         val projectId = projectRoot.fileName.toString().lowercase()
