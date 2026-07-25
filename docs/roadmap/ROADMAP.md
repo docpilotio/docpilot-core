@@ -45,7 +45,8 @@ module. Final evidence collection must run after an exact clean feature commit.
 
 After RFC-0049, Review Bundle Lifecycle and Apply Receipt is the recommended
 RFC-0050 candidate for the path from v0.5 release trust to v1.0 auditability and
-long-term operation. RFC-0050 is not yet formally approved.
+long-term operation. Signed Release Evidence and External Attestation is the
+release-security alternative. RFC-0050 is not yet formally approved.
 
 Future work must preserve Clean Architecture, Evidence First, deterministic core
 outputs, the separation between Snapshot Incremental and Specification

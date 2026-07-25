@@ -101,7 +101,8 @@ integration, push, tag, and release are not performed by this handoff.
 
 ## Git integration status
 
-- Feature commit: NOT CREATED
+- Feature implementation commit:
+  `3dd0fdb1d4202d1800d6681f3647776124037b43`
 - Main merge: NOT PERFORMED
 - Push: NOT PERFORMED
 - Tag: NOT PERFORMED
@@ -110,4 +111,5 @@ integration, push, tag, and release are not performed by this handoff.
 ## Follow-up
 
 After final RFC-0049 integration and v0.5 release evidence, Review Bundle Lifecycle
-and Apply Receipt remains the recommended RFC-0050 candidate.
+and Apply Receipt is the strongly recommended RFC-0050 candidate. Signed Release
+Evidence and External Attestation is retained as the alternative.
