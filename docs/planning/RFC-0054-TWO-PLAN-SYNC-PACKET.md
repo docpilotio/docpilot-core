@@ -5,6 +5,8 @@
 - Predecessor: RFC-0053 Semantic Relationship Expansion
 - RFC-0053 implementation: COMPLETE_WITH_LIMITATIONS
 - RFC-0053 verification: 100 XML / 312 tests / 0 failures
+- RFC-0053 Feature Commit: `3411424`
+- RFC-0053 Main integration: `a0c4a9c`
 - DIR schema: `0.3`
 - Snapshot format: `1`
 - Next track: Product Capability
