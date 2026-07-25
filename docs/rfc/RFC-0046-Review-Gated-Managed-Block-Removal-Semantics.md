@@ -2,8 +2,8 @@
 
 ## Status
 
-Implemented and locally verified in the RFC-0046 Feature Worktree. Git integration
-is pending.
+Implemented, locally verified, and integrated into local main. Remote synchronization
+is recorded separately from the implementation contract.
 
 Verification evidence:
 

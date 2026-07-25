@@ -9,9 +9,9 @@ execution, snapshot persistence, AI incremental generation, documentation
 diff/review, deterministic Relationship Semantics, and relationship-aware
 incremental diff/review, and review-gated managed-block removal are implemented.
 RFC-0046 focused verification, full regression verification, isolated
-architecture-samples smoke, canonical completion handoff, and documentation
-synchronization are complete. RFC-0046 Feature-branch Git integration remains
-pending. Artifact-version policy remains pending.
+architecture-samples smoke, canonical completion handoff, and local main
+integration are complete. Remote synchronization is the remaining Git action.
+Artifact-version policy remains pending.
 
 Delivered baseline:
 
@@ -33,9 +33,9 @@ Delivered baseline:
 
 ## Next
 
-RFC-0046 implementation, verification, isolated smoke, Main Planning update, and
-Completion Handoff are complete in the Feature Worktree; Git integration is
-pending. No later RFC is selected or approved. Future work must preserve Clean
+RFC-0046 implementation, verification, isolated smoke, Main Planning update,
+Completion Handoff, and local main integration are complete. RFC-0047 has two
+candidate plans; neither is selected or approved. Future work must preserve Clean
 Architecture, Evidence First, deterministic core outputs, the separation between
 Snapshot Incremental and Specification Incremental, and complete-review-before-
 merge. The primary POC target remains `C:\WorkSpace\architecture-samples`.
