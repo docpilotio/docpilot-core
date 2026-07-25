@@ -83,8 +83,8 @@ The Product Capability sequence after RFC-0052 is:
 3. RFC-0055: Existing Documentation Reconciliation for ownership, drift,
    adoption, managed/manual boundaries, and orphan disposition.
 
-RFC-0053 is selected. RFC-0054 and RFC-0055 remain provisional until separately
-approved.
+RFC-0053 and RFC-0055 are selected. RFC-0054 remains provisional until
+separately approved.
 
 RFC-0053 Plan A, Semantic Relationship Expansion, is now selected. Its detailed
 specification defines Evidence-backed deterministic `EXTENDS`, `IMPLEMENTS`,
@@ -92,15 +92,29 @@ specification defines Evidence-backed deterministic `EXTENDS`, `IMPLEMENTS`,
 policy, and Relationship Projection Report format 1. Core implementation and
 the 312-test regression suite, and Main integration at `a0c4a9c` are complete
 with documented scanner limitations. Remote synchronization is pending.
-RFC-0054 Documentation Quality Validation and RFC-0055 Existing Documentation
-Reconciliation remain proposed follow-ups.
+RFC-0054 Documentation Quality Validation remains a proposed follow-up.
+
+RFC-0055 Existing Documentation Reconciliation is implemented and verified.
+Its detailed specification defines Evidence-based Core ownership, preview-first three-way
+reconciliation, deterministic conflict detection, incremental reconciliation,
+proposal-only AI, atomic/recoverable apply, and a versioned Decision Explanation
+Report for every material Ownership/Merge outcome. It is the final v1.0 Product
+Capability RFC. Main integration is pending.
+RFC-0054 Documentation Quality Validation remains proposed and independently
+approvable.
+
+After the v1.0 integration tag, the Product Capability track adds Documentation
+Evolution Intelligence after RFC-0055. It will explain reasons, impact scope, and
+added/removed entities and relationships from Core-owned structured Evidence
+and the RFC-0055 Explanation Report. RFC-0056 is the proposed number, not a
+reserved approval.
 
 ## v1.1 Hardening track
 
 The following work is intentionally separated from the Product Capability track:
 
-- RFC-0056+ or v1.1: Cross-process Review Leases and Audit-safe Retention.
-- RFC-0057+ or v1.1: Signed Release Evidence and External Attestation.
+- RFC-0057+ or v1.1: Cross-process Review Leases and Audit-safe Retention.
+- RFC-0058+ or v1.1: Signed Release Evidence and External Attestation.
 
 These numbers are placeholders, not reserved RFC approvals. Hardening may move
 earlier only if new evidence shows an immediate release or data-integrity
