@@ -2,8 +2,8 @@
 
 ## Status
 
-Implemented and locally verified in the RFC-0047 Feature Worktree. Git integration
-is pending.
+Implemented, locally verified, and integrated into local main. Remote push is not
+part of this integration handoff.
 
 Verification evidence:
 
