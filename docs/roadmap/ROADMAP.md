@@ -90,9 +90,10 @@ RFC-0053 Plan A, Semantic Relationship Expansion, is now selected. Its detailed
 specification defines Evidence-backed deterministic `EXTENDS`, `IMPLEMENTS`,
 `CALLS`, and `IMPORTS`, stable identity, aggregation, bounded Core threshold
 policy, and Relationship Projection Report format 1. Core implementation and
-the 312-test regression suite are complete with documented scanner limitations;
-Git integration is pending. RFC-0054 Documentation Quality Validation and
-RFC-0055 Existing Documentation Reconciliation remain proposed follow-ups.
+the 312-test regression suite, and Main integration at `a0c4a9c` are complete
+with documented scanner limitations. Remote synchronization is pending.
+RFC-0054 Documentation Quality Validation and RFC-0055 Existing Documentation
+Reconciliation remain proposed follow-ups.
 
 ## v1.1 Hardening track
 

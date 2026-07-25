@@ -84,12 +84,12 @@ Structural relationships are not silently truncated.
 
 ## Git integration
 
-- Feature commit: NOT CREATED
-- Main merge: NOT PERFORMED
+- Feature commit: `341142423c62c4dc86ad46dfec60b8b6cc1cfcfe`
+- Main merge: `a0c4a9ce223da47dd1061d0bc028d637e9b67b86`
 - Push: NOT PERFORMED
 - Release: NOT PERFORMED
 
 ## Completion readiness
 
-Core semantic projection is implemented and locally verified. Git integration is
-ready, with scanner limitations explicitly retained for follow-up planning.
+Core semantic projection, local verification, Feature Commit, and Main
+integration are complete. Scanner limitations remain explicit follow-up inputs.

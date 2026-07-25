@@ -12,7 +12,7 @@
 | Implementation | COMPLETE_WITH_LIMITATIONS |
 | Clean build | PASS |
 | Full regression | PASS — 100 XML / 312 tests |
-| Main integration | NOT_STARTED |
+| Main integration | COMPLETE (`a0c4a9c`) |
 
 ## Baseline
 
