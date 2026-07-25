@@ -26,6 +26,16 @@ function Invoke-Gradle([string[]]$Arguments) {
     }
 }
 
+function Invoke-GradleCapture([string[]]$Arguments) {
+    $output = @(& (Join-Path $repoRoot 'gradlew.bat') @Arguments 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        $output | ForEach-Object { Write-Output $_ }
+        throw "Gradle failed: $($Arguments -join ' ')"
+    }
+    $output | ForEach-Object { Write-Output $_ }
+    return $output
+}
+
 function Get-ArtifactState([string]$Root, [string[]]$Directories) {
     $state = @{}
     foreach ($directory in $Directories) {
@@ -52,7 +62,10 @@ try {
 
     Invoke-Gradle @(':docpilot-cli:run', "--args=generate specification --project $fixture --output $fixture")
     $specificationFirst = Get-ArtifactState $fixture @('docs/specification', 'docs/architecture')
-    Invoke-Gradle @(':docpilot-cli:run', "--args=generate specification --project $fixture --output $fixture")
+    $secondSpecificationOutput = Invoke-GradleCapture @(
+        ':docpilot-cli:run',
+        "--args=generate specification --project $fixture --output $fixture"
+    )
     $specificationSecond = Get-ArtifactState $fixture @('docs/specification', 'docs/architecture')
     $specificationDelta = @(
         Compare-Object ($specificationFirst.GetEnumerator() | ForEach-Object { "$($_.Key)|$($_.Value)" }) `
@@ -60,6 +73,10 @@ try {
     ).Count
 
     Invoke-Gradle @(':docpilot-cli:test', '--tests', '*ReconcileCommandE2eTest')
+    Invoke-Gradle @(':test', '--tests', '*DocumentationQualityValidatorTest')
+    $noChangeMode = @($secondSpecificationOutput | Where-Object {
+        $_.ToString().Contains('Execution Mode: NO_CHANGES')
+    }).Count -gt 0
 
     $report = [ordered]@{
         formatVersion = 1
@@ -69,8 +86,14 @@ try {
         analysisDeterminismDelta = $analysisDelta
         specificationArtifacts = $specificationSecond.Count
         specificationDeterminismDelta = $specificationDelta
+        specificationNoChangeMode = $noChangeMode
         reconciliationCliE2e = 'PASS'
-        decision = if ($analysisDelta -eq 0 -and $specificationDelta -eq 0) { 'PASS' } else { 'FAIL' }
+        qualityValidatorTests = 'PASS'
+        decision = if ($analysisDelta -eq 0 -and $specificationDelta -eq 0 -and $noChangeMode) {
+            'PASS'
+        } else {
+            'FAIL'
+        }
     }
     $reportPath = Join-Path $runtime 'product-validation-result.json'
     $report | ConvertTo-Json | Set-Content -LiteralPath $reportPath -Encoding utf8
