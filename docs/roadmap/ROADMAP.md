@@ -103,11 +103,18 @@ Capability RFC. Main integration and the `v1.0.0` release tag are complete.
 RFC-0054 Documentation Quality Validation remains proposed and independently
 approvable.
 
-After the v1.0 integration tag, the Product Capability track adds Documentation
-Evolution Intelligence after RFC-0055. It will explain reasons, impact scope, and
+The post-tag Product Validation Release Gate is `PRODUCT_VALIDATION_FAIL`.
+`v1.0.0` remains the immutable technical baseline, but public Product Release
+readiness is not approved. Legacy analysis determinism, an official
+Reconciliation product workflow, architecture synthesis quality, parser
+accuracy, and independent review must pass the documented re-entry gate.
+
+After Product Validation passes, the Product Capability track may add
+Documentation Evolution Intelligence after RFC-0055. It will explain reasons,
+impact scope, and
 added/removed entities and relationships from Core-owned structured Evidence
 and the RFC-0055 Explanation Report. RFC-0056 is the proposed number, not a
-reserved approval.
+reserved approval. Its implementation is deferred during validation remediation.
 
 ## v1.1 Hardening track
 
