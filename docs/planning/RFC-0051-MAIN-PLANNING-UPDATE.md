@@ -11,7 +11,7 @@
 | Specification | APPROVED |
 | Implementation | COMPLETED |
 | Verification | 97 XML / 301 tests / 0 failures |
-| Main integration | NOT_STARTED |
+| Main integration | COMPLETED (`2036eb9`) |
 
 ## Baseline
 
@@ -84,6 +84,12 @@ CLI must not switch on lifecycle states to select behavior.
 
 RFC-0051 improves operational accessibility and automation safety. It does not
 change v0.5 Release Evidence or create a release by itself.
+
+## Git integration
+
+- Feature commit: `c24eac2e35e556f9aba0c1d8151de680bbacc0f6`
+- Main merge commit: `2036eb9a4c88b61d5f0ed7e51747c89885eecc63`
+- Push: NOT PERFORMED
 
 ## Deferred
 

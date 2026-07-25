@@ -6,7 +6,9 @@
 - Title: Official Review Lifecycle Operations and Recovery CLI
 - Branch: `feature/rfc-0051-lifecycle-operations-cli`
 - Baseline: `60704a254f7d90a0ea9c00e9490d06bf6e917b26`
-- Status: implementation and local verification complete
+- Feature commit: `c24eac2e35e556f9aba0c1d8151de680bbacc0f6`
+- Main merge commit: `2036eb9a4c88b61d5f0ed7e51747c89885eecc63`
+- Status: implementation, local verification, and main integration complete
 
 ## Delivered commands
 
@@ -87,8 +89,8 @@ Static boundary inspection found no CLI production references to:
 
 ## Git integration status
 
-- Feature commit: PENDING.
-- Main merge: NOT PERFORMED.
+- Feature commit: COMPLETE.
+- Main merge: COMPLETE.
 - Push: NOT PERFORMED.
 - Tag/release: NOT PERFORMED.
 
