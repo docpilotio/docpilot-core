@@ -26,6 +26,7 @@ public class MarkdownDocumentationReviewReportRenderer : DocumentationReviewRepo
             appendLine("# Documentation Diff Review")
             appendLine()
             appendLine("- Proposal completeness: ${if (proposal.isComplete) "COMPLETE" else "INCOMPLETE"}")
+            appendLine("- Reviewed base SHA-256: ${proposal.reviewedDocumentationSha256}")
             appendLine("- Proposed targets: ${proposal.entries.size}")
             appendLine("- Missing patches: ${proposal.missingPatchTargetIds.size}")
             if (proposal.missingPatchTargetIds.isNotEmpty()) {
@@ -41,6 +42,7 @@ public class MarkdownDocumentationReviewReportRenderer : DocumentationReviewRepo
                 appendLine("- Parent: ${entry.parentId ?: "none"}")
                 appendLine("- Specification change: ${entry.specificationChangeKind}")
                 appendLine("- Documentation change: ${entry.documentationChangeKind}")
+                appendLine("- Patch operation: ${entry.operation}")
                 appendLine("- Decision: ${decision?.disposition ?: "PENDING"}")
                 appendLine("- Evidence: ${entry.evidenceIds.ifEmpty { listOf("none") }.joinToString(", ")}")
                 decision?.comment?.let { appendLine("- Comment: $it") }
@@ -53,9 +55,13 @@ public class MarkdownDocumentationReviewReportRenderer : DocumentationReviewRepo
                 appendLine()
                 appendLine("### Proposed Markdown")
                 appendLine()
-                appendLine("````markdown")
-                appendLine(entry.proposedMarkdown)
-                appendLine("````")
+                if (entry.documentationChangeKind == DocumentationChangeKind.REMOVE) {
+                    appendLine("Managed block will be removed.")
+                } else {
+                    appendLine("````markdown")
+                    appendLine(entry.proposedMarkdown)
+                    appendLine("````")
+                }
             }
         }.trimEnd() + "\n"
     }

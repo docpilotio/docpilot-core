@@ -22,6 +22,7 @@ class DocumentationReviewReportRendererTest {
                     evidenceIds = listOf("evidence:1"),
                 ),
             ),
+            reviewedDocumentationSha256 = "0".repeat(64),
         )
         val renderer = MarkdownDocumentationReviewReportRenderer()
         val decisions = listOf(

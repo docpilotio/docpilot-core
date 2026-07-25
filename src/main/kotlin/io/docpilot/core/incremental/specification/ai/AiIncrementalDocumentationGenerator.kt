@@ -55,6 +55,19 @@ public class DefaultAiIncrementalDocumentationGenerator(
                 require(patches.all { it.targetId in expectedIds }) {
                     "AI response contains a patch for an unchanged target."
                 }
+                val actionById = request.updatePlan.actions.associateBy { it.id }
+                patches.filter { it.operation == AiDocumentationPatchOperation.REMOVE }.forEach { patch ->
+                    val action = actionById.getValue(patch.targetId)
+                    require(action.changeKind == io.docpilot.core.incremental.specification.ChangeKind.REMOVED) {
+                        "Managed-block REMOVE is authorized only for a REMOVED specification target: ${patch.targetId}"
+                    }
+                    require(targetExists(action.target, action.id, request.previousSpecification)) {
+                        "Managed-block REMOVE target did not exist in the previous specification: ${patch.targetId}"
+                    }
+                    require(!targetExists(action.target, action.id, request.currentSpecification)) {
+                        "Managed-block REMOVE target still exists in the current specification: ${patch.targetId}"
+                    }
+                }
                 AiIncrementalGenerationResult(
                     status = AiIncrementalGenerationStatus.SUCCEEDED,
                     mergedDocumentation = merger.merge(request.existingDocumentation, patches),
@@ -70,5 +83,22 @@ public class DefaultAiIncrementalDocumentationGenerator(
                 )
             }
         }
+    }
+
+    private fun targetExists(
+        target: io.docpilot.core.incremental.specification.IncrementalUpdateTarget,
+        id: String,
+        specification: io.docpilot.core.model.ProjectSpecification,
+    ): Boolean = when (target) {
+        io.docpilot.core.incremental.specification.IncrementalUpdateTarget.PACKAGE ->
+            specification.packages.any { it.id == id }
+        io.docpilot.core.incremental.specification.IncrementalUpdateTarget.TYPE ->
+            specification.components.any { it.id == id }
+        io.docpilot.core.incremental.specification.IncrementalUpdateTarget.API ->
+            specification.components.any { component -> component.apis.any { it.id == id } }
+        io.docpilot.core.incremental.specification.IncrementalUpdateTarget.PROPERTY ->
+            specification.components.any { component -> component.properties.any { it.id == id } }
+        io.docpilot.core.incremental.specification.IncrementalUpdateTarget.RELATIONSHIP ->
+            specification.relationships.any { it.id == id }
     }
 }

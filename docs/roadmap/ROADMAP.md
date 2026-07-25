@@ -2,15 +2,16 @@
 
 ## Current milestone
 
-### v0.5 MVP / POC - RFC-0001 through RFC-0045
+### v0.5 MVP / POC - RFC-0001 through RFC-0046
 
 Status: technical runtime gates passed on July 25, 2026. Specification incremental
 execution, snapshot persistence, AI incremental generation, documentation
 diff/review, deterministic Relationship Semantics, and relationship-aware
-incremental diff/review are implemented. RFC-0045 targeted verification, full
-regression verification, isolated architecture-samples smoke, canonical completion
-handoff, and documentation synchronization are complete. Feature-branch Git
-integration remains pending. Artifact-version policy remains pending.
+incremental diff/review, and review-gated managed-block removal are implemented.
+RFC-0046 focused verification, full regression verification, isolated
+architecture-samples smoke, canonical completion handoff, and documentation
+synchronization are complete. RFC-0046 Feature-branch Git integration remains
+pending. Artifact-version policy remains pending.
 
 Delivered baseline:
 
@@ -25,20 +26,19 @@ Delivered baseline:
 - deterministic INTERNAL, EXTERNAL, and UNRESOLVED relationship endpoint semantics
 - direct `DEPENDS_ON` component dependency projection and validation
 - relationship-aware incremental diff, planning, AI context, and review Evidence
+- explicit review-gated managed-block removal with reviewed-base conflict safety
 - prompt-package generation
 - AI Provider SPI
 - verified Ollama architecture generation
 
 ## Next
 
-RFC-0045 implementation, verification, isolated smoke, Main Planning update, and
-Completion Handoff are complete; the verified Feature Branch Commit is awaiting
-Git integration. RFC-0046 is not selected or approved. Candidate analysis must
-weigh product value and architecture value and must preserve Clean Architecture,
-Evidence First, deterministic core outputs, the separation between Snapshot
-Incremental and Specification Incremental, and the RFC-0043 complete-review-before-
-merge invariant. The primary POC target remains
-`C:\WorkSpace\architecture-samples`.
+RFC-0046 implementation, verification, isolated smoke, Main Planning update, and
+Completion Handoff are complete in the Feature Worktree; Git integration is
+pending. No later RFC is selected or approved. Future work must preserve Clean
+Architecture, Evidence First, deterministic core outputs, the separation between
+Snapshot Incremental and Specification Incremental, and complete-review-before-
+merge. The primary POC target remains `C:\WorkSpace\architecture-samples`.
 
 ## Release validation policy
 

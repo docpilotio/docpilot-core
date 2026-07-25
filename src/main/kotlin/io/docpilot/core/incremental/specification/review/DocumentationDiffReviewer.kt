@@ -4,8 +4,11 @@ import io.docpilot.core.incremental.specification.IncrementalUpdateAction
 import io.docpilot.core.incremental.specification.IncrementalUpdateTarget
 import io.docpilot.core.incremental.specification.ai.AiDocumentationMerger
 import io.docpilot.core.incremental.specification.ai.AiDocumentationPatch
+import io.docpilot.core.incremental.specification.ai.AiDocumentationPatchOperation
 import io.docpilot.core.incremental.specification.ai.ManagedBlockAiDocumentationMerger
 import io.docpilot.core.model.ProjectSpecification
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 public interface DocumentationDiffReviewer {
     public fun propose(request: DocumentationReviewRequest): DocumentationReviewProposal
@@ -41,12 +44,14 @@ public class DefaultDocumentationDiffReviewer(
         val entries = request.patches.map { patch ->
             val action = actionById.getValue(patch.targetId)
             val existingMarkdown = existingBlocks[patch.targetId]
+            validateOperation(patch, action, existingMarkdown, request)
             DocumentationReviewEntry(
                 targetId = patch.targetId,
                 parentId = action.parentId,
                 target = action.target,
                 specificationChangeKind = action.changeKind,
-                documentationChangeKind = documentationChangeKind(existingMarkdown, patch.markdown),
+                documentationChangeKind = documentationChangeKind(patch, existingMarkdown),
+                operation = patch.operation,
                 existingMarkdown = existingMarkdown,
                 proposedMarkdown = patch.markdown.trim(),
                 evidenceIds = evidenceIds(
@@ -61,7 +66,11 @@ public class DefaultDocumentationDiffReviewer(
             .filterNot(patchById::containsKey)
             .sorted()
 
-        return DocumentationReviewProposal(entries, missingPatchTargetIds)
+        return DocumentationReviewProposal(
+            entries = entries,
+            missingPatchTargetIds = missingPatchTargetIds,
+            reviewedDocumentationSha256 = sha256(request.existingDocumentation),
+        )
     }
 
     override fun apply(
@@ -69,6 +78,9 @@ public class DefaultDocumentationDiffReviewer(
         proposal: DocumentationReviewProposal,
         decisions: List<DocumentationReviewDecision>,
     ): DocumentationReviewResult {
+        require(sha256(existingDocumentation) == proposal.reviewedDocumentationSha256) {
+            "Documentation changed after review preparation; reviewed-base conflict detected."
+        }
         require(decisions.map { it.targetId }.distinct().size == decisions.size) {
             "Documentation review contains duplicate decisions."
         }
@@ -106,7 +118,7 @@ public class DefaultDocumentationDiffReviewer(
         val acceptedPatches = proposal.entries
             .filter { decisionById.getValue(it.targetId).disposition == DocumentationReviewDisposition.ACCEPTED }
             .filter { it.documentationChangeKind != DocumentationChangeKind.NO_CHANGE }
-            .map { AiDocumentationPatch(it.targetId, it.proposedMarkdown) }
+            .map { AiDocumentationPatch(it.targetId, it.proposedMarkdown, it.operation) }
 
         val mergedDocumentation = if (acceptedPatches.isEmpty()) {
             existingDocumentation
@@ -123,13 +135,53 @@ public class DefaultDocumentationDiffReviewer(
     }
 
     private fun documentationChangeKind(
+        patch: AiDocumentationPatch,
         existingMarkdown: String?,
-        proposedMarkdown: String,
     ): DocumentationChangeKind = when {
+        patch.operation == AiDocumentationPatchOperation.REMOVE -> DocumentationChangeKind.REMOVE
         existingMarkdown == null -> DocumentationChangeKind.CREATE
-        normalize(existingMarkdown) == normalize(proposedMarkdown) -> DocumentationChangeKind.NO_CHANGE
+        normalize(existingMarkdown) == normalize(patch.markdown) -> DocumentationChangeKind.NO_CHANGE
         else -> DocumentationChangeKind.UPDATE
     }
+
+    private fun validateOperation(
+        patch: AiDocumentationPatch,
+        action: IncrementalUpdateAction,
+        existingMarkdown: String?,
+        request: DocumentationReviewRequest,
+    ) {
+        if (patch.operation != AiDocumentationPatchOperation.REMOVE) return
+        require(action.changeKind == io.docpilot.core.incremental.specification.ChangeKind.REMOVED) {
+            "Managed-block REMOVE is authorized only for a REMOVED specification target: ${patch.targetId}"
+        }
+        require(targetExists(action.target, action.id, request.previousSpecification)) {
+            "Managed-block REMOVE target did not exist in the previous specification: ${patch.targetId}"
+        }
+        require(!targetExists(action.target, action.id, request.currentSpecification)) {
+            "Managed-block REMOVE target still exists in the current specification: ${patch.targetId}"
+        }
+        require(existingMarkdown != null) {
+            "Cannot remove missing managed documentation block: ${patch.targetId}"
+        }
+    }
+
+    private fun targetExists(
+        target: IncrementalUpdateTarget,
+        id: String,
+        specification: ProjectSpecification,
+    ): Boolean = when (target) {
+        IncrementalUpdateTarget.PACKAGE -> specification.packages.any { it.id == id }
+        IncrementalUpdateTarget.TYPE -> specification.components.any { it.id == id }
+        IncrementalUpdateTarget.API -> specification.components.any { component -> component.apis.any { it.id == id } }
+        IncrementalUpdateTarget.PROPERTY ->
+            specification.components.any { component -> component.properties.any { it.id == id } }
+        IncrementalUpdateTarget.RELATIONSHIP -> specification.relationships.any { it.id == id }
+    }
+
+    private fun sha256(documentation: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(documentation.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 
     private fun normalize(markdown: String): String = markdown.trim().replace("\r\n", "\n")
 
