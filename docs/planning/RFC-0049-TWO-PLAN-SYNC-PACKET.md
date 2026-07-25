@@ -1,4 +1,4 @@
-# RFC-0049 Two-plan Sync Packet
+# RFC-0049 Candidate Decision Sync Packet
 
 ## Baseline
 
@@ -38,4 +38,14 @@
 Select Plan A to close v0.5 release readiness. Select Plan B only when durable
 review history is more urgent than release evidence.
 
-Neither plan is approved as RFC-0049.
+## Decision
+
+- RFC-0049: Plan A selected and detailed specification approved.
+- Proposed RFC-0050: Plan B retained as the preferred follow-up candidate.
+- RFC-0050 number and detailed scope remain subject to separate approval.
+
+Canonical specification:
+
+```text
+docs/rfc/RFC-0049-v0.5-Release-Provenance-and-Determinism-Gate.md
+```

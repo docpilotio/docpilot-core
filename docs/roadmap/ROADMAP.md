@@ -2,16 +2,17 @@
 
 ## Current milestone
 
-### v0.5 MVP / POC - RFC-0001 through RFC-0046
+### v0.5 MVP / POC - RFC-0001 through RFC-0049
 
 Status: technical runtime gates passed on July 25, 2026. Specification incremental
 execution, snapshot persistence, AI incremental generation, documentation
 diff/review, deterministic Relationship Semantics, and relationship-aware
 incremental diff/review, and review-gated managed-block removal are implemented.
-RFC-0046 focused verification, full regression verification, isolated
-architecture-samples smoke, canonical completion handoff, and local main
-integration are complete. Remote synchronization is the remaining Git action.
-Artifact-version policy remains pending.
+RFC-0046 through RFC-0048 implementation, focused verification, full regression
+verification, isolated smoke, canonical handoff, main integration, and remote
+synchronization are complete. RFC-0049 is implemented and locally verified as the
+v0.5 Release Provenance and Determinism Gate. Exact clean-commit evidence
+collection and Git integration are pending.
 
 Delivered baseline:
 
@@ -27,22 +28,30 @@ Delivered baseline:
 - direct `DEPENDS_ON` component dependency projection and validation
 - relationship-aware incremental diff, planning, AI context, and review Evidence
 - explicit review-gated managed-block removal with reviewed-base conflict safety
+- durable, integrity-protected Review Bundles and restart-safe apply
+- official thin-adapter CLI review workflow
 - prompt-package generation
 - AI Provider SPI
 - verified Ollama architecture generation
 
 ## Next
 
-RFC-0046 implementation, verification, isolated smoke, Main Planning update,
-Completion Handoff, and local main integration are complete. RFC-0047 Auditable
-Review Persistence and Resumable Conflict-safe Apply is implemented, locally
-verified, and integrated into local main. RFC-0048 is selected as the Official CLI
-Review Bundle Workflow; it is implemented, locally verified, and integrated into
-local main. RFC-0049 has two candidate plans and neither is selected. The v0.5 Release
-Provenance plan remains a later release-track candidate. Future work must preserve Clean
-Architecture, Evidence First, deterministic core outputs, the separation between
-Snapshot Incremental and Specification Incremental, and complete-review-before-
-merge. The primary POC target remains `C:\WorkSpace\architecture-samples`.
+RFC-0049 Plan A, v0.5 Release Provenance and Determinism Gate, is implemented and
+locally verified. It provides Release Evidence Manifest format 1, exact
+clean-commit and embedded MCP binding, strict test aggregation, artifact
+integrity, deterministic JSON/Markdown reporting, atomic evidence storage,
+offline verification, and a fail-closed binary release gate in an independent
+module. Final evidence collection must run after an exact clean feature commit.
+
+After RFC-0049, Review Bundle Lifecycle and Apply Receipt is the recommended
+RFC-0050 candidate for the path from v0.5 release trust to v1.0 auditability and
+long-term operation. Signed Release Evidence and External Attestation is the
+release-security alternative. RFC-0050 is not yet formally approved.
+
+Future work must preserve Clean Architecture, Evidence First, deterministic core
+outputs, the separation between Snapshot Incremental and Specification
+Incremental, and complete-review-before-merge. The primary POC target remains
+`C:\WorkSpace\architecture-samples`.
 
 ## Release validation policy
 

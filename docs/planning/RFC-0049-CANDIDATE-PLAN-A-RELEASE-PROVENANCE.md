@@ -2,7 +2,7 @@
 
 ## Status
 
-PROPOSED - NOT APPROVED AS RFC-0049
+SELECTED AND SPECIFIED AS RFC-0049
 
 ## Type
 
@@ -87,10 +87,19 @@ MEDIUM
 STRONGLY_RECOMMENDED. The product workflow is now broad enough that closing release
 evidence is the most valuable bounded next step.
 
-## Decisions required
+## Decision
 
-1. Approve Plan A as RFC-0049.
-2. Approve Release Evidence Manifest v1.
-3. Define cached/skipped test policy.
-4. Decide whether live provider smoke is mandatory.
-5. Confirm publication remains manual.
+Resolved by the Canonical RFC-0049 specification:
+
+1. Plan A is approved as RFC-0049.
+2. Release Evidence Manifest format 1 is approved.
+3. Cached/up-to-date test output is insufficient and skipped tests fail v0.5.
+4. Deterministic fixture-provider smoke is mandatory; live provider smoke is
+   optional.
+5. Push, tag, publication, and release remain manual.
+
+Canonical specification:
+
+```text
+docs/rfc/RFC-0049-v0.5-Release-Provenance-and-Determinism-Gate.md
+```
