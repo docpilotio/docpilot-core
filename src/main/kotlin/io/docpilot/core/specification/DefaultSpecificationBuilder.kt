@@ -17,7 +17,13 @@ import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
 
 public class DefaultSpecificationBuilder : SpecificationBuilder {
-    override fun build(request: SpecificationBuildRequest): ProjectSpecification {
+    override fun build(request: SpecificationBuildRequest): ProjectSpecification =
+        buildWithReport(request).specification
+
+    public fun buildWithReport(
+        request: SpecificationBuildRequest,
+        policy: RelationshipProjectionPolicy = RelationshipProjectionPolicy(),
+    ): SpecificationBuildResult {
         val sourceIndex = request.sourceIndex
         val nodeById = request.knowledge.graph.nodes.associateBy { it.id }
         val nodeByQualifiedName = request.knowledge.graph.nodes
@@ -77,22 +83,28 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
             symbolSpecIdByNodeId = symbolSpecIdByNodeId,
         )
 
-        val relationships = request.knowledge.graph.edges
-            .map { edge ->
+        val relationshipCandidates = request.knowledge.graph.edges
+            .filter { edge -> edge.relationship.name in SemanticRelationshipKind.entries.map { it.name } }
+            .flatMap { edge ->
                 val sourceId = resolver.resolve(edge.sourceNodeId, edge.targetNodeId, "source")
                 val targetId = resolver.resolve(edge.targetNodeId, edge.sourceNodeId, "target")
-                RelationshipSpecification(
-                    id = "relationship:${edge.relationship.name}:$sourceId->$targetId",
+                val relationship = RelationshipSpecification(
+                    id = RelationshipIdentity.of(edge.relationship.name, sourceId, targetId),
                     type = edge.relationship.name,
                     sourceId = sourceId,
                     targetId = targetId,
                     description = "${edge.relationship.name} relationship from $sourceId to $targetId.",
                     evidenceRefs = edge.evidenceRefs.toSortedSet(),
                 )
+                List(edge.attributes["occurrenceCount"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1) {
+                    relationship
+                }
             }
-            .filterNot { it.sourceId == it.targetId }
-            .distinctBy { it.id }
-            .sortedWith(compareBy({ it.sourceId }, { it.type }, { it.targetId }, { it.id }))
+            .filterNot { relationship ->
+                relationship.sourceId == relationship.targetId && relationship.type != "CALLS"
+            }
+        val projection = RelationshipProjector.project(relationshipCandidates, policy)
+        val relationships = projection.relationships
 
         relationships.flatMap { listOf(it.sourceId, it.targetId) }
             .filter { it.startsWith(RelationshipEndpointSemantics.UNRESOLVED_PREFIX) }
@@ -131,7 +143,7 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
             unresolved = unresolved.distinctBy { it.id }.sortedBy { it.id },
         )
         ProjectSpecificationValidator.validate(specification)
-        return specification
+        return SpecificationBuildResult(specification, projection.report)
     }
 
     private fun buildModules(sourceIndex: SourceIndex?, nodeById: Map<String, KnowledgeNode>): List<ModuleSpecification> {

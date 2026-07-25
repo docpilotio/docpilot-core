@@ -1,6 +1,8 @@
 package io.docpilot.core.specification
 
 import io.docpilot.core.model.ComponentSpecification
+import io.docpilot.core.model.Evidence
+import io.docpilot.core.model.EvidenceConfidence
 import io.docpilot.core.model.ModuleSpecification
 import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.ProjectDescriptor
@@ -49,7 +51,7 @@ class ProjectSpecificationValidatorTest {
     @Test
     fun `rejects blank relationship endpoints`() {
         val specification = validSpecification().copy(
-            relationships = listOf(RelationshipSpecification("relationship:test", "USES", "", "type:repository")),
+            relationships = listOf(RelationshipSpecification("relationship:test", "IMPORTS", "", "type:repository", evidenceRefs = setOf("e:1"))),
         )
 
         assertFailsWith<IllegalArgumentException> {
@@ -61,9 +63,9 @@ class ProjectSpecificationValidatorTest {
     fun `accepts internal source and external or evidenced unresolved targets`() {
         val specification = validSpecification().copy(
             relationships = listOf(
-                RelationshipSpecification("relationship:internal", "USES", "type:repository", "module:app"),
-                RelationshipSpecification("relationship:external", "USES", "type:repository", "external:kotlin.String"),
-                RelationshipSpecification("relationship:unresolved", "USES", "type:repository", "unresolved:missing:target"),
+                relationship("IMPORTS", "type:repository", "module:app"),
+                relationship("IMPORTS", "type:repository", "external:kotlin.String"),
+                relationship("IMPORTS", "type:repository", "unresolved:missing:target"),
             ),
             unresolved = listOf(UnresolvedItem("missing", "type:repository", "Resolve target")),
         )
@@ -76,7 +78,7 @@ class ProjectSpecificationValidatorTest {
     fun `rejects non internal relationship source`() {
         assertFailsWith<IllegalArgumentException> {
             ProjectSpecificationValidator.validate(validSpecification().copy(
-                relationships = listOf(RelationshipSpecification("relationship:test", "USES", "external:source", "module:app")),
+                relationships = listOf(relationship("IMPORTS", "external:source", "module:app")),
             ))
         }
     }
@@ -85,7 +87,7 @@ class ProjectSpecificationValidatorTest {
     fun `rejects unresolved target without matching evidence`() {
         assertFailsWith<IllegalArgumentException> {
             ProjectSpecificationValidator.validate(validSpecification().copy(
-                relationships = listOf(RelationshipSpecification("relationship:test", "USES", "type:repository", "unresolved:missing:target")),
+                relationships = listOf(relationship("IMPORTS", "type:repository", "unresolved:missing:target")),
             ))
         }
     }
@@ -94,7 +96,7 @@ class ProjectSpecificationValidatorTest {
     fun `rejects raw unknown endpoint fallback`() {
         val specification = validSpecification().copy(
             relationships = listOf(
-                RelationshipSpecification("relationship:test", "USES", "type:repository", "unknown:type"),
+                relationship("IMPORTS", "type:repository", "unknown:type"),
             ),
         )
 
@@ -107,7 +109,7 @@ class ProjectSpecificationValidatorTest {
     fun `rejects structural self relationships`() {
         val specification = validSpecification().copy(
             relationships = listOf(
-                RelationshipSpecification("relationship:test", "USES", "type:repository", "type:repository"),
+                relationship("EXTENDS", "type:repository", "type:repository"),
             ),
         )
 
@@ -118,22 +120,12 @@ class ProjectSpecificationValidatorTest {
 
     @Test
     fun `enforces direct depends on dependency ids`() {
-        val relationship = RelationshipSpecification(
-            "relationship:test",
-            "DEPENDS_ON",
-            "type:repository",
-            "external:database",
-        )
+        val relationship = relationship("DEPENDS_ON", "type:repository", "external:database")
         val valid = validSpecification().copy(
             components = listOf(component().copy(dependencyIds = setOf("external:database"))),
             relationships = listOf(
                 relationship,
-                RelationshipSpecification(
-                    "relationship:unresolved",
-                    "DEPENDS_ON",
-                    "type:repository",
-                    "unresolved:missing:target",
-                ),
+                relationship("DEPENDS_ON", "type:repository", "unresolved:missing:target"),
             ),
             unresolved = listOf(UnresolvedItem("missing", "type:repository", "Resolve target")),
         )
@@ -152,6 +144,10 @@ class ProjectSpecificationValidatorTest {
         modules = listOf(ModuleSpecification("module:app", "app")),
         packages = listOf(PackageSpecification("package:sample", "sample", "io.sample", "module:app")),
         components = listOf(component()),
+        evidence = listOf(
+            Evidence("e:1", "SOURCE_SYMBOL", "src/Repository.kt", "Repository", 1, 1,
+                "Relationship evidence", EvidenceConfidence.HIGH),
+        ),
     )
 
     private fun component(packageId: String = "package:sample") = ComponentSpecification(
@@ -162,4 +158,13 @@ class ProjectSpecificationValidatorTest {
         kind = "class",
         role = "Repository",
     )
+
+    private fun relationship(type: String, sourceId: String, targetId: String) =
+        RelationshipSpecification(
+            id = RelationshipIdentity.of(type, sourceId, targetId),
+            type = type,
+            sourceId = sourceId,
+            targetId = targetId,
+            evidenceRefs = setOf("e:1"),
+        )
 }

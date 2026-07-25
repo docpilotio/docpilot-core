@@ -43,7 +43,7 @@ class DefaultSpecificationBuilderTest {
         assertEquals("io.sample.UserRepository", component.qualifiedName)
         assertEquals(listOf("findUser"), component.apis.map { it.name })
         assertEquals(listOf("cache"), component.properties.map { it.name })
-        assertTrue(first.relationships.isNotEmpty())
+        assertTrue(first.relationships.isEmpty())
         assertTrue(first.evidence.isNotEmpty())
         assertTrue(first.unresolved.any { it.subject == "broken.kt" })
     }
@@ -85,12 +85,14 @@ class DefaultSpecificationBuilderTest {
                 sourceNodeId = serviceId,
                 targetNodeId = repositoryId,
                 relationship = RelationshipType.DEPENDS_ON,
+                evidenceRefs = baseKnowledge.graph.nodes.single { it.id == serviceId }.evidenceRefs,
             ),
             KnowledgeEdge(
                 id = "edge:DEPENDS_ON:$serviceId->missing:cache",
                 sourceNodeId = serviceId,
                 targetNodeId = "missing:cache",
                 relationship = RelationshipType.DEPENDS_ON,
+                evidenceRefs = baseKnowledge.graph.nodes.single { it.id == serviceId }.evidenceRefs,
             ),
             KnowledgeEdge(
                 id = "edge:USES:$serviceId->$serviceId",
@@ -121,11 +123,6 @@ class DefaultSpecificationBuilderTest {
         assertTrue(specification.relationships.any {
             it.sourceId == serviceId && it.targetId == "unresolved:missing:cache:target"
         })
-        assertTrue(specification.relationships.any {
-            it.type == "DECLARES" &&
-                it.sourceId == "module:app:package:io.sample" &&
-                it.targetId == serviceId
-        })
         assertFalse(specification.relationships.any { it.sourceId == it.targetId })
         assertFalse(specification.relationships.any { it.targetId == "missing:cache" })
     }
@@ -155,16 +152,7 @@ class DefaultSpecificationBuilderTest {
             SpecificationBuildRequest(ProjectDescriptor("sample", "Sample"), knowledge, sourceIndex),
         )
 
-        assertEquals(
-            setOf(
-                "module:app:package:io.sample" to "symbol:app-type",
-                "module:lib:package:io.sample" to "symbol:lib-type",
-            ),
-            specification.relationships
-                .filter { it.type == "DECLARES" }
-                .map { it.sourceId to it.targetId }
-                .toSet(),
-        )
+        assertTrue(specification.relationships.none { it.type == "DECLARES" })
     }
 
     private fun sampleIndex(): SourceIndex = SourceIndex(

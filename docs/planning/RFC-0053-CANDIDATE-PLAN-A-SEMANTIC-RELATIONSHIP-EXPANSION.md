@@ -2,7 +2,8 @@
 
 ## Status
 
-PROPOSED — user approval required.
+SELECTED for RFC-0053. Detailed specification:
+`docs/rfc/RFC-0053-Semantic-Relationship-Expansion.md`.
 
 ## Purpose
 
