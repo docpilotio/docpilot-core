@@ -4,7 +4,7 @@
 
 Audit date: 2026-07-25 (Asia/Seoul)
 
-The audit inspected 337 physical candidate files:
+The audit inspected 346 physical candidate files:
 
 | Source | Candidates |
 |---|---:|
@@ -14,6 +14,7 @@ The audit inspected 337 physical candidate files:
 | Phase 10 Direct Codex worktree | 93 |
 | MCP runtime | 62 |
 | Direct Codex runtime | 14 |
+| Current integration worktree Phase 7–10 reports | 9 |
 
 Candidate formats were Markdown, text, AsciiDoc, reStructuredText, JSON, YAML, and YML. Build output, dependency directories, Git internals, raw logs, JSONL, locks, PIDs, and process dumps were excluded by policy. The two experiment worktrees contain duplicated baseline repository documents; physical counts intentionally retain those duplicates.
 
@@ -38,6 +39,12 @@ Each entry below records path/purpose, phase or RFC, state, duplication/latest s
 | MCP runtime smoke fixture and generated docs/prompt packages | Phase 9 CLI smoke output | Generated, machine/run specific | Reproducible; no canonical role | `SKIP_TEMPORARY` | Final smoke result summarized in Markdown |
 | Direct runtime smoke fixture docs and prompt packages (14 candidates) | Phase 10 Direct smoke output | Generated and experiment-local | Comparison only | `SKIP_TEMPORARY` | Phase 10 conclusion preserved without raw output |
 | Phase 10 comparison conclusion | Decide future MCP/Codex roles | Latest operating conclusion | High; no secret | `KEEP_HISTORICAL` | `PHASE-10-MCP-VS-DIRECT-CODEX-TRANSITION.md` |
+| Integration worktree Phase 7 implementation report | Initial governed implementation and interrupted-worker limitation | Final Phase 7 report; unique execution evidence | High; local paths present | `KEEP_HISTORICAL` | `source-reports/DOCPILOT-MCP-PHASE-7.0-RFC-0044-IMPLEMENTATION-REPORT.md` |
+| Integration worktree initial Phase 8 verification | Independent failure with three contract findings and 252-test snapshot | Superseded as a gate result but important correction evidence | High; local paths present | `KEEP_HISTORICAL` | `source-reports/DOCPILOT-MCP-PHASE-8.0-RFC-0044-INDEPENDENT-VERIFICATION-REPORT.md` |
+| Integration worktree Phase 8 re-verification | Final independent re-verification with 254 tests | Final; overlaps consolidated summary | High; local paths present | `KEEP_HISTORICAL` | `source-reports/DOCPILOT-MCP-PHASE-8-REVERIFICATION-REPORT.md` |
+| Integration worktree Phase 9 smoke result | Final smoke/readiness evidence | Final; overlaps consolidated summary | High; local paths present | `KEEP_HISTORICAL` | `source-reports/DOCPILOT-MCP-PHASE-9-RFC-0044-COMPLETION-SMOKE-RESULT.md` |
+| Integration worktree Phase 10 transition and Direct correction | Comparison gate, failure, recovery, and environment limitation | Final paired evidence; Direct-only replacement not approved | High; local paths present | `KEEP_HISTORICAL` | Two Phase 10 reports under `source-reports/` |
+| Integration worktree Phase 7 correction and two intermediate Phase 9 synchronization reports | Correction and blocked intermediate gates | Conclusions fully captured by selected final reports and canonical handoff | Moderate; local paths present | `SKIP_DUPLICATE` | Not copied; inventory retains the decision |
 | Long prompts, logs, JSONL, locks, manifests, diagnostics, Kotlin error logs | One-time execution support | Raw, duplicated, or failed-attempt output | Low; elevated sensitivity risk | `SKIP_TEMPORARY` | Not committed by policy |
 
 ## Selected New or Updated Documents
@@ -64,6 +71,7 @@ Each entry below records path/purpose, phase or RFC, state, duplication/latest s
 - Phase 8 RFC-0044 Independent Re-verification
 - Phase 9 RFC-0044 Completion and Smoke
 - Phase 10 MCP vs Direct Codex Transition
+- Six selected original Phase 7–10 source reports
 - This inventory
 - Pre-Core Document Consolidation Report
 

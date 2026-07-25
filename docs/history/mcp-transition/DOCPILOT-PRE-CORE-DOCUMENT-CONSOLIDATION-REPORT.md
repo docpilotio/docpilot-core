@@ -25,7 +25,7 @@ The audit selected canonical, reusable operational, and final transition evidenc
 
 ## 4. Document Inventory
 
-337 physical candidates were inspected. See [the inventory](DOCPILOT-CODEX-MCP-DOCUMENT-INVENTORY.md) for counts, classifications, preservation decisions, and rationale.
+346 physical candidates were inspected. See [the inventory](DOCPILOT-CODEX-MCP-DOCUMENT-INVENTORY.md) for counts, classifications, preservation decisions, and rationale.
 
 ## 5. Canonical Documents Selected
 
@@ -45,6 +45,7 @@ The audit selected canonical, reusable operational, and final transition evidenc
 - Phase 8 independent re-verification
 - Phase 9 completion and smoke
 - Phase 10 transition assessment
+- Six original Phase 7–10 source reports preserving initial failure, correction context, re-verification, smoke, comparison, and Direct replay recovery
 - Transition index, inventory, and this report
 
 ## 8. Skipped Temporary Documents
@@ -73,7 +74,7 @@ PASS.
 
 ## 12. Files Created
 
-Six development workflow documents, one RFC, one planning update, one handoff, and six transition-history documents were created.
+Six development workflow documents, one RFC, one planning update, one handoff, six transition-history documents, and six source reports were created.
 
 ## 13. Files Updated
 
