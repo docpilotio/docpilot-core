@@ -12,7 +12,8 @@
 | Detailed specification | APPROVED |
 | Implementation | COMPLETED |
 | Verification | COMPLETED — 102 XML / 323 tests / 0 failures |
-| Main integration | PENDING |
+| Main integration | COMPLETED at `4e05018` |
+| Release tag | `v1.0.0` pushed |
 
 ## Baseline
 
@@ -91,8 +92,8 @@ generated artifacts, existing user documents, and shared managed blocks.
 - Isolated user-document fixtures verify persistence, restart, recovery,
   idempotency, and unmanaged-byte preservation.
 
-The implementation completion gate is closed. Main integration, final main
-verification, push, and the `v1.0.0` tag remain Git integration steps.
+The implementation and Git integration gates are closed. Final main verification
+passed before `origin/main` and the annotated `v1.0.0` tag were pushed.
 
 ## Known design constraints
 
