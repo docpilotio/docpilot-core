@@ -5,7 +5,8 @@
 - Predecessor: RFC-0052 Selective Documentation Artifact Planning and Rendering
 - RFC-0052 implementation: COMPLETE
 - RFC-0052 verification: 98 XML / 306 tests / 0 failures
-- RFC-0052 Git integration: pending at packet creation
+- RFC-0052 Feature Commit: `824e730`
+- RFC-0052 Main integration: `33503f7`
 - Next track: Product Capability
 
 ## Plan A
