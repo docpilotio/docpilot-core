@@ -2,7 +2,7 @@
 
 ## Status
 
-PROPOSED ALTERNATIVE — user approval required.
+NOT SELECTED for RFC-0053. Retained as the recommended RFC-0054 direction.
 
 ## Purpose
 

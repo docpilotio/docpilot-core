@@ -17,6 +17,7 @@ import io.docpilot.core.model.source.SourceImport
 import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
+import io.docpilot.core.model.source.SourceSuperTypeKind
 
 class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
 
@@ -37,6 +38,7 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                     evidence = evidence,
                 )
             }
+        addSemanticRelationships(sourceIndex, nodes, edges, evidence)
 
         return KnowledgeBuildResult(
             graph = KnowledgeGraph(
@@ -48,6 +50,177 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                     .sortedBy { it.id.value },
             ),
         )
+    }
+
+    private fun addSemanticRelationships(
+        sourceIndex: SourceIndex,
+        nodes: MutableMap<String, KnowledgeNode>,
+        edges: MutableMap<String, KnowledgeEdge>,
+        evidence: MutableMap<EvidenceId, Evidence>,
+    ) {
+        val nodesByQualifiedName = nodes.values
+            .mapNotNull { node -> node.attributes["qualifiedName"]?.let { it to node } }
+            .groupBy({ it.first }, { it.second })
+        sourceIndex.files.sortedBy { it.relativePath }.forEach { file ->
+            fun visit(symbol: SourceSymbol, siblingIndex: Int) {
+                val sourceNodeId = symbolNodeId(file.relativePath, symbol, siblingIndex)
+                val provenLegacyReferences = symbol.location?.let { location ->
+                    symbol.superTypes.mapNotNull { rawName ->
+                        val simpleName = rawName.substringBefore('<').substringBefore('(').trim()
+                        val candidateNames = buildList {
+                            add(simpleName)
+                            if (!simpleName.contains('.') && file.packageName != null) {
+                                add("${file.packageName}.$simpleName")
+                            }
+                        }
+                        val candidates = candidateNames.flatMap { nodesByQualifiedName[it].orEmpty() }
+                            .distinctBy { it.id }
+                        val target = candidates.singleOrNull() ?: return@mapNotNull null
+                        val kind = when {
+                            symbol.kind == SourceSymbolKind.INTERFACE &&
+                                target.kind == KnowledgeNodeKind.INTERFACE -> SourceSuperTypeKind.EXTENDS
+                            target.kind == KnowledgeNodeKind.INTERFACE -> SourceSuperTypeKind.IMPLEMENTS
+                            target.kind in setOf(
+                                KnowledgeNodeKind.CLASS,
+                                KnowledgeNodeKind.OBJECT,
+                                KnowledgeNodeKind.ENUM_CLASS,
+                                KnowledgeNodeKind.ANNOTATION_CLASS,
+                            ) -> SourceSuperTypeKind.EXTENDS
+                            else -> return@mapNotNull null
+                        }
+                        io.docpilot.core.model.source.SourceSuperTypeReference(
+                            target.attributes["qualifiedName"] ?: target.name,
+                            kind,
+                            location,
+                        )
+                    }
+                }.orEmpty()
+                (symbol.superTypeReferences + provenLegacyReferences).distinct()
+                    .sortedWith(
+                    compareBy({ it.kind.ordinal }, { it.qualifiedName }, { it.location.lineStart ?: Int.MAX_VALUE }),
+                ).forEach { reference ->
+                    val evidenceId = addEvidence(
+                        evidence = evidence,
+                        type = EvidenceType.RELATIONSHIP,
+                        relativePath = reference.location.relativePath,
+                        lineStart = reference.location.lineStart,
+                        columnStart = reference.location.columnStart,
+                        lineEnd = reference.location.lineEnd,
+                        columnEnd = reference.location.columnEnd,
+                        summary = "${reference.kind.name} ${reference.qualifiedName} is declared.",
+                        attributes = mapOf(
+                            "relationshipKind" to reference.kind.name,
+                            "targetQualifiedName" to reference.qualifiedName,
+                        ),
+                    )
+                    val targetId = semanticTarget(
+                        reference.qualifiedName,
+                        nodesByQualifiedName,
+                        nodes,
+                        evidenceId.value,
+                        "supertype",
+                    )
+                    addEdge(
+                        edges,
+                        sourceNodeId,
+                        targetId,
+                        if (reference.kind == SourceSuperTypeKind.EXTENDS) {
+                            RelationshipType.EXTENDS
+                        } else {
+                            RelationshipType.IMPLEMENTS
+                        },
+                        setOf(evidenceId.value),
+                    )
+                }
+                symbol.calls.sortedWith(
+                    compareBy({ it.targetQualifiedName }, { it.targetSignature ?: "" },
+                        { it.location.lineStart ?: Int.MAX_VALUE }),
+                ).forEach { call ->
+                    val evidenceId = addEvidence(
+                        evidence = evidence,
+                        type = EvidenceType.RELATIONSHIP,
+                        relativePath = call.location.relativePath,
+                        lineStart = call.location.lineStart,
+                        columnStart = call.location.columnStart,
+                        lineEnd = call.location.lineEnd,
+                        columnEnd = call.location.columnEnd,
+                        summary = "CALLS ${call.targetQualifiedName} is observed.",
+                        attributes = buildMap {
+                            put("relationshipKind", RelationshipType.CALLS.name)
+                            put("targetQualifiedName", call.targetQualifiedName)
+                            call.targetSignature?.let { put("targetSignature", it) }
+                        },
+                    )
+                    val candidates = nodesByQualifiedName[call.targetQualifiedName].orEmpty().filter { node ->
+                        call.targetSignature == null || node.attributes["signature"] == call.targetSignature
+                    }
+                    val targetId = when (candidates.size) {
+                        1 -> candidates.single().id
+                        0 -> semanticTarget(
+                            call.targetQualifiedName,
+                            nodesByQualifiedName,
+                            nodes,
+                            evidenceId.value,
+                            "call",
+                        )
+                        else -> ambiguousTarget(call.targetQualifiedName, nodes, evidenceId.value, "call")
+                    }
+                    addEdge(
+                        edges,
+                        sourceNodeId,
+                        targetId,
+                        RelationshipType.CALLS,
+                        setOf(evidenceId.value),
+                    )
+                }
+                symbol.children.forEachIndexed { index, child -> visit(child, index) }
+            }
+            file.symbols.forEachIndexed { index, symbol -> visit(symbol, index) }
+        }
+    }
+
+    private fun semanticTarget(
+        qualifiedName: String,
+        nodesByQualifiedName: Map<String, List<KnowledgeNode>>,
+        nodes: MutableMap<String, KnowledgeNode>,
+        evidenceRef: String,
+        category: String,
+    ): String {
+        val candidates = nodesByQualifiedName[qualifiedName].orEmpty()
+        if (candidates.size == 1) return candidates.single().id
+        if (candidates.size > 1) return ambiguousTarget(qualifiedName, nodes, evidenceRef, category)
+        val id = "external:$qualifiedName"
+        nodes.putIfAbsent(
+            id,
+            KnowledgeNode(
+                id = id,
+                name = qualifiedName,
+                kind = KnowledgeNodeKind.EXTERNAL_TYPE,
+                attributes = mapOf("qualifiedName" to qualifiedName),
+                evidenceRefs = setOf(evidenceRef),
+            ),
+        )
+        return id
+    }
+
+    private fun ambiguousTarget(
+        qualifiedName: String,
+        nodes: MutableMap<String, KnowledgeNode>,
+        evidenceRef: String,
+        category: String,
+    ): String {
+        val id = "unresolved:$category:$qualifiedName"
+        nodes.putIfAbsent(
+            id,
+            KnowledgeNode(
+                id = id,
+                name = qualifiedName,
+                kind = KnowledgeNodeKind.UNKNOWN,
+                attributes = mapOf("qualifiedName" to qualifiedName),
+                evidenceRefs = setOf(evidenceRef),
+            ),
+        )
+        return id
     }
 
     private fun addFile(
@@ -330,16 +503,20 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
         val id =
             "edge:${relationship.name}:$sourceNodeId->$targetNodeId"
 
-        edges.putIfAbsent(
-            id,
-            KnowledgeEdge(
+        val edge = KnowledgeEdge(
                 id = id,
                 sourceNodeId = sourceNodeId,
                 targetNodeId = targetNodeId,
                 relationship = relationship,
                 evidenceRefs = evidenceRefs,
-            ),
-        )
+            )
+        val existing = edges[id]
+        edges[id] = existing?.copy(
+            attributes = existing.attributes + (
+                "occurrenceCount" to ((existing.attributes["occurrenceCount"]?.toIntOrNull() ?: 1) + 1).toString()
+                ),
+            evidenceRefs = (existing.evidenceRefs + evidenceRefs).toSortedSet(),
+        ) ?: edge
     }
 
     private fun symbolNodeId(

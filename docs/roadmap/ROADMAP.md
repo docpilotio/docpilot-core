@@ -74,7 +74,7 @@ documents are generated. Implementation, the 306-test clean regression suite,
 and Main integration at `33503f7` are complete. Remote synchronization is
 pending.
 
-The proposed Product Capability sequence after RFC-0052 is:
+The Product Capability sequence after RFC-0052 is:
 
 1. RFC-0053: Semantic Relationship Expansion (`EXTENDS`, `IMPLEMENTS`, `CALLS`,
    `IMPORTS`) with deterministic identity and Evidence.
@@ -83,7 +83,16 @@ The proposed Product Capability sequence after RFC-0052 is:
 3. RFC-0055: Existing Documentation Reconciliation for ownership, drift,
    adoption, managed/manual boundaries, and orphan disposition.
 
-Only RFC-0052 is selected. RFC-0053 through RFC-0055 numbers remain provisional.
+RFC-0053 is selected. RFC-0054 and RFC-0055 remain provisional until separately
+approved.
+
+RFC-0053 Plan A, Semantic Relationship Expansion, is now selected. Its detailed
+specification defines Evidence-backed deterministic `EXTENDS`, `IMPLEMENTS`,
+`CALLS`, and `IMPORTS`, stable identity, aggregation, bounded Core threshold
+policy, and Relationship Projection Report format 1. Core implementation and
+the 312-test regression suite are complete with documented scanner limitations;
+Git integration is pending. RFC-0054 Documentation Quality Validation and
+RFC-0055 Existing Documentation Reconciliation remain proposed follow-ups.
 
 ## v1.1 Hardening track
 

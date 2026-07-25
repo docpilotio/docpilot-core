@@ -38,6 +38,15 @@ public object ProjectSpecificationValidator {
                 addAll(component.properties.map { it.id })
             }
         }
+        require(specification.relationships.all {
+            it.type in SemanticRelationshipKind.entries.map(SemanticRelationshipKind::name)
+        }) { "Every DIR relationship type must belong to the semantic relationship allowlist." }
+        require(specification.relationships.all {
+            it.id == RelationshipIdentity.of(it.type, it.sourceId, it.targetId)
+        }) { "Every relationship ID must match its canonical semantic identity." }
+        require(specification.relationships.all { it.evidenceRefs.isNotEmpty() }) {
+            "Every semantic relationship must reference Evidence."
+        }
         require(specification.relationships.all { relationship ->
             val sourceKind = RelationshipEndpointSemantics.kindOf(relationship.sourceId, internalEndpointIds)
             sourceKind == RelationshipEndpointKind.INTERNAL &&
@@ -54,7 +63,7 @@ public object ProjectSpecificationValidator {
         }) {
             "Every relationship endpoint must be internal, external, or explicitly unresolved."
         }
-        require(specification.relationships.none { it.sourceId == it.targetId }) {
+        require(specification.relationships.none { it.sourceId == it.targetId && it.type != "CALLS" }) {
             "Structural self-relationships are not allowed."
         }
 
