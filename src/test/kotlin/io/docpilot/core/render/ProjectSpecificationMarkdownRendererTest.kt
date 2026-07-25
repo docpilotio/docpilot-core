@@ -35,6 +35,8 @@ class ProjectSpecificationMarkdownRendererTest {
         assertTrue(artifact.content.contains("Properties:"))
         assertTrue(artifact.content.contains("`cache`"))
         assertTrue(artifact.content.contains("## Relationships"))
+        assertTrue(artifact.content.contains("  - Source kind: INTERNAL"))
+        assertTrue(artifact.content.contains("  - Target kind: EXTERNAL"))
         assertTrue(artifact.content.contains("## Evidence"))
         assertTrue(artifact.content.contains("## Unresolved"))
     }
@@ -149,7 +151,7 @@ class ProjectSpecificationMarkdownRendererTest {
                 typeParameters = listOf("T"),
                 superTypes = listOf("Store<T>"),
                 responsibilities = listOf("Load users"),
-                dependencyIds = setOf("type:user-source"),
+                dependencyIds = setOf("external:type:user-source"),
                 apis = listOf(
                     ApiSpecification(
                         id = "api:find-user",
@@ -186,7 +188,7 @@ class ProjectSpecificationMarkdownRendererTest {
                 id = "relationship:depends",
                 type = "DEPENDS_ON",
                 sourceId = "type:user-repository",
-                targetId = "type:user-source",
+                targetId = "external:type:user-source",
                 description = "Repository depends on source.",
                 evidenceRefs = setOf("evidence:relationship"),
             ),

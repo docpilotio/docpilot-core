@@ -2,6 +2,10 @@ package io.docpilot.core.specification
 
 import io.docpilot.core.knowledge.DefaultKnowledgeGraphBuilder
 import io.docpilot.core.model.ProjectDescriptor
+import io.docpilot.core.model.knowledge.KnowledgeEdge
+import io.docpilot.core.model.knowledge.KnowledgeNode
+import io.docpilot.core.model.knowledge.KnowledgeNodeKind
+import io.docpilot.core.model.knowledge.RelationshipType
 import io.docpilot.core.model.source.SourceFile
 import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceIndexFailure
@@ -14,6 +18,7 @@ import io.docpilot.core.model.source.SourceVisibility
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class DefaultSpecificationBuilderTest {
     @Test
@@ -50,6 +55,116 @@ class DefaultSpecificationBuilderTest {
         )
         assertEquals("0.2", legacy.schemaVersion)
         assertTrue(legacy.packages.isEmpty())
+    }
+
+    @Test
+    fun `resolves endpoint kinds removes structural self relationships and derives direct dependencies`() {
+        val sourceIndex = sampleIndex().copy(
+            files = sampleIndex().files + SourceFile(
+                relativePath = "app/src/main/kotlin/io/sample/UserService.kt",
+                language = SourceLanguage.KOTLIN,
+                packageName = "io.sample",
+                candidateModulePath = "app",
+                sourceSetName = "main",
+                symbols = listOf(
+                    SourceSymbol(
+                        id = "type-user-service",
+                        name = "UserService",
+                        qualifiedName = "io.sample.UserService",
+                        kind = SourceSymbolKind.CLASS,
+                    ),
+                ),
+            ),
+        )
+        val baseKnowledge = DefaultKnowledgeGraphBuilder().buildWithEvidence(sourceIndex)
+        val repositoryId = "symbol:type-user-repository"
+        val serviceId = "symbol:type-user-service"
+        val addedEdges = listOf(
+            KnowledgeEdge(
+                id = "edge:DEPENDS_ON:$serviceId->$repositoryId",
+                sourceNodeId = serviceId,
+                targetNodeId = repositoryId,
+                relationship = RelationshipType.DEPENDS_ON,
+            ),
+            KnowledgeEdge(
+                id = "edge:DEPENDS_ON:$serviceId->missing:cache",
+                sourceNodeId = serviceId,
+                targetNodeId = "missing:cache",
+                relationship = RelationshipType.DEPENDS_ON,
+            ),
+            KnowledgeEdge(
+                id = "edge:USES:$serviceId->$serviceId",
+                sourceNodeId = serviceId,
+                targetNodeId = serviceId,
+                relationship = RelationshipType.USES,
+            ),
+        )
+        val specification = DefaultSpecificationBuilder().build(
+            SpecificationBuildRequest(
+                project = ProjectDescriptor(id = "sample", name = "Sample"),
+                knowledge = baseKnowledge.copy(
+                    graph = baseKnowledge.graph.copy(
+                        nodes = baseKnowledge.graph.nodes + KnowledgeNode(
+                            id = "missing:cache",
+                            name = "cache",
+                            kind = KnowledgeNodeKind.UNKNOWN,
+                        ),
+                        edges = baseKnowledge.graph.edges + addedEdges,
+                    ),
+                ),
+                sourceIndex = sourceIndex,
+            ),
+        )
+
+        val service = specification.components.single { it.name == "UserService" }
+        assertEquals(setOf(repositoryId), service.dependencyIds)
+        assertTrue(specification.relationships.any {
+            it.sourceId == serviceId && it.targetId == "unresolved:missing:cache:target"
+        })
+        assertTrue(specification.relationships.any {
+            it.type == "DECLARES" &&
+                it.sourceId == "module:app:package:io.sample" &&
+                it.targetId == serviceId
+        })
+        assertFalse(specification.relationships.any { it.sourceId == it.targetId })
+        assertFalse(specification.relationships.any { it.targetId == "missing:cache" })
+    }
+
+    @Test
+    fun `resolves the same package independently in multiple modules`() {
+        val sourceIndex = SourceIndex(
+            files = listOf("app", "lib").map { module ->
+                SourceFile(
+                    relativePath = "$module/src/main/kotlin/io/sample/${module}Type.kt",
+                    language = SourceLanguage.KOTLIN,
+                    packageName = "io.sample",
+                    candidateModulePath = module,
+                    symbols = listOf(
+                        SourceSymbol(
+                            id = "$module-type",
+                            name = "${module}Type",
+                            qualifiedName = "io.sample.${module}Type",
+                            kind = SourceSymbolKind.CLASS,
+                        ),
+                    ),
+                )
+            },
+        )
+        val knowledge = DefaultKnowledgeGraphBuilder().buildWithEvidence(sourceIndex)
+        val specification = DefaultSpecificationBuilder().build(
+            SpecificationBuildRequest(ProjectDescriptor("sample", "Sample"), knowledge, sourceIndex),
+        )
+
+        assertEquals(
+            setOf(
+                "module:app:package:io.sample" to "symbol:app-type",
+                "module:lib:package:io.sample" to "symbol:lib-type",
+            ),
+            specification.relationships
+                .filter { it.type == "DECLARES" }
+                .map { it.sourceId to it.targetId }
+                .toSet(),
+        )
     }
 
     private fun sampleIndex(): SourceIndex = SourceIndex(
