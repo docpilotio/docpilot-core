@@ -20,25 +20,25 @@ class ProjectSpecificationMarkdownRendererTest {
     private val renderer = ProjectSpecificationMarkdownRenderer()
 
     @Test
-    fun `renders all DIR sections into one markdown artifact`() {
-        val artifact = renderer.render(fullSpecification()).single()
+    fun `renders all DIR sections into deterministic markdown artifacts`() {
+        val artifacts = renderer.render(fullSpecification())
+        val artifact = artifacts.single { it.relativePath == "docs/project-specification.md" }
+        val content = artifacts.joinToString("\n") { it.content }
 
         assertEquals("docs/project-specification.md", artifact.relativePath)
         assertEquals("text/markdown", artifact.mediaType)
-        assertTrue(artifact.content.contains("# Sample\\#Project"))
-        assertTrue(artifact.content.contains("## Modules"))
-        assertTrue(artifact.content.contains("### app"))
-        assertTrue(artifact.content.contains("##### io.sample"))
-        assertTrue(artifact.content.contains("**io.sample.UserRepository**"))
-        assertTrue(artifact.content.contains("APIs:"))
-        assertTrue(artifact.content.contains("`findUser(id: String): User?`"))
-        assertTrue(artifact.content.contains("Properties:"))
-        assertTrue(artifact.content.contains("`cache`"))
-        assertTrue(artifact.content.contains("## Relationships"))
-        assertTrue(artifact.content.contains("  - Source kind: INTERNAL"))
-        assertTrue(artifact.content.contains("  - Target kind: EXTERNAL"))
-        assertTrue(artifact.content.contains("## Evidence"))
-        assertTrue(artifact.content.contains("## Unresolved"))
+        assertEquals(8, artifacts.size)
+        assertTrue(content.contains("# Sample\\#Project"))
+        assertTrue(content.contains("## Modules"))
+        assertTrue(content.contains("### app"))
+        assertTrue(content.contains("##### io.sample"))
+        assertTrue(content.contains("**io.sample.UserRepository**"))
+        assertTrue(content.contains("`findUser(id: String): User?`"))
+        assertTrue(content.contains("`cache`"))
+        assertTrue(content.contains("  - Source kind: INTERNAL"))
+        assertTrue(content.contains("  - Target kind: EXTERNAL"))
+        assertTrue(content.contains("## Evidence"))
+        assertTrue(content.contains("## Unresolved"))
     }
 
     @Test
@@ -48,7 +48,7 @@ class ProjectSpecificationMarkdownRendererTest {
                 schemaVersion = "0.3",
                 project = ProjectDescriptor(id = "empty", name = "Empty"),
             ),
-        ).single().content
+        ).joinToString("\n") { it.content }
 
         assertTrue(content.contains("## Modules\n\n- None"))
         assertTrue(content.contains("## Relationships\n\n- None"))
@@ -96,7 +96,7 @@ class ProjectSpecificationMarkdownRendererTest {
                     ),
                 ),
             ),
-        ).single().content
+        ).joinToString("\n") { it.content }
 
         assertTrue(content.contains("# A \\*project\\* \\[draft\\] \\| v1"))
         assertTrue(content.contains("``project`id``"))

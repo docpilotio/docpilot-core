@@ -24,6 +24,7 @@ public data class ExistingDocumentationArtifact(
     public val relativePath: String,
     public val mediaType: String,
     public val content: String,
+    public val ownership: DocumentationArtifactOwnership = DocumentationArtifactOwnership.DOCPILOT,
 )
 
 public data class DocumentationArtifactAction(
@@ -51,6 +52,8 @@ public data class IncrementalDocumentationExecutionResult(
     public val renderedArtifacts: List<RenderedArtifact> = emptyList(),
     public val fallbackReason: IncrementalFallbackReason? = null,
     public val warnings: List<String> = emptyList(),
+    public val artifactPlanSha256: String? = null,
+    public val orphanedArtifacts: List<OrphanedDocumentationArtifact> = emptyList(),
     public val errorMessage: String? = null,
     public val writePerformed: Boolean = false,
 ) {
