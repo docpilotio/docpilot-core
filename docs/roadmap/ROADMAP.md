@@ -49,8 +49,8 @@ long-term operation. Review Bundle format 1 remains unchanged. Separate
 Lifecycle Metadata, Apply Receipt, and Apply Transaction Journal format 1
 contracts provide Core-owned transitions, atomic Receipt/APPLIED visibility,
 recoverable documentation apply, idempotency, crash recovery, and offline
-verification. The clean build and 291-test regression suite pass; Git integration
-and remote synchronization are pending.
+verification. The clean build and 291-test regression suite pass, and main
+integration is complete at `0f6b15d`. Remote synchronization is pending.
 
 Signed Release Evidence and External Attestation remains a later
 release-security candidate.

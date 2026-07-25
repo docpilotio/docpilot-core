@@ -6,7 +6,9 @@
 - Title: Review Bundle Lifecycle and Apply Receipt
 - Feature branch: `feature/rfc-0050-review-lifecycle-spec`
 - Baseline commit: `d674463c078125b3d113823a90a49c26cb77b139`
-- Status: implementation and local verification complete; Git integration pending
+- Feature commit: `4bfa654e5318cc7a5b6bb995f30612cc445ae79c`
+- Main merge commit: `0f6b15d`
+- Status: implementation, verification, and main integration complete
 
 ## Implementation summary
 
@@ -76,8 +78,8 @@ idempotent exact retry, post-apply change blocking, and deterministic recovery.
 - Core implementation: READY.
 - Regression verification: READY.
 - Canonical documentation: READY.
-- Feature commit: PENDING.
-- Main integration: NOT PERFORMED.
+- Feature commit: COMPLETE.
+- Main integration: COMPLETE.
 - Push: NOT PERFORMED.
 - Release: NOT PERFORMED.
 

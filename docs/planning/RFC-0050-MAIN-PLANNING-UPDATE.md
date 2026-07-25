@@ -10,7 +10,7 @@
 | Specification | APPROVED |
 | Implementation | COMPLETED |
 | Verification | 291 tests / 0 failures |
-| Main integration | NOT_STARTED |
+| Main integration | COMPLETED (`0f6b15d`) |
 
 ## Current phase
 
@@ -18,8 +18,9 @@ RFC-0049 is implemented, verified, integrated into `main`, and synchronized to
 `origin/main`. RFC-0050 Plan A is selected and its detailed Canonical
 specification is approved.
 
-RFC-0050 implementation and local verification are complete on the feature
-worktree. Git integration, push, tag, and release remain pending.
+RFC-0050 implementation, local verification, Feature Commit
+`4bfa654e5318cc7a5b6bb995f30612cc445ae79c`, and main integration Commit
+`0f6b15d` are complete. Push, tag, and release remain pending.
 
 ## Approved product outcome
 
