@@ -2,7 +2,7 @@
 
 ## Candidate status
 
-PROPOSED - NOT APPROVED AS RFC-0047
+SELECTED AND APPROVED FOR RFC-0047 SPECIFICATION
 
 ## Proposed title
 
@@ -130,11 +130,19 @@ RFC-0046
   -> Later CLI review workflow
 ```
 
-## Decision gates
+## Decision record
 
-1. Approve persistence as RFC-0047 product scope.
-2. Approve JSON review bundle format version 1.
-3. Decide whether reviewer comments are persisted by default.
+Selected by the user as RFC-0047. Review Bundle is an official Core-owned,
+versioned long-term data contract rather than a CLI exchange format.
+
+Implementation remains unapproved until the detailed RFC-0047 specification is
+reviewed.
+
+## Remaining implementation gates
+
+1. Review the detailed RFC-0047 specification.
+2. Approve implementation start.
+3. Confirm reviewer comments are persisted as integrity-protected bundle content.
 4. Confirm CLI commands remain a later RFC.
 5. Confirm MCP remains outside the runtime boundary.
 

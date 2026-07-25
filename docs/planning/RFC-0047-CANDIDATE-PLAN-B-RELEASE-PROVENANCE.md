@@ -2,7 +2,7 @@
 
 ## Candidate status
 
-PROPOSED - NOT APPROVED AS RFC-0047
+NOT SELECTED FOR RFC-0047 - RETAINED AS A RELEASE-TRACK ALTERNATIVE
 
 ## Proposed title
 
@@ -146,3 +146,8 @@ RFC-0046 integrated
 
 STRONGLY_RECOMMENDED if the immediate goal is to close v0.5 MVP/POC release
 readiness before adding another user workflow.
+
+## Selection outcome
+
+The user selected Plan A for RFC-0047. Plan B remains a later release-track
+candidate and is not part of the RFC-0047 scope.
