@@ -6,6 +6,7 @@ public enum class IncrementalUpdateTarget {
     TYPE,
     API,
     PROPERTY,
+    RELATIONSHIP,
 }
 
 public data class IncrementalUpdateAction(

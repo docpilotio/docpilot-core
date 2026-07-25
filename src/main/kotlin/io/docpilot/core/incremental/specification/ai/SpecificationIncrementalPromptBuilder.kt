@@ -4,6 +4,7 @@ import io.docpilot.core.incremental.specification.ChangeKind
 import io.docpilot.core.incremental.specification.IncrementalUpdateAction
 import io.docpilot.core.incremental.specification.IncrementalUpdateTarget
 import io.docpilot.core.model.ProjectSpecification
+import io.docpilot.core.specification.RelationshipEndpointSemantics
 
 public fun interface SpecificationIncrementalPromptBuilder {
     public fun build(
@@ -50,7 +51,25 @@ public class DefaultSpecificationIncrementalPromptBuilder : SpecificationIncreme
             IncrementalUpdateTarget.PROPERTY -> specification.components.asSequence().flatMap { it.properties.asSequence() }
                 .firstOrNull { it.id == action.id }
                 ?.let { "id=${it.id}; name=${it.name}; type=${it.type.orEmpty()}; purpose=${it.purpose.orEmpty()}" }
+            IncrementalUpdateTarget.RELATIONSHIP -> specification.relationships.firstOrNull { it.id == action.id }
+                ?.let {
+                    val internalIds = internalEndpointIds(specification)
+                    "id=${it.id}; type=${it.type}; source=${it.sourceId}; target=${it.targetId}; " +
+                        "sourceKind=${RelationshipEndpointSemantics.kindOf(it.sourceId, internalIds)}; " +
+                        "targetKind=${RelationshipEndpointSemantics.kindOf(it.targetId, internalIds)}; " +
+                        "description=${it.description.orEmpty()}; evidence=${it.evidenceRefs.sorted().joinToString()}"
+                }
         }
         return value?.let { "$label $it" } ?: if (action.changeKind == ChangeKind.REMOVED) "$label id=${action.id}; removed=true" else null
+    }
+
+    private fun internalEndpointIds(specification: ProjectSpecification): Set<String> = buildSet {
+        addAll(specification.modules.map { it.id })
+        addAll(specification.packages.map { it.id })
+        specification.components.forEach { component ->
+            add(component.id)
+            addAll(component.apis.map { it.id })
+            addAll(component.properties.map { it.id })
+        }
     }
 }

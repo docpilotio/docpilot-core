@@ -5,6 +5,7 @@ import io.docpilot.core.model.ComponentSpecification
 import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.ProjectSpecification
 import io.docpilot.core.model.PropertySpecification
+import io.docpilot.core.model.RelationshipSpecification
 
 /** Stable-id based, deterministic ProjectSpecification differ. */
 public class DefaultSpecificationDiffer : SpecificationDiffer {
@@ -30,6 +31,19 @@ public class DefaultSpecificationDiffer : SpecificationDiffer {
             propertyChanges = compareOwned(
                 previous = flattenProperties(previousTypes),
                 current = flattenProperties(currentTypes),
+            ),
+            relationshipChanges = compare(
+                previous = indexByStableId(
+                    previous.relationships,
+                    RelationshipSpecification::id,
+                    "previous relationships",
+                ),
+                current = indexByStableId(
+                    current.relationships,
+                    RelationshipSpecification::id,
+                    "current relationships",
+                ),
+                parentId = RelationshipSpecification::sourceId,
             ),
         )
     }

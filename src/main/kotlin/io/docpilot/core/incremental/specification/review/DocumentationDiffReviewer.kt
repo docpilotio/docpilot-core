@@ -159,5 +159,7 @@ public class DefaultDocumentationDiffReviewer(
             .flatMap { it.properties.asSequence() }
             .firstOrNull { it.id == id }
             ?.evidenceRefs
+        IncrementalUpdateTarget.RELATIONSHIP ->
+            specification.relationships.firstOrNull { it.id == id }?.evidenceRefs
     } ?: emptySet()
 }
