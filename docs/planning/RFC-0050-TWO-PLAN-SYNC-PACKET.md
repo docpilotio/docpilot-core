@@ -39,18 +39,26 @@
 | Security sensitivity | Medium | High |
 | Natural next priority | Strong | Moderate |
 
-## Recommendation
+## Decision
 
-Select Plan A for RFC-0050. It follows the agreed roadmap from v0.5 release trust
-to v1.0 review auditability and long-term operation.
+- RFC-0050: Plan A selected and detailed specification approved.
+- Plan B: retained as a later release-security candidate.
+- Review Bundle format 1 remains unchanged.
+- Lifecycle Metadata, Apply Receipt, and Apply Transaction Journal use independent
+  format version 1 contracts.
 
-Keep Plan B as a later release-security candidate. Neither candidate is formally
-approved as RFC-0050 by this packet.
+Canonical RFC:
+
+```text
+docs/rfc/RFC-0050-Review-Bundle-Lifecycle-and-Apply-Receipt.md
+```
 
 ## Decisions required
 
-1. RFC-0050 candidate selection
-2. Lifecycle states and terminal-transition rules
-3. Receipt atomicity boundary
-4. Existing Bundle compatibility policy
-5. CLI exposure inclusion or deferral
+Resolved by the Canonical specification:
+
+1. Plan A selected.
+2. Lifecycle uses a closed Core-owned state machine.
+3. Receipt and APPLIED lifecycle commit through one atomic control generation.
+4. Review Bundle v1 remains unchanged; legacy adoption is explicit.
+5. CLI and MCP remain thin adapters.

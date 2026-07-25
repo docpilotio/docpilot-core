@@ -68,7 +68,10 @@ class ReviewCommand(
             ?: FileReviewBundleRepository(projectRoot)
         val generator: AiIncrementalDocumentationGenerator =
             DefaultAiIncrementalDocumentationGenerator(bootstrap.createProvider(args.required("provider")))
-        val workflow = DefaultPersistentDocumentationReviewWorkflow(generator, repository, codec)
+        val lifecycleRepository = FileReviewLifecycleRepository(projectRoot)
+        val workflow = DefaultPersistentDocumentationReviewWorkflow(
+            generator, repository, codec, lifecycleRepository = lifecycleRepository,
+        )
         val result = workflow.prepareAndSave(
             AiIncrementalGenerationRequest(
                 previous,
@@ -156,7 +159,7 @@ class ReviewCommand(
             if (args.flag("accept")) DocumentationReviewDisposition.ACCEPTED else DocumentationReviewDisposition.REJECTED,
             comment,
         )
-        val workflow = workflow(context.repository)
+        val workflow = workflow(context)
         return when (val result = workflow.recordDecisions(
             context.projectId,
             context.bundle.proposalId,
@@ -183,49 +186,52 @@ class ReviewCommand(
         args.requireOnly(setOf("project", "proposal", "bundle", "documentation", "payload-sha256"), setOf("json"))
         val context = load(args)
         val documentationPath = regularFile(args.required("documentation"))
-        val existing = Files.readString(documentationPath, StandardCharsets.UTF_8)
         val expected = args.optional("payload-sha256") ?: context.bundle.integrity.payloadSha256
-        val result = workflow(context.repository).resumeApply(
-            ResumableReviewApplyRequest(context.projectId, context.bundle.proposalId, existing, expected),
+        val lifecycleRepository = FileReviewLifecycleRepository(context.projectRoot)
+        val lifecycle = lifecycleRepository.load(context.projectId, context.bundle.proposalId)
+        if (lifecycle !is ReviewLifecycleResult.Success) {
+            return renderFailure(
+                "review apply", 5, "INVALID_LIFECYCLE", "Review lifecycle is missing or invalid.", args.json,
+                context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
+            )
+        }
+        val result = ReviewLifecycleApplyWorkflow(context.repository, lifecycleRepository).apply(
+            context.projectId,
+            context.bundle.proposalId,
+            expected,
+            lifecycle.value.metadata.generation,
+            FileDocumentationResource(documentationPath),
         )
         return when (result) {
-            is ResumableReviewApplyResult.Applied -> {
-                try {
-                    writer.replace(documentationPath, existing, result.mergedDocumentation)
-                } catch (error: IllegalArgumentException) {
-                    return renderFailure(
-                        "review apply", 4, "STALE_DOCUMENTATION", error.message.orEmpty(), args.json,
-                        context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
-                    )
-                } catch (error: Exception) {
-                    return renderFailure(
-                        "review apply", 8, "DOCUMENT_WRITE_FAILED", error.message.orEmpty(), args.json,
-                        context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
-                    )
+            is LifecycleApplyResult.Applied, is LifecycleApplyResult.AlreadyApplied -> {
+                val receipt = when (result) {
+                    is LifecycleApplyResult.Applied -> result.receipt
+                    is LifecycleApplyResult.AlreadyApplied -> result.receipt
+                    else -> error("unreachable")
                 }
-                render(
-                    "review apply", "APPLIED", 0, context.bundle, context.path, args.json,
+                render("review apply", if (result is LifecycleApplyResult.Applied) "APPLIED" else "ALREADY_APPLIED",
+                    0, context.bundle, context.path, args.json,
                     mapOf(
-                        "acceptedCount" to result.acceptedTargetIds.size,
-                        "rejectedCount" to result.rejectedTargetIds.size,
-                        "resultDocumentationSha256" to result.mergedDocumentationSha256,
-                    ),
-                )
+                        "receiptId" to receipt.receiptId,
+                        "acceptedCount" to receipt.acceptedTargetIds.size,
+                        "rejectedCount" to receipt.rejectedTargetIds.size,
+                        "resultDocumentationSha256" to receipt.resultDocumentationSha256,
+                    ))
             }
-            is ResumableReviewApplyResult.Pending -> render(
+            is LifecycleApplyResult.Pending -> render(
                 "review apply", "PENDING_REVIEW", 3, context.bundle, context.path, args.json,
-                mapOf(
-                    "pendingCount" to result.pendingTargetIds.size,
-                    "missingPatchCount" to result.missingPatchTargetIds.size,
-                ),
+                mapOf("pendingCount" to result.targetIds.size),
             )
-            is ResumableReviewApplyResult.Conflict -> renderFailure(
-                "review apply", 4,
-                if (result.reason == ResumableReviewConflict.BUNDLE_CHANGED) "BUNDLE_CHANGED" else "STALE_DOCUMENTATION",
+            is LifecycleApplyResult.Conflict -> renderFailure(
+                "review apply", 4, "APPLY_CONFLICT",
                 result.message, args.json, context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
             )
-            is ResumableReviewApplyResult.InvalidBundle -> renderFailure(
-                "review apply", 5, "INVALID_BUNDLE", result.message, args.json,
+            is LifecycleApplyResult.RecoveryRequired -> renderFailure(
+                "review apply", 9, "RECOVERY_REQUIRED", result.message, args.json,
+                context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
+            )
+            is LifecycleApplyResult.Failed -> renderFailure(
+                "review apply", 5, "APPLY_FAILED", result.message, args.json,
                 context.bundle.proposalId, context.path, context.bundle.integrity.payloadSha256,
             )
         }
@@ -259,11 +265,16 @@ class ReviewCommand(
         if (loaded !is ReviewBundleLoadResult.Valid) {
             throw ReviewCliFailure(5, "INVALID_BUNDLE", "Review bundle is missing or invalid.", args.json)
         }
-        return BundleContext(projectId, loaded.bundle, repository, path)
+        return BundleContext(projectRoot, projectId, loaded.bundle, repository, path)
     }
 
-    private fun workflow(repository: ReviewBundleRepository) =
-        DefaultPersistentDocumentationReviewWorkflow(UnusedGenerator, repository, codec)
+    private fun workflow(context: BundleContext) =
+        DefaultPersistentDocumentationReviewWorkflow(
+            UnusedGenerator,
+            context.repository,
+            codec,
+            lifecycleRepository = FileReviewLifecycleRepository(context.projectRoot),
+        )
 
     private fun defaultBundlePath(projectRoot: Path, proposalId: String): Path =
         projectRoot.resolve(ReviewBundleFormat.DEFAULT_DIRECTORY)
@@ -375,6 +386,7 @@ class ReviewCommand(
     }
 
     private data class BundleContext(
+        val projectRoot: Path,
         val projectId: String,
         val bundle: StoredReviewBundle,
         val repository: ReviewBundleRepository,

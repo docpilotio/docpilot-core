@@ -2,7 +2,7 @@
 
 ## Status
 
-PROPOSED - NOT YET APPROVED AS RFC-0050
+SELECTED AND SPECIFIED AS RFC-0050
 
 ## Type
 
@@ -141,3 +141,24 @@ STRONGLY_RECOMMENDED for RFC-0050.
 
 It naturally follows RFC-0049: v0.5 gains trustworthy release evidence, then the
 v1.0 path gains durable review audit and long-term operation.
+
+## Decision
+
+Plan A is approved and specified as RFC-0050.
+
+Canonical specification:
+
+```text
+docs/rfc/RFC-0050-Review-Bundle-Lifecycle-and-Apply-Receipt.md
+```
+
+Approved contract direction:
+
+- Review Bundle format 1 unchanged;
+- separate Lifecycle Metadata format 1;
+- separate Apply Receipt format 1;
+- separate Apply Transaction Journal format 1;
+- atomic Receipt/APPLIED lifecycle visibility through an immutable control
+  generation pointer;
+- recoverable cross-resource documentation transaction;
+- Core-only lifecycle, receipt, idempotency, and recovery rules.
