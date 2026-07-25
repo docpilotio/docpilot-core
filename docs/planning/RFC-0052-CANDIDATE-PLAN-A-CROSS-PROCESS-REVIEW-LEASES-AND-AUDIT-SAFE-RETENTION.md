@@ -2,6 +2,9 @@
 
 # Cross-process Review Leases and Audit-safe Retention
 
+Status: NOT SELECTED for RFC-0052. Moved to the proposed RFC-0056+/v1.1
+Hardening track.
+
 ## Type
 
 ARCHITECTURE_ENABLER

@@ -39,15 +39,16 @@ class ProjectSpecificationMarkdownRendererIntegrationTest {
             ),
         )
 
-        val firstArtifact = renderer.render(firstSpecification).single()
-        val secondArtifact = renderer.render(secondSpecification).single()
+        val firstArtifacts = renderer.render(firstSpecification)
+        val secondArtifacts = renderer.render(secondSpecification)
+        val content = firstArtifacts.joinToString("\n") { it.content }
 
-        assertEquals(firstArtifact, secondArtifact)
-        assertTrue(firstArtifact.content.contains("- Schema version: `0.3`"))
-        assertTrue(firstArtifact.content.contains("**io.sample.UserRepository**"))
-        assertTrue(firstArtifact.content.contains("`findUser(id: String): User?`"))
-        assertTrue(firstArtifact.content.contains("`cache`"))
-        assertTrue(firstArtifact.content.contains("## Evidence"))
+        assertEquals(firstArtifacts, secondArtifacts)
+        assertTrue(content.contains("- Schema version: `0.3`"))
+        assertTrue(content.contains("**io.sample.UserRepository**"))
+        assertTrue(content.contains("`findUser(id: String): User?`"))
+        assertTrue(content.contains("`cache`"))
+        assertTrue(content.contains("## Evidence"))
     }
 
     private fun sampleIndex(): SourceIndex = SourceIndex(

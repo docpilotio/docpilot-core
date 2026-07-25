@@ -1,6 +1,10 @@
 package io.docpilot.core.incremental.execution
 
 import io.docpilot.core.api.SpecificationRenderer
+import io.docpilot.core.api.DocumentationArtifactDescriptor
+import io.docpilot.core.api.DocumentationArtifactId
+import io.docpilot.core.api.DocumentationArtifactKind
+import io.docpilot.core.api.SelectiveSpecificationRenderer
 import io.docpilot.core.incremental.specification.ChangeKind
 import io.docpilot.core.incremental.specification.IncrementalUpdateAction
 import io.docpilot.core.incremental.specification.IncrementalUpdatePlan
@@ -158,6 +162,29 @@ class DefaultIncrementalDocumentationExecutorTest {
         assertTrue(writer.writes.isEmpty())
     }
 
+    @Test
+    fun `selective renderer receives only changed artifact ids and never deletes orphans`() {
+        val writer = RecordingWriter()
+        val renderer = RecordingSelectiveRenderer()
+        val executor = DefaultIncrementalDocumentationExecutor(renderer, writer)
+
+        val result = executor.execute(
+            request(
+                existingArtifacts = listOf(
+                    existing("old-a", "docs/a.md"),
+                    existing("same-b", "docs/b.md"),
+                    existing("legacy", "docs/legacy.md"),
+                ),
+            ),
+        )
+
+        assertEquals(setOf(DocumentationArtifactId("component:a")), renderer.renderedIds)
+        assertEquals(listOf("docs/a.md"), writer.writes.map { it.relativePath })
+        assertTrue(writer.deletes.isEmpty())
+        assertEquals(listOf("docs/b.md"), result.keptArtifacts)
+        assertEquals(64, result.artifactPlanSha256?.length)
+    }
+
     private fun request(
         previousSpecification: ProjectSpecification? = specification(),
         currentSpecification: ProjectSpecification = specification(),
@@ -208,6 +235,40 @@ class DefaultIncrementalDocumentationExecutorTest {
 
         override fun delete(relativePath: String) {
             deletes += relativePath
+        }
+    }
+
+    private inner class RecordingSelectiveRenderer : SelectiveSpecificationRenderer {
+        var renderedIds: Set<DocumentationArtifactId> = emptySet()
+
+        override fun describe(specification: ProjectSpecification) = listOf(
+            DocumentationArtifactDescriptor(
+                DocumentationArtifactId("component:a"),
+                "docs/a.md",
+                "text/markdown",
+                DocumentationArtifactKind.COMPONENT,
+                listOf("type:sample"),
+            ),
+            DocumentationArtifactDescriptor(
+                DocumentationArtifactId("component:b"),
+                "docs/b.md",
+                "text/markdown",
+                DocumentationArtifactKind.COMPONENT,
+                listOf("type:unrelated"),
+            ),
+        )
+
+        override fun render(
+            specification: ProjectSpecification,
+            artifactIds: Set<DocumentationArtifactId>,
+        ): List<RenderedArtifact> {
+            renderedIds = artifactIds
+            return artifactIds.map {
+                when (it.value) {
+                    "component:a" -> artifact("new-a", "docs/a.md")
+                    else -> artifact("same-b", "docs/b.md")
+                }
+            }
         }
     }
 }

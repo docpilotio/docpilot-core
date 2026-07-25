@@ -15,8 +15,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
-private const val SPECIFICATION_OUTPUT_PATH: String = "docs/project-specification.md"
-
 fun interface SpecificationGenerateWorkflow {
     fun execute(projectRoot: Path, outputRoot: Path): SpecificationSnapshotExecutionResult
 }
@@ -46,21 +44,24 @@ class DefaultSpecificationGenerateWorkflow(
         )
         return coordinator.execute(
             currentSpecification = specification,
-            existingArtifacts = loadExistingArtifacts(normalizedOutputRoot),
+            existingArtifacts = renderer.describe(specification).mapNotNull { descriptor ->
+                loadExistingArtifact(normalizedOutputRoot, descriptor.relativePath, descriptor.mediaType)
+            },
         )
     }
 
-    private fun loadExistingArtifacts(outputRoot: Path): List<ExistingDocumentationArtifact> {
-        val relativePath = SPECIFICATION_OUTPUT_PATH
+    private fun loadExistingArtifact(
+        outputRoot: Path,
+        relativePath: String,
+        mediaType: String,
+    ): ExistingDocumentationArtifact? {
         val path = outputRoot.resolve(relativePath).normalize()
         require(path.startsWith(outputRoot)) { "Specification output path escapes output root: $relativePath" }
-        if (!Files.isRegularFile(path)) return emptyList()
-        return listOf(
-            ExistingDocumentationArtifact(
-                relativePath = relativePath,
-                mediaType = "text/markdown",
-                content = Files.readString(path, StandardCharsets.UTF_8),
-            ),
+        if (!Files.isRegularFile(path)) return null
+        return ExistingDocumentationArtifact(
+            relativePath = relativePath,
+            mediaType = mediaType,
+            content = Files.readString(path, StandardCharsets.UTF_8),
         )
     }
 }

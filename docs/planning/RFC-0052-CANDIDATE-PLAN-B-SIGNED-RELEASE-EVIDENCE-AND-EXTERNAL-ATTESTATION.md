@@ -2,6 +2,9 @@
 
 # Signed Release Evidence and External Attestation
 
+Status: NOT SELECTED for RFC-0052. Moved to the proposed RFC-0057+/v1.1
+Hardening track.
+
 ## Type
 
 QUALITY_RELEASE

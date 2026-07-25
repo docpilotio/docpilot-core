@@ -34,7 +34,7 @@ Delivered baseline:
 - AI Provider SPI
 - verified Ollama architecture generation
 
-## Next
+## Product Capability track
 
 RFC-0049 Plan A, v0.5 Release Provenance and Determinism Gate, is implemented and
 locally verified. It provides Release Evidence Manifest format 1, exact
@@ -63,6 +63,37 @@ requires explicit confirmation; automation may bind confirmation to the Plan
 SHA. The clean build and 301-test regression suite pass. Main integration is
 complete at `2036eb9`. Remote synchronization is pending. Cross-process Review
 Leases and Audit-safe Retention remains deferred.
+
+RFC-0052 returns to the primary Product Capability roadmap as Selective
+Documentation Artifact Planning and Rendering. The current executor avoids
+unchanged writes but still performs a full render, and the official specification
+renderer emits one monolithic artifact. RFC-0052 introduces renderer-owned
+artifact descriptors, deterministic Stable-ID impact planning, a multi-artifact
+official layout, and selective rendering so only required CREATE/UPDATE
+documents are generated. Implementation and the 306-test clean regression suite
+are complete on the RFC-0052 feature branch. Git integration is pending.
+
+The proposed Product Capability sequence after RFC-0052 is:
+
+1. RFC-0053: Semantic Relationship Expansion (`EXTENDS`, `IMPLEMENTS`, `CALLS`,
+   `IMPORTS`) with deterministic identity and Evidence.
+2. RFC-0054: Documentation Quality Validation for coverage, Evidence
+   traceability, stale claims, unresolved gaps, and relationship consistency.
+3. RFC-0055: Existing Documentation Reconciliation for ownership, drift,
+   adoption, managed/manual boundaries, and orphan disposition.
+
+Only RFC-0052 is selected. RFC-0053 through RFC-0055 numbers remain provisional.
+
+## v1.1 Hardening track
+
+The following work is intentionally separated from the Product Capability track:
+
+- RFC-0056+ or v1.1: Cross-process Review Leases and Audit-safe Retention.
+- RFC-0057+ or v1.1: Signed Release Evidence and External Attestation.
+
+These numbers are placeholders, not reserved RFC approvals. Hardening may move
+earlier only if new evidence shows an immediate release or data-integrity
+blocker.
 
 Future work must preserve Clean Architecture, Evidence First, deterministic core
 outputs, the separation between Snapshot Incremental and Specification

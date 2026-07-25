@@ -1,5 +1,14 @@
 # RFC-0052 Two-plan Sync Packet
 
+Status: SUPERSEDED by the Product Roadmap realignment.
+
+Neither former plan is selected for RFC-0052:
+
+- Lease/Retention moves to RFC-0056+/v1.1 Hardening.
+- Signed Evidence/Attestation moves to RFC-0057+/v1.1 Hardening.
+
+RFC-0052 now targets Selective Documentation Artifact Planning and Rendering.
+
 ## Baseline
 
 - Main baseline before RFC-0051 integration:
