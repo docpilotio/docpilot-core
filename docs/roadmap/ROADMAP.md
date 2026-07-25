@@ -36,8 +36,9 @@ Delivered baseline:
 RFC-0046 implementation, verification, isolated smoke, Main Planning update,
 Completion Handoff, and local main integration are complete. RFC-0047 Auditable
 Review Persistence and Resumable Conflict-safe Apply is implemented, locally
-verified, and integrated into local main. RFC-0048 has two candidate plans and
-neither is selected. The v0.5 Release
+verified, and integrated into local main. RFC-0048 is selected as the Official CLI
+Review Bundle Workflow; it is implemented and locally verified in its Feature
+Worktree, with Git integration pending. The v0.5 Release
 Provenance plan remains a later release-track candidate. Future work must preserve Clean
 Architecture, Evidence First, deterministic core outputs, the separation between
 Snapshot Incremental and Specification Incremental, and complete-review-before-

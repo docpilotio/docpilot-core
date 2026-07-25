@@ -17,7 +17,7 @@ class CliBootstrap(
         return DocPilotFactory.create(provider)
     }
 
-    private fun createProvider(providerId: String): AiProvider =
+    fun createProvider(providerId: String): AiProvider =
         when (providerId.trim().lowercase()) {
             "ollama" -> createOllamaProvider()
             "openai" -> createOpenAiProvider()

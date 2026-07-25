@@ -2,7 +2,7 @@
 
 ## Status
 
-PROPOSED - NOT APPROVED AS RFC-0048
+NOT SELECTED FOR RFC-0048 - RETAINED AS A RELEASE-TRACK ALTERNATIVE
 
 ## Proposed title
 
@@ -121,3 +121,8 @@ new review capability to end users.
 3. Define skipped/cached test policy.
 4. Decide whether provider smoke is mandatory.
 5. Confirm publication and tagging remain manual.
+
+## Selection outcome
+
+The user selected Plan A for RFC-0048. Plan B remains a later release-track
+candidate and is not part of RFC-0048.
