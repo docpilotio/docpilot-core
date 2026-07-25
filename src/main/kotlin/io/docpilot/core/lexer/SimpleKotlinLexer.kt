@@ -166,8 +166,9 @@ class SimpleKotlinLexer : KotlinLexer {
         private fun scanSymbol() {
             val tokenLine = line
             val tokenColumn = column
-            val text = current().toString()
-            advance()
+            val text = MULTI_CHARACTER_SYMBOLS.firstOrNull(::startsWith)
+                ?: current().toString()
+            repeat(text.length) { advance() }
             addToken(
                 KotlinTokenType.SYMBOL,
                 text,
@@ -212,6 +213,11 @@ class SimpleKotlinLexer : KotlinLexer {
             value == '_' || value.isLetterOrDigit()
 
         companion object {
+            private val MULTI_CHARACTER_SYMBOLS = listOf(
+                "!==", "===", "..<", "!!", "?.", "?:", "::", "->", "=>",
+                "==", "!=", "<=", ">=", "&&", "||", "++", "--", "+=", "-=",
+                "*=", "/=", "%=", "..",
+            )
             private val KEYWORDS = setOf(
                 "package",
                 "import",

@@ -14,6 +14,25 @@ class SimpleKotlinSymbolExtractorTest {
         SimpleKotlinSymbolExtractor()
 
     @Test
+    fun `property accessor is not included in declared type and operators remain intact`() {
+        val file = extractor.extract(
+            "Task.kt",
+            lexer.tokenize(
+                """
+                class Task {
+                    val displayLabel: String
+                        get() = title || description
+                }
+                """.trimIndent(),
+            ),
+        )
+        val property = file.symbols.single().children.single()
+
+        assertEquals("String", property.type)
+        assertTrue(property.signature!!.contains("||"))
+    }
+
+    @Test
     fun `extracts package imports and declarations`() {
         val source = """
             package example.tasks

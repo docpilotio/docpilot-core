@@ -116,4 +116,25 @@ class LocalSourceScannerTest {
         assertEquals(2, inventory.totalDirectoryCount)
         assertEquals(1, inventory.totalFileCount)
     }
+
+    @Test
+    fun `excludes DocPilot outputs but preserves user documentation`() {
+        val root = Files.createTempDirectory("docpilot-managed-outputs")
+        root.resolve("src").createDirectories().resolve("Main.kt").writeText("class Main")
+        root.resolve("docs/guide").createDirectories().resolve("user.md").writeText("# User")
+        root.resolve("docs/specification/components").createDirectories()
+            .resolve("generated.md").writeText("# Generated")
+        root.resolve("docs/project-summary.md").writeText("# Generated")
+        root.resolve("prompt-package").createDirectories().resolve("overview.md").writeText("# Generated")
+        root.resolve(".docpilot/snapshots").createDirectories().resolve("specification.json").writeText("{}")
+
+        val inventory = scanner.scan(loader.load(root))
+
+        assertTrue(inventory.files.any { it.relativePath == "docs/guide/user.md" })
+        assertFalse(inventory.files.any { it.relativePath == "docs/project-summary.md" })
+        assertFalse(inventory.files.any { it.relativePath.startsWith("docs/specification/") })
+        assertFalse(inventory.files.any { it.relativePath.startsWith("prompt-package/") })
+        assertFalse(inventory.files.any { it.relativePath.startsWith(".docpilot/") })
+        assertFalse("docs" in inventory.directories)
+    }
 }

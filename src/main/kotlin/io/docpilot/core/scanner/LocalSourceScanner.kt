@@ -30,9 +30,10 @@ class LocalSourceScanner(
                 .forEach { candidate ->
                     val relative = project.path.relativize(candidate)
                         .joinToString("/") { it.toString() }
+                    if (isManagedOutput(relative)) return@forEach
 
                     when {
-                        Files.isDirectory(candidate) -> dirs += relative
+                        Files.isDirectory(candidate) && !isManagedContainer(relative) -> dirs += relative
                         Files.isRegularFile(candidate) ->
                             files += ProjectFile(relative, classify(candidate))
                     }
@@ -45,6 +46,21 @@ class LocalSourceScanner(
             files.sortedBy { it.relativePath },
         )
     }
+
+    private fun isManagedOutput(relativePath: String): Boolean =
+        relativePath == ".docpilot" || relativePath.startsWith(".docpilot/") ||
+            relativePath == "prompt-package" || relativePath.startsWith("prompt-package/") ||
+            relativePath == "docs/project-summary.md" ||
+            relativePath == "docs/source-index.md" ||
+            relativePath == "docs/knowledge-graph.json" ||
+            relativePath == "docs/project-specification.md" ||
+            relativePath == "docs/architecture/overview.md" ||
+            relativePath == "docs/specification" ||
+            relativePath.startsWith("docs/specification/")
+
+    private fun isManagedContainer(relativePath: String): Boolean =
+        relativePath == "docs" || relativePath == "docs/specification" ||
+            relativePath == "docs/architecture"
 
     private fun classify(path: Path): ProjectFileType =
         when {

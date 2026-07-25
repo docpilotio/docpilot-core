@@ -6,6 +6,9 @@ import io.docpilot.core.knowledge.DefaultKnowledgeGraphBuilder
 import io.docpilot.core.lexer.SimpleKotlinLexer
 import io.docpilot.core.loader.LocalProjectLoader
 import io.docpilot.core.model.ProjectDescriptor
+import io.docpilot.core.model.ProjectBuildSystem
+import io.docpilot.core.model.ProjectFileType
+import io.docpilot.core.model.ProjectLanguage
 import io.docpilot.core.model.knowledge.KnowledgeBuildResult
 import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.scanner.LocalSourceScanner
@@ -27,10 +30,21 @@ class ProjectKnowledgeLoader {
             lexer = SimpleKotlinLexer(),
             extractor = SimpleKotlinSymbolExtractor(),
         ).index(inventory)
+        val summary = io.docpilot.core.summary.DefaultProjectSummaryBuilder().build(inventory)
         return ProjectAnalysis(
             project = ProjectDescriptor(
                 id = project.name.lowercase(),
                 name = project.name,
+                platforms = buildSet {
+                    if (inventory.filesOfType(ProjectFileType.ANDROID_MANIFEST).isNotEmpty()) add("Android")
+                },
+                languages = buildSet {
+                    if (ProjectLanguage.KOTLIN in summary.languages) add("Kotlin")
+                    if (ProjectLanguage.JAVA in summary.languages) add("Java")
+                },
+                buildSystems = buildSet {
+                    if (ProjectBuildSystem.GRADLE in summary.buildSystems) add("Gradle")
+                },
             ),
             sourceIndex = index,
             knowledge = DefaultKnowledgeGraphBuilder().buildWithEvidence(index),

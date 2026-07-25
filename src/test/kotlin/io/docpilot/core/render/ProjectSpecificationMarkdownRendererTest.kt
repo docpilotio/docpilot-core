@@ -27,7 +27,8 @@ class ProjectSpecificationMarkdownRendererTest {
 
         assertEquals("docs/project-specification.md", artifact.relativePath)
         assertEquals("text/markdown", artifact.mediaType)
-        assertEquals(8, artifacts.size)
+        assertEquals(9, artifacts.size)
+        assertTrue(artifacts.any { it.relativePath == "docs/architecture/overview.md" })
         assertTrue(content.contains("# Sample\\#Project"))
         assertTrue(content.contains("## Modules"))
         assertTrue(content.contains("### app"))
@@ -39,6 +40,7 @@ class ProjectSpecificationMarkdownRendererTest {
         assertTrue(content.contains("  - Target kind: EXTERNAL"))
         assertTrue(content.contains("## Evidence"))
         assertTrue(content.contains("## Unresolved"))
+        assertTrue(content.contains("## System context"))
     }
 
     @Test

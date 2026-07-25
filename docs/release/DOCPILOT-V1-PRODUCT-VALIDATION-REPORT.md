@@ -4,188 +4,109 @@
 
 ```text
 Decision: PRODUCT_VALIDATION_FAIL
+Automated remediation gate: PASS
 Technical baseline: v1.0.0 remains immutable
 Public v1.0 readiness: NOT_READY
 RFC-0056 implementation: DEFERRED
 ```
 
-DocPilot demonstrates strong deterministic specification generation,
-source-level traceability, and selective incremental updates. It does not yet
-demonstrate the complete product promise. The legacy analysis path is not
-same-input deterministic after its own outputs appear, RFC-0055 has no official
-end-user Reconciliation workflow, and generated documentation remains a large
-fact inventory rather than a Kubernetes-quality architecture explanation.
+The corrective implementation removes the two original product-workflow hard
+failures and the observed parser and metadata defects. Same-input generation is
+now deterministic, and RFC-0055 Reconciliation is executable through an
+official Core-backed Thin Adapter CLI.
 
-## Generation evidence
+The release gate nevertheless remains failed. The generated Architecture
+Overview improves boundaries, relationship profiles, external dependencies,
+risks, unknowns, and navigation, but runtime/data flow, deployment, architectural
+decisions, and concise human-oriented explanation remain below the declared
+quality threshold. An organizationally independent review has also not occurred.
 
-### Legacy Core analysis
+## Automated remediation evidence
 
-- Command: `.\gradlew.bat :run --args="analyze <fixture>"`
-- Exit: PASS
-- Artifacts: 7
-- Notable outputs:
-  - `docs/knowledge-graph.json`: 1,355,001 bytes
-  - `docs/source-index.md`: 48,068 bytes
-  - `docs/project-summary.md`: 415 bytes on first run
-- All outputs were non-empty.
+- Script: `scripts/validate-v1-product.ps1`
+- Sample source: `C:\WorkSpace\architecture-samples`
+- Isolated fixture: external Product Validation runtime
+- Legacy analysis artifacts: 7
+- Legacy same-input hash delta: 0
+- Specification Markdown artifacts: 69
+- Specification same-input hash delta: 0
+- Reconciliation CLI E2E: PASS
+- Automated decision: PASS
 
-### Official specification workflow
+The script copies the sample without `.git`, existing generated documentation,
+or prompt-package output. It runs the legacy analysis twice, runs specification
+generation twice, compares content hashes, and executes the Reconciliation CLI
+E2E test.
 
-- Command: `.\gradlew.bat :docpilot-cli:run --args="generate specification ..."`
-- First mode: `FULL_REGENERATION`
-- Snapshot: `NOT_FOUND`
-- Generated Markdown Artifacts: 69
-- Generated Markdown bytes: 2,814,576
-- Snapshot bytes: 1,340,419
-- Evidence-reference occurrences: 6,639
-- Relationship entries: 501
-- Text occurrences of `unresolved`: 574
+## Corrected findings
 
-The output includes project, module, package, component, relationship, and
-Evidence Artifacts with stable hashed filenames and source references.
+| ID | Previous severity | Result | Evidence |
+| --- | --- | --- | --- |
+| PV-001 | HIGH | CORRECTED | Scanner excludes DocPilot-managed output while preserving arbitrary user documentation; repeated analysis hash delta is zero |
+| PV-002 | HIGH | CORRECTED | `reconcile preview`, `inspect`, `apply`, `recover`, and `verify` are available through a Core-backed Thin Adapter CLI |
+| PV-003 | MEDIUM | CORRECTED | Kotlin property parsing stops before accessor keywords; regression test covers `String get()` |
+| PV-004 | MEDIUM | CORRECTED | Multi-character operators such as `||` and `&&` retain their identity; nested generic `>>` remains parser-safe |
+| PV-005 | MEDIUM | CORRECTED | Project descriptor derives Android, Kotlin/Java, and Gradle metadata from inventory Evidence |
 
-## Determinism
+## Reconciliation product validation
 
-### Finding PV-001 — legacy analyze self-contaminates inventory
+The CLI delegates ownership classification, merge planning, conflict detection,
+application, recovery, and offline verification to RFC-0055 Core services. The
+E2E test validates:
 
-- Severity: HIGH
-- Result: FAIL
+- preview without mutation;
+- explicit generated-content acceptance;
+- byte preservation of a user-owned title and footer;
+- managed-block replacement;
+- offline verification;
+- recovery orchestration.
 
-Running `analyze` again on the exact same fixture path changed only
-`docs/project-summary.md`. Generated Markdown increased the scanned inventory:
+No ownership or merge rule is duplicated in the CLI.
 
-```text
-First run Markdown files: 2
-Second run Markdown files: 6
-First run directories: 90
-Second run directories: 92
-First run files: 119
-Second run files: 126
-```
-
-The command writes under the analyzed root and subsequently counts its own
-generated output. Same-path byte determinism therefore fails.
-
-Different fixture directory names also change the project name in
-`project-summary.md`; that is an input-identity difference and is not classified
-as nondeterminism.
-
-### Specification no-change replay
-
-- Snapshot validation: `VALID`
-- Reported mode: `INCREMENTAL_UPDATE`
-- Artifact hash or last-write changes: 0
-- Result: PASS_WITH_OBSERVATION
-
-The bytes and write state were stable, though a no-change run being labeled
-`INCREMENTAL_UPDATE` rather than `NO_CHANGES` is a semantic reporting issue.
-
-## Incremental validation
-
-### Fixture change
-
-One property was added to the existing `Task` component:
-
-```kotlin
-val displayLabel: String
-    get() = titleForList
-```
-
-### Result
-
-- Total Markdown Artifacts before change: 69
-- Changed Artifacts: 2
-- Changed:
-  - `docs/specification/project.md`
-  - owning `Task` Component Artifact
-- Unrelated Component, Package, Module, Relationship, and Evidence Artifacts:
-  byte-identical
-- Result: PASS
-
-This is strong product Evidence for RFC-0052 selective planning.
-
-## Reconciliation validation
-
-### Finding PV-002 — no official product workflow
-
-- Severity: HIGH
-- Result: FAIL
-
-RFC-0055 provides Core models, preview/apply services, file persistence,
-recovery, and tests. Neither the root CLI nor distributable CLI exposes an
-official Reconciliation command. Product Validation could not perform
-architecture-samples Preview, decision, Apply, restart, and offline verification
-through a supported end-user workflow.
-
-Core unit and isolated repository tests remain valid implementation Evidence,
-but they cannot substitute for the requested product-level validation.
-
-No user document was modified and no preservation PASS is claimed for the
-architecture-samples product workflow.
-
-## Documentation quality
+## Documentation quality reassessment
 
 | Category | Score | Evidence |
 | --- | ---: | --- |
-| Structural completeness | 3/5 | Rich project/module/package/component/API/property/relationship inventory; lacks coherent runtime, deployment, decision, risk, and operational views |
-| Accuracy | 3/5 | Source-backed, but examples include `Type: String get()`, escaped `| |`, unspecified project metadata, and 574 unresolved occurrences |
-| Traceability | 5/5 | Stable IDs and 6,639 Evidence references provide unusually strong source linkage |
-| Explanation | 1/5 | Most purpose text is declarative boilerplate; little rationale, causal flow, trade-off, or system behavior synthesis |
-| Maintainability | 2/5 | 2.8 MB Markdown, very large raw Evidence sections, hashed navigation names, and high unresolved volume impede human review |
-| **Total** | **14/25** | Required: 21/25 and every category at least 4 |
+| Structural completeness | 4/5 | Adds a coherent Architecture Overview with system context, module boundaries, relationship profile, external boundaries, risks, unknowns, and navigation; runtime/deployment/decision views remain incomplete |
+| Accuracy | 4/5 | Previously observed parser and metadata defects are corrected and claims remain Core-derived; unresolved Evidence remains explicitly represented |
+| Traceability | 5/5 | Stable identities and direct source Evidence remain strong |
+| Explanation | 3/5 | Overview adds cross-cutting synthesis, but causal runtime behavior, rationale, trade-offs, and change explanation remain limited |
+| Maintainability | 3/5 | Human-readable index labels and progressive overview improve entry and navigation; detailed output remains large and Evidence-heavy |
+| **Total** | **19/25** | Required: 21/25 and every category at least 4 |
 
-## Kubernetes comparison
-
-Kubernetes' official Cluster Architecture page explains a concise control-plane
-and node model, component responsibilities, an architecture diagram, deployment
-variations, workload placement, extensibility, and operational context
-(<https://kubernetes.io/docs/concepts/architecture/>).
-
-The official Kubernetes Enhancement Proposal process preserves a structured,
-reviewable decision record
-(<https://github.com/kubernetes/enhancements/blob/master/keps/README.md>).
-Its current template explicitly covers motivation, risks, tests, graduation,
-upgrade/downgrade, production readiness, monitoring, dependencies, scalability,
-troubleshooting, and alternatives
-(<https://github.com/kubernetes/enhancements/blob/master/keps/NNNN-kep-template/README.md>).
-
-DocPilot exceeds these references in automatic source-line traceability for the
-sample. It falls materially short in synthesis, rationale, operational views,
-progressive disclosure, and human-review scale. The comparison therefore does
-not support a “Kubernetes-level design document” claim.
-
-## Fact and omission inventory
+## Remaining findings
 
 | ID | Severity | Kind | Finding |
 | --- | --- | --- | --- |
-| PV-001 | HIGH | Determinism | legacy `analyze` counts its own generated outputs |
-| PV-002 | HIGH | Product workflow | RFC-0055 Reconciliation has no supported CLI/product entry point |
-| PV-003 | MEDIUM | Accuracy | Kotlin accessor types can render as `String get()` |
-| PV-004 | MEDIUM | Accuracy | expression token rendering can show `| |` instead of `||` |
-| PV-005 | MEDIUM | Completeness | project platform/language/build metadata is `None` in specification output despite Android/Kotlin/Gradle input |
-| PV-006 | MEDIUM | Explanation | generated purposes largely restate declarations |
-| PV-007 | MEDIUM | Maintainability | raw Evidence and unresolved sections dominate document volume |
-| PV-008 | LOW | Status semantics | unchanged specification execution reports `INCREMENTAL_UPDATE` |
-| PV-009 | HIGH | Review | organizationally independent reviewer was not available in this execution |
+| PV-006 | MEDIUM | Explanation | Generated component purpose still largely reflects declarations rather than rationale or causal behavior |
+| PV-007 | MEDIUM | Maintainability | Detailed Evidence and unresolved sections remain large for human review |
+| PV-008 | LOW | Status semantics | An unchanged specification execution is reported as `INCREMENTAL_UPDATE`, although bytes and writes are stable |
+| PV-009 | HIGH | Review | An organizationally independent reviewer was not available |
+| PV-010 | MEDIUM | Completeness | Runtime/data flow, deployment, and decision views cannot yet be completed from current Core Evidence |
 
-No `CRITICAL` corruption or fabricated architecture claim was observed. The two
-product hard-gate failures and missing independent review are sufficient for
-FAIL.
+No Critical corruption, unsupported material claim, ownership violation, or
+determinism mismatch was observed.
+
+## Kubernetes comparison
+
+DocPilot now provides a concise generated entry view and exceeds the reference
+in automatic source-line traceability. It still falls short of Kubernetes'
+official architecture documentation in causal system explanation, operational
+context, deployment variation, and progressive human-oriented presentation.
+The result therefore does not support a Kubernetes-level equivalence claim.
 
 ## Independent review
 
-The report uses a predeclared rubric and primary benchmark sources, but the
-execution did not include a separate human or independently authorized reviewer.
-It must not be labeled independent validation. A subsequent gate rerun requires
-an external reviewer who did not implement the fixes.
+This remediation was implemented and evaluated by the same execution authority.
+It is not independent validation. A reviewer who did not implement these fixes
+must verify the fixture, findings, rubric scores, and release decision before
+the hard gate can pass.
 
-## Recommended corrective track
+## Required next improvement
 
-1. Exclude managed output roots from legacy scanner inventory or deprecate that
-   path in favor of the official specification workflow.
-2. Expose RFC-0055 through an official Thin Adapter product workflow.
-3. Add architecture synthesis views: system context, component responsibility,
-   runtime/data flow, deployment, decisions, risks, and change impact.
-4. Fix accessor/expression parsing and project metadata detection.
-5. Add progressive disclosure and compact Evidence references.
-6. Rerun this exact gate with an independent reviewer.
+1. Add Evidence-bounded runtime/data-flow and deployment views, explicitly
+   rendering unknowns instead of inferring unsupported behavior.
+2. Add decision/rationale and change-impact explanations from canonical Evidence.
+3. Compact detailed Evidence behind summaries and improve unresolved aggregation.
+4. Distinguish true no-change execution in status reporting.
+5. Rerun this exact gate with an independent reviewer.
