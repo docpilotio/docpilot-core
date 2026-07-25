@@ -4,3 +4,4 @@ include("docpilot-provider-ollama")
 include("docpilot-provider-openai")
 
 include("docpilot-cli")
+include("docpilot-release")
