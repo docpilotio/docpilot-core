@@ -64,12 +64,14 @@ document, Manifest, and Result phases. Repeated recovery is idempotent.
 
 ## Git and release
 
-- Feature commit: PENDING
-- Main integration: NOT PERFORMED
-- Push: NOT PERFORMED
-- `v1.0.0` tag: NOT CREATED
+- Feature commit: `954e7c4`
+- Main integration: `4e050181ed349dc1c1389387f297e60886d86cba`
+- Push: `origin/main` synchronized
+- `v1.0.0` annotated tag: created and pushed
+- Tag peeled commit: `4e050181ed349dc1c1389387f297e60886d86cba`
 
-The tag may be created after main integration and clean main verification.
+The v1.0 release baseline is immutable. Subsequent main work belongs to v1.1;
+v1.0 fixes and stabilization belong to `release/v1.0.x`.
 
 ## Post-v1.0 direction
 

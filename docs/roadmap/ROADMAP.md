@@ -99,7 +99,7 @@ Its detailed specification defines Evidence-based Core ownership, preview-first 
 reconciliation, deterministic conflict detection, incremental reconciliation,
 proposal-only AI, atomic/recoverable apply, and a versioned Decision Explanation
 Report for every material Ownership/Merge outcome. It is the final v1.0 Product
-Capability RFC. Main integration is pending.
+Capability RFC. Main integration and the `v1.0.0` release tag are complete.
 RFC-0054 Documentation Quality Validation remains proposed and independently
 approvable.
 
