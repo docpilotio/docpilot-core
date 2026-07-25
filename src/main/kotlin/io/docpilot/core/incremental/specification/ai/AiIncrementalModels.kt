@@ -14,10 +14,28 @@ public data class AiIncrementalGenerationRequest(
 
 public enum class AiIncrementalGenerationStatus { NO_CHANGES, SUCCEEDED, FAILED }
 
+public enum class AiDocumentationPatchOperation {
+    UPSERT,
+    REMOVE,
+}
+
 public data class AiDocumentationPatch(
     public val targetId: String,
     public val markdown: String,
-)
+    public val operation: AiDocumentationPatchOperation = AiDocumentationPatchOperation.UPSERT,
+) {
+    init {
+        require(targetId.isNotBlank()) { "AI documentation patch target id must not be blank." }
+        when (operation) {
+            AiDocumentationPatchOperation.UPSERT -> require(markdown.isNotBlank()) {
+                "AI documentation UPSERT markdown must not be blank for target: $targetId"
+            }
+            AiDocumentationPatchOperation.REMOVE -> require(markdown.isEmpty()) {
+                "AI documentation REMOVE markdown must be empty for target: $targetId"
+            }
+        }
+    }
+}
 
 public data class AiIncrementalMetrics(
     public val promptCharacters: Int,

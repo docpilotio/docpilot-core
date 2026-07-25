@@ -4,6 +4,7 @@ import io.docpilot.core.incremental.specification.ChangeKind
 import io.docpilot.core.incremental.specification.IncrementalUpdatePlan
 import io.docpilot.core.incremental.specification.IncrementalUpdateTarget
 import io.docpilot.core.incremental.specification.ai.AiDocumentationPatch
+import io.docpilot.core.incremental.specification.ai.AiDocumentationPatchOperation
 import io.docpilot.core.model.ProjectSpecification
 
 public data class DocumentationReviewRequest(
@@ -17,6 +18,7 @@ public data class DocumentationReviewRequest(
 public enum class DocumentationChangeKind {
     CREATE,
     UPDATE,
+    REMOVE,
     NO_CHANGE,
 }
 
@@ -26,6 +28,7 @@ public data class DocumentationReviewEntry(
     public val target: IncrementalUpdateTarget,
     public val specificationChangeKind: ChangeKind,
     public val documentationChangeKind: DocumentationChangeKind,
+    public val operation: AiDocumentationPatchOperation = AiDocumentationPatchOperation.UPSERT,
     public val existingMarkdown: String? = null,
     public val proposedMarkdown: String,
     public val evidenceIds: List<String> = emptyList(),
@@ -35,24 +38,42 @@ public data class DocumentationReviewEntry(
         require(parentId == null || parentId.isNotBlank()) {
             "Documentation review parent id must be null or non-blank."
         }
-        require(proposedMarkdown.isNotBlank()) {
-            "Documentation review proposed Markdown must not be blank for target: $targetId"
-        }
         require(evidenceIds.none(String::isBlank)) {
             "Documentation review evidence ids must not be blank."
         }
         require(evidenceIds == evidenceIds.distinct().sorted()) {
             "Documentation review evidence ids must be unique and sorted."
         }
+        when (operation) {
+            AiDocumentationPatchOperation.UPSERT -> require(proposedMarkdown.isNotBlank()) {
+                "Documentation review UPSERT Markdown must not be blank for target: $targetId"
+            }
+            AiDocumentationPatchOperation.REMOVE -> require(proposedMarkdown.isEmpty()) {
+                "Documentation review REMOVE Markdown must be empty for target: $targetId"
+            }
+        }
         when (documentationChangeKind) {
-            DocumentationChangeKind.CREATE -> require(existingMarkdown == null) {
-                "Created documentation must not have existing Markdown."
+            DocumentationChangeKind.CREATE -> require(
+                operation == AiDocumentationPatchOperation.UPSERT && existingMarkdown == null,
+            ) {
+                "Created documentation must be an UPSERT without existing Markdown."
             }
-            DocumentationChangeKind.UPDATE -> require(existingMarkdown != null) {
-                "Updated documentation must have existing Markdown."
+            DocumentationChangeKind.UPDATE -> require(
+                operation == AiDocumentationPatchOperation.UPSERT && existingMarkdown != null,
+            ) {
+                "Updated documentation must be an UPSERT with existing Markdown."
             }
-            DocumentationChangeKind.NO_CHANGE -> require(existingMarkdown != null) {
-                "Unchanged documentation must have existing Markdown."
+            DocumentationChangeKind.REMOVE -> require(
+                operation == AiDocumentationPatchOperation.REMOVE &&
+                    specificationChangeKind == ChangeKind.REMOVED &&
+                    existingMarkdown != null,
+            ) {
+                "Removed documentation must be an explicit REMOVE for an existing removed target."
+            }
+            DocumentationChangeKind.NO_CHANGE -> require(
+                operation == AiDocumentationPatchOperation.UPSERT && existingMarkdown != null,
+            ) {
+                "Unchanged documentation must be an UPSERT with existing Markdown."
             }
         }
     }
@@ -61,6 +82,7 @@ public data class DocumentationReviewEntry(
 public data class DocumentationReviewProposal(
     public val entries: List<DocumentationReviewEntry> = emptyList(),
     public val missingPatchTargetIds: List<String> = emptyList(),
+    public val reviewedDocumentationSha256: String,
 ) {
     init {
         require(entries == entries.sortedWith(ENTRY_ORDER)) {
@@ -74,6 +96,9 @@ public data class DocumentationReviewProposal(
         }
         require(missingPatchTargetIds == missingPatchTargetIds.distinct().sorted()) {
             "Missing patch target ids must be unique and sorted."
+        }
+        require(reviewedDocumentationSha256.matches(Regex("[0-9a-f]{64}"))) {
+            "Reviewed documentation SHA-256 must be lowercase hexadecimal."
         }
     }
 

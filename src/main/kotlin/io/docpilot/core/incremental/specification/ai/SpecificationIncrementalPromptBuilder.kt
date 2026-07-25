@@ -25,7 +25,10 @@ public class DefaultSpecificationIncrementalPromptBuilder : SpecificationIncreme
         appendLine("<<<DOCPILOT_PATCH id=TARGET_ID>>>")
         appendLine("Markdown for that target only")
         appendLine("<<<END_DOCPILOT_PATCH>>>")
+        appendLine("For a REMOVED target, you may instead request explicit managed-block removal using exactly:")
+        appendLine("<<<DOCPILOT_REMOVE id=TARGET_ID>>>")
         appendLine("Do not return the full document. Do not invent facts. Preserve stable IDs.")
+        appendLine("Return exactly one PATCH or REMOVE operation per changed target. REMOVE is valid only for REMOVED targets.")
         appendLine()
         actions.sortedWith(compareBy({ it.target.ordinal }, { it.id }, { it.changeKind.ordinal })).forEach { action ->
             appendLine("CHANGE ${action.changeKind} ${action.target} ${action.id}")
