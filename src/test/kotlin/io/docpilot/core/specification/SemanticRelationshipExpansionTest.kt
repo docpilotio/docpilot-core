@@ -71,7 +71,10 @@ class SemanticRelationshipExpansionTest {
         }.map { action ->
             currentCatalog.single { it.artifactId == action.artifactId }.kind.name
         }.toSet()
-        assertEquals(setOf("RELATIONSHIP", "PROJECT_OVERVIEW", "INDEX"), updatedKinds)
+        assertEquals(
+            setOf("RELATIONSHIP", "PROJECT_OVERVIEW", "ARCHITECTURE_OVERVIEW", "INDEX"),
+            updatedKinds,
+        )
         assertTrue(plan.actions.filter { it.operation == DocumentationArtifactOperation.KEEP }.any {
             currentCatalog.single { descriptor -> descriptor.artifactId == it.artifactId }.kind.name == "COMPONENT"
         })

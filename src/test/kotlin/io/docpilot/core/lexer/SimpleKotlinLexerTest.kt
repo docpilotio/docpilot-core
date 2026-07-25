@@ -11,6 +11,17 @@ class SimpleKotlinLexerTest {
     private val lexer = SimpleKotlinLexer()
 
     @Test
+    fun `preserves multi character operators`() {
+        val texts = lexer.tokenize("val active = ready || pending && value != null")
+            .map { it.text }
+
+        assertTrue("||" in texts)
+        assertTrue("&&" in texts)
+        assertTrue("!=" in texts)
+        assertFalse(texts.windowed(2).any { it == listOf("|", "|") })
+    }
+
+    @Test
     fun `tokenizes declarations and literals`() {
         val tokens = lexer.tokenize(
             """

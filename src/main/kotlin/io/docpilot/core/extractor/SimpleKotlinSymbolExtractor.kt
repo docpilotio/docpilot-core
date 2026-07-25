@@ -307,7 +307,9 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
                 if (open == null) start else matching(open, "(", ")", end) + 1
             } else start
             val colon = (searchStart until end).firstOrNull { tokens[it].text == ":" } ?: return null
-            val stop = (colon + 1 until end).firstOrNull { tokens[it].text in setOf("=", "{") } ?: end
+            val stop = (colon + 1 until end).firstOrNull {
+                tokens[it].text in setOf("=", "{", "get", "set", "by")
+            } ?: end
             return render(colon + 1, stop).takeIf(String::isNotBlank)
         }
 

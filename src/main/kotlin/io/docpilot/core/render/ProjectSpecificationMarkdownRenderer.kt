@@ -87,14 +87,21 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
             scopes = listOf(specification.project.id),
             dependencies = moduleDescriptors.map { it.artifactId } + listOf(relationship.artifactId, evidence.artifactId),
         )
+        val architecture = descriptor(
+            id = "architecture:${specification.project.id}",
+            path = "docs/architecture/overview.md",
+            kind = DocumentationArtifactKind.ARCHITECTURE_OVERVIEW,
+            scopes = specification.modules.map { it.id } + specification.relationships.map { it.id },
+            dependencies = moduleDescriptors.map { it.artifactId } + listOf(relationship.artifactId),
+        )
         val index = descriptor(
             id = "index:${specification.project.id}",
             path = OUTPUT_PATH,
             kind = DocumentationArtifactKind.INDEX,
             scopes = emptyList(),
-            dependencies = listOf(overview.artifactId),
+            dependencies = listOf(overview.artifactId, architecture.artifactId),
         )
-        return (listOf(index, overview) + moduleDescriptors + packageDescriptors +
+        return (listOf(index, overview, architecture) + moduleDescriptors + packageDescriptors +
             componentDescriptors + relationship + evidence).sortedBy { it.artifactId.value }
     }
 
@@ -190,6 +197,7 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
             specification.copy(modules = emptyList(), packages = emptyList(), components = emptyList(),
                 relationships = emptyList()),
         )
+        DocumentationArtifactKind.ARCHITECTURE_OVERVIEW -> buildArchitectureOverview(specification)
     }
 
     private fun buildIndex(specification: ProjectSpecification): String = buildString {
@@ -199,7 +207,89 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
         appendLine()
         describe(specification).filter { it.kind != DocumentationArtifactKind.INDEX }
             .sortedBy { it.relativePath }
-            .forEach { appendLine("- [${escapeText(it.kind.name)}](${it.relativePath.removePrefix("docs/")})") }
+            .forEach {
+                appendLine(
+                    "- [${escapeText(indexLabel(specification, it))}](${it.relativePath.removePrefix("docs/")})",
+                )
+            }
+    }
+
+    private fun indexLabel(
+        specification: ProjectSpecification,
+        descriptor: DocumentationArtifactDescriptor,
+    ): String = when (descriptor.kind) {
+        DocumentationArtifactKind.COMPONENT -> {
+            val id = descriptor.artifactId.value.removePrefix("component:")
+            "Component — ${specification.components.single { it.id == id }.qualifiedName ?:
+                specification.components.single { it.id == id }.name}"
+        }
+        DocumentationArtifactKind.MODULE -> "Module — ${specification.modules.single {
+            it.id == descriptor.scopeIds.single()
+        }.name}"
+        DocumentationArtifactKind.PACKAGE -> "Package — ${specification.packages.single {
+            it.id == descriptor.scopeIds.single()
+        }.qualifiedName}"
+        DocumentationArtifactKind.ARCHITECTURE_OVERVIEW -> "Architecture overview"
+        DocumentationArtifactKind.PROJECT_OVERVIEW -> "Project facts"
+        DocumentationArtifactKind.RELATIONSHIP -> "Relationships"
+        DocumentationArtifactKind.EVIDENCE -> "Evidence and unresolved items"
+        DocumentationArtifactKind.INDEX -> "Index"
+    }
+
+    private fun buildArchitectureOverview(specification: ProjectSpecification): String = buildString {
+        appendLine("# ${escapeText(specification.project.name)} architecture overview")
+        appendLine()
+        appendLine("> Classification: CORE_DERIVED from DIR ${escapeText(specification.schemaVersion)} and source Evidence.")
+        appendLine()
+        appendLine("## System context")
+        appendLine()
+        appendLine(
+            "The analyzed system contains ${specification.modules.size} modules, " +
+                "${specification.packages.size} packages, and ${specification.components.size} components.",
+        )
+        appendLine(
+            "Its detected platform is ${renderCollection(specification.project.platforms)}; " +
+                "languages are ${renderCollection(specification.project.languages)}; " +
+                "build systems are ${renderCollection(specification.project.buildSystems)}.",
+        )
+        appendLine()
+        appendLine("## Module boundaries")
+        appendLine()
+        specification.modules.sortedBy { it.id }.forEach { module ->
+            val componentCount = specification.components.count { it.moduleId == module.id }
+            val packageCount = specification.packages.count { it.moduleId == module.id }
+            appendLine("- **${escapeText(module.name)}** — $packageCount packages, $componentCount components; " +
+                "source sets: ${renderCollection(module.sourceSets)}.")
+        }
+        if (specification.modules.isEmpty()) appendLine("- No module boundary was observed.")
+        appendLine()
+        appendLine("## Relationship profile")
+        appendLine()
+        specification.relationships.groupingBy { it.type }.eachCount().toSortedMap().forEach { (type, count) ->
+            appendLine("- **${escapeText(type)}**: $count")
+        }
+        if (specification.relationships.isEmpty()) appendLine("- No relationship was observed.")
+        appendLine()
+        appendLine("## External boundaries")
+        appendLine()
+        val external = specification.relationships.filter { it.targetId.startsWith("external:") }
+            .groupingBy { it.targetId.removePrefix("external:").substringBefore('.') }
+            .eachCount().entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+        external.take(12).forEach { appendLine("- ${code(it.key)}: ${it.value} relationships") }
+        if (external.isEmpty()) appendLine("- No external boundary was observed.")
+        appendLine()
+        appendLine("## Risks, constraints, and unknowns")
+        appendLine()
+        appendLine("- Observed unresolved items: ${specification.unresolved.size}.")
+        appendLine("- Architecture intent, business rationale, deployment topology, and operational SLOs are UNKNOWN unless supplied as separate Evidence.")
+        appendLine("- Import and call volume describes static source relationships; it does not prove runtime frequency or criticality.")
+        appendLine()
+        appendLine("## Navigation")
+        appendLine()
+        appendLine("- [Project facts](../specification/project.md)")
+        appendLine("- [Relationships](../specification/relationships.md)")
+        appendLine("- [Evidence and unresolved items](../specification/evidence.md)")
+        appendLine("- [Artifact index](../project-specification.md)")
     }
 
     private fun safeSegment(id: String): String =
