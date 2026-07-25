@@ -44,7 +44,7 @@ class JsonSpecificationSnapshotCodecTest {
             properties = listOf(PropertySpecification("property:name", "name", "String", mutable = false, hasInitializer = true, evidenceRefs = setOf("e:1"))),
             evidenceRefs = setOf("e:1"),
         )),
-        relationships = listOf(RelationshipSpecification("rel:1", "depends_on", "type:sample", "type:other", evidenceRefs = setOf("e:1"))),
+        relationships = listOf(RelationshipSpecification("rel:1", "USES", "type:sample", "external:type:other", evidenceRefs = setOf("e:1"))),
         evidence = listOf(Evidence("e:1", "source", "src/Sample.kt", "Sample", 1, 10, "근거", EvidenceConfidence.HIGH)),
         unresolved = listOf(UnresolvedItem("u:1", "Sample", "Why?", "Review")),
     )

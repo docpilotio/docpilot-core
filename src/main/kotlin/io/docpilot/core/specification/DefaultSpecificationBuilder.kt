@@ -68,19 +68,19 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
             )
         }
 
-        val fileToModule = sourceIndex?.files.orEmpty().associate { "file:${it.relativePath}" to moduleId(it) }
-        val packageGraphToSpec = mutableMapOf<String, String>()
-        sourceIndex?.files.orEmpty().forEach { file ->
-            file.packageName?.let { packageName ->
-                packageGraphToSpec.putIfAbsent("package:$packageName", packageId(moduleId(file), packageName))
-            }
-        }
-        val endpointMap = fileToModule + packageGraphToSpec + symbolSpecIdByNodeId
+        val resolver = RelationshipEndpointResolver(
+            files = sourceIndex?.files.orEmpty(),
+            modules = modules,
+            packages = packages,
+            components = components,
+            nodesById = nodeById,
+            symbolSpecIdByNodeId = symbolSpecIdByNodeId,
+        )
 
         val relationships = request.knowledge.graph.edges
             .map { edge ->
-                val sourceId = endpointMap[edge.sourceNodeId] ?: edge.sourceNodeId
-                val targetId = endpointMap[edge.targetNodeId] ?: edge.targetNodeId
+                val sourceId = resolver.resolve(edge.sourceNodeId, edge.targetNodeId, "source")
+                val targetId = resolver.resolve(edge.targetNodeId, edge.sourceNodeId, "target")
                 RelationshipSpecification(
                     id = "relationship:${edge.relationship.name}:$sourceId->$targetId",
                     type = edge.relationship.name,
@@ -90,15 +90,42 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
                     evidenceRefs = edge.evidenceRefs.toSortedSet(),
                 )
             }
+            .filterNot { it.sourceId == it.targetId }
             .distinctBy { it.id }
             .sortedWith(compareBy({ it.sourceId }, { it.type }, { it.targetId }, { it.id }))
+
+        relationships.flatMap { listOf(it.sourceId, it.targetId) }
+            .filter { it.startsWith(RelationshipEndpointSemantics.UNRESOLVED_PREFIX) }
+            .map { it.removePrefix(RelationshipEndpointSemantics.UNRESOLVED_PREFIX).substringBeforeLast(':') }
+            .filter(String::isNotBlank)
+            .distinct()
+            .forEach { reference ->
+                if (unresolved.none { it.id == reference }) {
+                    unresolved += UnresolvedItem(
+                        id = reference,
+                        subject = reference,
+                        question = "Resolve relationship endpoint $reference.",
+                    )
+                }
+            }
+
+        val dependencyIdsByComponent = relationships
+            .asSequence()
+            .filter { it.type == "DEPENDS_ON" }
+            .filter { it.sourceId in components.map(ComponentSpecification::id) }
+            .filterNot { it.targetId.startsWith(RelationshipEndpointSemantics.UNRESOLVED_PREFIX) }
+            .groupBy(RelationshipSpecification::sourceId)
+            .mapValues { (_, values) -> values.mapTo(sortedSetOf(), RelationshipSpecification::targetId) }
+        val componentsWithDependencies = components.map { component ->
+            component.copy(dependencyIds = dependencyIdsByComponent[component.id].orEmpty())
+        }
 
         val specification = ProjectSpecification(
             schemaVersion = CURRENT_SCHEMA_VERSION,
             project = request.project,
             modules = modules,
             packages = packages,
-            components = components.sortedWith(compareBy({ it.moduleId }, { it.qualifiedName ?: it.name }, { it.id })),
+            components = componentsWithDependencies.sortedWith(compareBy({ it.moduleId }, { it.qualifiedName ?: it.name }, { it.id })),
             relationships = relationships,
             evidence = request.knowledge.evidence.items.sortedBy { it.id.value }.map(DirEvidenceMapper::map),
             unresolved = unresolved.distinctBy { it.id }.sortedBy { it.id },

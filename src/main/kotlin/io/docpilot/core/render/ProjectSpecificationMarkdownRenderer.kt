@@ -10,6 +10,7 @@ import io.docpilot.core.model.ProjectSpecification
 import io.docpilot.core.model.PropertySpecification
 import io.docpilot.core.model.RenderedArtifact
 import io.docpilot.core.model.UnresolvedItem
+import io.docpilot.core.specification.RelationshipEndpointSemantics
 
 /**
  * Renders a ProjectSpecification (DIR) as deterministic, reviewable Markdown.
@@ -204,9 +205,20 @@ public class ProjectSpecificationMarkdownRenderer : SpecificationRenderer {
             appendLine()
             return
         }
+        val internalEndpointIds = buildSet {
+            addAll(specification.modules.map { it.id })
+            addAll(specification.packages.map { it.id })
+            specification.components.forEach { component ->
+                add(component.id)
+                addAll(component.apis.map { it.id })
+                addAll(component.properties.map { it.id })
+            }
+        }
         relationships.forEach { relationship ->
             appendLine("- ${code(relationship.sourceId)} -> **${escapeText(relationship.type)}** -> ${code(relationship.targetId)}")
             appendLine("  - ID: ${code(relationship.id)}")
+            appendLine("  - Source kind: ${RelationshipEndpointSemantics.kindOf(relationship.sourceId, internalEndpointIds).name}")
+            appendLine("  - Target kind: ${RelationshipEndpointSemantics.kindOf(relationship.targetId, internalEndpointIds).name}")
             appendOptionalNestedField("Description", relationship.description)
             appendNestedEvidenceRefs(relationship.evidenceRefs)
         }

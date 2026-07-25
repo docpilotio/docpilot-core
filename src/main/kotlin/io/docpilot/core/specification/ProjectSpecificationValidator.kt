@@ -29,8 +29,44 @@ public object ProjectSpecificationValidator {
             packageSpecification.moduleId == component.moduleId
         }) { "Every component package must exist and belong to the component module." }
 
-        require(specification.relationships.all { it.sourceId.isNotBlank() && it.targetId.isNotBlank() }) {
-            "Relationship endpoints must not be blank."
+        val internalEndpointIds = buildSet {
+            addAll(moduleIds)
+            addAll(packagesById.keys)
+            specification.components.forEach { component ->
+                add(component.id)
+                addAll(component.apis.map { it.id })
+                addAll(component.properties.map { it.id })
+            }
+        }
+        require(specification.relationships.all { relationship ->
+            val sourceKind = RelationshipEndpointSemantics.kindOf(relationship.sourceId, internalEndpointIds)
+            sourceKind == RelationshipEndpointKind.INTERNAL &&
+                listOf(relationship.sourceId, relationship.targetId).all { endpointId ->
+                endpointId.isNotBlank() && when (
+                    RelationshipEndpointSemantics.kindOf(endpointId, internalEndpointIds)
+                ) {
+                    RelationshipEndpointKind.INTERNAL -> true
+                    RelationshipEndpointKind.EXTERNAL ->
+                        endpointId.length > RelationshipEndpointSemantics.EXTERNAL_PREFIX.length
+                    RelationshipEndpointKind.UNRESOLVED -> unresolvedEndpointHasEvidence(endpointId, specification)
+                }
+            }
+        }) {
+            "Every relationship endpoint must be internal, external, or explicitly unresolved."
+        }
+        require(specification.relationships.none { it.sourceId == it.targetId }) {
+            "Structural self-relationships are not allowed."
+        }
+
+        val expectedDependencyIds = specification.relationships
+            .filter { it.type == "DEPENDS_ON" }
+            .filterNot { it.targetId.startsWith(RelationshipEndpointSemantics.UNRESOLVED_PREFIX) }
+            .groupBy { it.sourceId }
+            .mapValues { (_, values) -> values.mapTo(sortedSetOf()) { it.targetId } }
+        require(specification.components.all { component ->
+            component.dependencyIds == expectedDependencyIds[component.id].orEmpty()
+        }) {
+            "Component dependencyIds must equal direct outgoing DEPENDS_ON relationship targets."
         }
 
         val evidenceIds = specification.evidence.mapTo(mutableSetOf()) { it.id }
@@ -46,5 +82,16 @@ public object ProjectSpecificationValidator {
         require(specification.evidence.all { it.lineStart == null || it.lineEnd == null || it.lineStart <= it.lineEnd }) {
             "Evidence lineStart must not be after lineEnd."
         }
+    }
+
+    private fun unresolvedEndpointHasEvidence(endpointId: String, specification: ProjectSpecification): Boolean {
+        if (!endpointId.startsWith(RelationshipEndpointSemantics.UNRESOLVED_PREFIX)) return false
+        val reference = endpointId.removePrefix(RelationshipEndpointSemantics.UNRESOLVED_PREFIX)
+        if (reference.isBlank()) return false
+        val separator = reference.lastIndexOf(':')
+        val relationshipId = if (separator > 0) reference.substring(0, separator) else reference
+        val direction = if (separator > 0) reference.substring(separator + 1) else ""
+        if (direction !in setOf("source", "target")) return false
+        return specification.unresolved.any { item -> item.id == relationshipId }
     }
 }
