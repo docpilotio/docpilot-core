@@ -185,6 +185,29 @@ class DefaultIncrementalDocumentationExecutorTest {
         assertEquals(64, result.artifactPlanSha256?.length)
     }
 
+    @Test
+    fun `selective renderer reports no changes when every planned artifact is kept`() {
+        val writer = RecordingWriter()
+        val renderer = RecordingSelectiveRenderer()
+        val executor = DefaultIncrementalDocumentationExecutor(renderer, writer)
+
+        val result = executor.execute(
+            request(
+                updatePlan = IncrementalUpdatePlan.EMPTY,
+                existingArtifacts = listOf(
+                    existing("new-a", "docs/a.md"),
+                    existing("same-b", "docs/b.md"),
+                ),
+            ),
+        )
+
+        assertEquals(IncrementalExecutionMode.NO_CHANGES, result.mode)
+        assertTrue(renderer.renderedIds.isEmpty())
+        assertFalse(result.writePerformed)
+        assertTrue(writer.writes.isEmpty())
+        assertTrue(writer.deletes.isEmpty())
+    }
+
     private fun request(
         previousSpecification: ProjectSpecification? = specification(),
         currentSpecification: ProjectSpecification = specification(),

@@ -108,8 +108,13 @@ public class DefaultIncrementalDocumentationExecutor(
                 mediaType = descriptorsById.getValue(it.artifactId).mediaType,
             )
         }.sortedBy { it.relativePath }
+        val changed = plan.actions.any {
+            it.operation == DocumentationArtifactOperation.CREATE ||
+                it.operation == DocumentationArtifactOperation.UPDATE ||
+                it.operation == DocumentationArtifactOperation.DELETE
+        }
         return IncrementalDocumentationExecutionResult(
-            mode = IncrementalExecutionMode.INCREMENTAL_UPDATE,
+            mode = if (changed) IncrementalExecutionMode.INCREMENTAL_UPDATE else IncrementalExecutionMode.NO_CHANGES,
             artifactActions = actions,
             renderedArtifacts = rendered.sortedBy { it.relativePath },
             artifactPlanSha256 = plan.planSha256,
@@ -117,7 +122,7 @@ public class DefaultIncrementalDocumentationExecutor(
             warnings = plan.orphanedArtifacts.map {
                 "Orphan retained: ${it.relativePath} (${it.reason})"
             },
-            writePerformed = rendered.isNotEmpty(),
+            writePerformed = changed,
         )
     }
 

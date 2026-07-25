@@ -36,11 +36,16 @@ class ProjectSpecificationMarkdownRendererTest {
         assertTrue(content.contains("**io.sample.UserRepository**"))
         assertTrue(content.contains("`findUser(id: String): User?`"))
         assertTrue(content.contains("`cache`"))
-        assertTrue(content.contains("  - Source kind: INTERNAL"))
-        assertTrue(content.contains("  - Target kind: EXTERNAL"))
+        assertTrue(content.contains("kinds INTERNAL/EXTERNAL"))
         assertTrue(content.contains("## Evidence"))
         assertTrue(content.contains("## Unresolved"))
         assertTrue(content.contains("## System context"))
+        assertTrue(content.contains("## Evidence basis"))
+        assertTrue(content.contains("## Runtime interaction view"))
+        assertTrue(content.contains("## Data-flow view"))
+        assertTrue(content.contains("## Deployment view"))
+        assertTrue(content.contains("## Decisions and rationale"))
+        assertTrue(content.contains("UNKNOWN"))
     }
 
     @Test
@@ -103,7 +108,7 @@ class ProjectSpecificationMarkdownRendererTest {
         assertTrue(content.contains("# A \\*project\\* \\[draft\\] \\| v1"))
         assertTrue(content.contains("``project`id``"))
         assertTrue(content.contains("Line one Line two \\# heading"))
-        assertTrue(content.contains("**type\\|name** - Use \\*this\\*?"))
+        assertTrue(content.contains("**type\\|name** — Use \\*this\\*?"))
         assertTrue(content.contains("``question`1``"))
     }
 

@@ -241,6 +241,12 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
         appendLine()
         appendLine("> Classification: CORE_DERIVED from DIR ${escapeText(specification.schemaVersion)} and source Evidence.")
         appendLine()
+        appendLine("## Evidence basis")
+        appendLine()
+        appendLine("- **DIRECT_EVIDENCE**: a fact copied from a DIR field or referenced source Evidence.")
+        appendLine("- **DERIVED**: a deterministic aggregation or path built only from DIR facts.")
+        appendLine("- **UNKNOWN**: current Evidence cannot support a material claim.")
+        appendLine()
         appendLine("## System context")
         appendLine()
         appendLine(
@@ -270,6 +276,53 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
         }
         if (specification.relationships.isEmpty()) appendLine("- No relationship was observed.")
         appendLine()
+        appendLine("## Runtime interaction view")
+        appendLine()
+        appendLine("> Classification: DERIVED static interaction candidates; this is not runtime telemetry.")
+        appendLine()
+        val endpointLabels = endpointLabels(specification)
+        val interactions = specification.relationships
+            .filter { it.type == "CALLS" || it.type == "DEPENDS_ON" }
+            .sortedWith(compareBy({ it.type }, { it.sourceId }, { it.targetId }, { it.id }))
+        interactions.take(INTERACTION_DETAIL_LIMIT).forEach { relationship ->
+            appendLine(
+                "- ${code(endpointLabels[relationship.sourceId] ?: relationship.sourceId)} " +
+                    "— **${relationship.type}** → " +
+                    "${code(endpointLabels[relationship.targetId] ?: relationship.targetId)} " +
+                    "(${relationship.evidenceRefs.size} Evidence refs)",
+            )
+        }
+        if (interactions.isEmpty()) appendLine("- UNKNOWN — no CALLS or DEPENDS_ON Evidence was observed.")
+        if (interactions.size > INTERACTION_DETAIL_LIMIT) {
+            appendLine(
+                "- ${interactions.size - INTERACTION_DETAIL_LIMIT} additional interactions are available " +
+                    "in the detailed Relationship Artifact.",
+            )
+        }
+        appendLine()
+        appendLine("## Data-flow view")
+        appendLine()
+        appendLine("- Known: static dependency and call direction is shown in the Runtime interaction view.")
+        appendLine("- UNKNOWN: payload shape, mutation, persistence boundary, ordering, and runtime frequency are not represented by the current DIR.")
+        appendLine("- Constraint: DocPilot does not convert IMPORTS into a data-flow claim.")
+        appendLine()
+        appendLine("## Deployment view")
+        appendLine()
+        specification.modules.sortedBy { it.id }.forEach { module ->
+            appendLine(
+                "- **${escapeText(module.name)}** is a source/build boundary (DIRECT_EVIDENCE); " +
+                    "deployment-unit identity is UNKNOWN.",
+            )
+        }
+        if (specification.modules.isEmpty()) appendLine("- UNKNOWN — no module or deployment Evidence was observed.")
+        appendLine("- Runtime topology, replicas, network placement, SLOs, and operational ownership are UNKNOWN.")
+        appendLine()
+        appendLine("## Decisions and rationale")
+        appendLine()
+        appendLine("- UNKNOWN: the DIR does not contain a canonical architecture-decision contract.")
+        appendLine("- Relationship descriptions are treated as source-derived facts, not as design rationale.")
+        appendLine("- Canonical ADR/RFC Evidence must be supplied before DocPilot can state intent or trade-offs.")
+        appendLine()
         appendLine("## External boundaries")
         appendLine()
         val external = specification.relationships.filter { it.targetId.startsWith("external:") }
@@ -290,6 +343,16 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
         appendLine("- [Relationships](../specification/relationships.md)")
         appendLine("- [Evidence and unresolved items](../specification/evidence.md)")
         appendLine("- [Artifact index](../project-specification.md)")
+    }
+
+    private fun endpointLabels(specification: ProjectSpecification): Map<String, String> = buildMap {
+        specification.modules.forEach { put(it.id, "module:${it.name}") }
+        specification.packages.forEach { put(it.id, "package:${it.qualifiedName}") }
+        specification.components.forEach { component ->
+            put(component.id, component.qualifiedName ?: component.name)
+            component.apis.forEach { put(it.id, "${component.qualifiedName ?: component.name}.${it.name}") }
+            component.properties.forEach { put(it.id, "${component.qualifiedName ?: component.name}.${it.name}") }
+        }
     }
 
     private fun safeSegment(id: String): String =
@@ -483,12 +546,20 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
             }
         }
         relationships.forEach { relationship ->
-            appendLine("- ${code(relationship.sourceId)} -> **${escapeText(relationship.type)}** -> ${code(relationship.targetId)}")
-            appendLine("  - ID: ${code(relationship.id)}")
-            appendLine("  - Source kind: ${RelationshipEndpointSemantics.kindOf(relationship.sourceId, internalEndpointIds).name}")
-            appendLine("  - Target kind: ${RelationshipEndpointSemantics.kindOf(relationship.targetId, internalEndpointIds).name}")
-            appendOptionalNestedField("Description", relationship.description)
-            appendNestedEvidenceRefs(relationship.evidenceRefs)
+            val sourceKind = RelationshipEndpointSemantics.kindOf(
+                relationship.sourceId,
+                internalEndpointIds,
+            ).name
+            val targetKind = RelationshipEndpointSemantics.kindOf(
+                relationship.targetId,
+                internalEndpointIds,
+            ).name
+            appendLine(
+                "- ${code(relationship.sourceId)} → **${escapeText(relationship.type)}** → " +
+                    "${code(relationship.targetId)} — ID ${code(relationship.id)}; " +
+                    "kinds $sourceKind/$targetKind; Evidence ${renderCodeCollection(relationship.evidenceRefs)}",
+            )
+            relationship.description?.let { appendLine("  - ${escapeText(it)}") }
         }
         appendLine()
     }
@@ -503,12 +574,15 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
             return
         }
         sorted.forEach { item ->
-            appendLine("- ${code(item.id)} - ${escapeText(item.summary)}")
-            appendLine("  - Type: ${escapeText(item.type)}")
-            appendLine("  - Confidence: ${item.confidence.name}")
-            appendOptionalNestedField("File", item.file)
-            appendOptionalNestedField("Symbol", item.symbol)
-            appendLineRange(item)
+            val location = listOfNotNull(
+                item.file?.let(::code),
+                renderLineRange(item).takeUnless { it == "Unspecified" }?.let { "lines $it" },
+                item.symbol?.let { "symbol ${code(it)}" },
+            ).joinToString(", ").ifBlank { "location Unspecified" }
+            appendLine(
+                "- ${code(item.id)} — ${escapeText(item.summary)}; " +
+                    "${escapeText(item.type)}/${item.confidence.name}; $location",
+            )
         }
         appendLine()
     }
@@ -522,9 +596,10 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
             return
         }
         sorted.forEach { item ->
-            appendLine("- **${escapeText(item.subject)}** - ${escapeText(item.question)}")
-            appendLine("  - ID: ${code(item.id)}")
-            appendOptionalNestedField("Required action", item.requiredAction)
+            appendLine(
+                "- **${escapeText(item.subject)}** — ${escapeText(item.question)}; " +
+                    "ID ${code(item.id)}; action ${item.requiredAction?.let(::escapeText) ?: "Unspecified"}",
+            )
         }
     }
 
@@ -560,15 +635,13 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
         appendLine("  - Evidence refs: ${renderCodeCollection(refs)}")
     }
 
-    private fun StringBuilder.appendLineRange(evidence: Evidence) {
-        val value = when {
+    private fun renderLineRange(evidence: Evidence): String =
+        when {
             evidence.lineStart == null && evidence.lineEnd == null -> "Unspecified"
             evidence.lineStart == evidence.lineEnd || evidence.lineEnd == null -> evidence.lineStart.toString()
             evidence.lineStart == null -> evidence.lineEnd.toString()
             else -> "${evidence.lineStart}-${evidence.lineEnd}"
         }
-        appendLine("  - Lines: $value")
-    }
 
     private fun renderCollection(values: Collection<String>): String =
         values.sorted().takeIf { it.isNotEmpty() }?.joinToString(", ") { code(it) } ?: "None"
@@ -594,6 +667,7 @@ public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRender
     private companion object {
         const val OUTPUT_PATH: String = "docs/project-specification.md"
         const val MARKDOWN_MEDIA_TYPE: String = "text/markdown"
+        const val INTERACTION_DETAIL_LIMIT: Int = 24
         val componentComparator: Comparator<ComponentSpecification> =
             compareBy({ it.qualifiedName ?: it.name }, { it.kind }, { it.id })
         val MARKDOWN_SPECIAL_CHARACTERS: Set<Char> =
