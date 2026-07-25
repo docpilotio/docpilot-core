@@ -2,7 +2,7 @@
 
 ## Status
 
-PROPOSED - NOT APPROVED AS RFC-0048
+SELECTED AND APPROVED FOR RFC-0048 SPECIFICATION
 
 ## Proposed title
 
@@ -127,10 +127,20 @@ MEDIUM
 
 STRONGLY_RECOMMENDED as the natural product continuation after RFC-0047.
 
-## Decisions required
+## Decision record
 
-1. Approve Plan A as RFC-0048.
-2. Approve command and exit-code contract design.
-3. Decide whether decision comments are accepted by flag or file input.
-4. Define the documentation artifact path used by apply.
-5. Confirm non-interactive commands only.
+Selected by the user as RFC-0048. The CLI is required to remain a thin adapter
+over RFC-0047 Core workflows.
+
+Approved additions include `review status`, common proposal/bundle/payload
+identity output, `--json`, `--bundle`, inline/file comments, and stable exit codes.
+
+Implementation remains unapproved until the detailed RFC-0048 specification is
+reviewed.
+
+## Remaining implementation decisions
+
+1. Review the detailed RFC-0048 specification.
+2. Approve implementation start.
+3. Confirm the exact documentation artifact path contract for apply.
+4. Confirm non-interactive commands only.

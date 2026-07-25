@@ -15,8 +15,9 @@ public interface ReviewBundleRepository {
 public class FileReviewBundleRepository(
     projectRoot: Path,
     private val codec: JsonReviewBundleCodec = JsonReviewBundleCodec(),
+    private val exactBundlePath: Path? = null,
 ) : ReviewBundleRepository {
-    private val directory = projectRoot.resolve(ReviewBundleFormat.DEFAULT_DIRECTORY)
+    private val directory = exactBundlePath?.parent ?: projectRoot.resolve(ReviewBundleFormat.DEFAULT_DIRECTORY)
 
     override fun load(expectedProjectId: String, proposalId: String): ReviewBundleLoadResult {
         val path = pathFor(proposalId)
@@ -100,7 +101,7 @@ public class FileReviewBundleRepository(
 
     private fun pathFor(proposalId: String): Path {
         require(proposalId.matches(Regex("review:[0-9a-f]{64}"))) { "Unsafe review proposal id." }
-        return directory.resolve("review-${proposalId.removePrefix("review:")}.json")
+        return exactBundlePath ?: directory.resolve("review-${proposalId.removePrefix("review:")}.json")
     }
 
     private fun moveReplacing(source: Path, target: Path) {
@@ -108,6 +109,17 @@ public class FileReviewBundleRepository(
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
+    public companion object {
+        public fun atPath(
+            bundlePath: Path,
+            codec: JsonReviewBundleCodec = JsonReviewBundleCodec(),
+        ): FileReviewBundleRepository {
+            val normalized = bundlePath.toAbsolutePath().normalize()
+            val parent = requireNotNull(normalized.parent) { "Review bundle path must have a parent." }
+            return FileReviewBundleRepository(parent, codec, normalized)
         }
     }
 }
