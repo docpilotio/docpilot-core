@@ -4,6 +4,7 @@ import io.docpilot.core.model.ApiSpecification
 import io.docpilot.core.model.ComponentSpecification
 import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.PropertySpecification
+import io.docpilot.core.model.RelationshipSpecification
 
 /** A deterministic change entry identified by the entity's stable DIR id. */
 public data class SpecificationChange<T>(
@@ -35,12 +36,14 @@ public data class SpecificationDiff(
     public val typeChanges: List<SpecificationChange<ComponentSpecification>> = emptyList(),
     public val apiChanges: List<SpecificationChange<ApiSpecification>> = emptyList(),
     public val propertyChanges: List<SpecificationChange<PropertySpecification>> = emptyList(),
+    public val relationshipChanges: List<SpecificationChange<RelationshipSpecification>> = emptyList(),
 ) {
     public val hasChanges: Boolean
         get() = packageChanges.isNotEmpty() ||
             typeChanges.isNotEmpty() ||
             apiChanges.isNotEmpty() ||
-            propertyChanges.isNotEmpty()
+            propertyChanges.isNotEmpty() ||
+            relationshipChanges.isNotEmpty()
 
     public companion object {
         public val EMPTY: SpecificationDiff = SpecificationDiff()
