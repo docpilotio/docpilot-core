@@ -12,7 +12,7 @@
 | Implementation | COMPLETE |
 | Targeted verification | PASS |
 | Full regression | PASS |
-| Main integration | NOT_STARTED |
+| Main integration | COMPLETE (`33503f7`) |
 
 ## Baseline
 

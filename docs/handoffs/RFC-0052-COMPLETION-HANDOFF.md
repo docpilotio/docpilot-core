@@ -66,12 +66,12 @@ only planned CREATE and UPDATE artifact IDs.
 
 ## Git integration
 
-- Feature commit: NOT CREATED
-- Main merge: NOT PERFORMED
+- Feature commit: `824e730b3c351d16f42d84985c833ab7f31ca5c0`
+- Main merge: `33503f7ed8e025d42935df8cb18d936b9248805a`
 - Push: NOT PERFORMED
 - Release: NOT PERFORMED
 
 ## Completion readiness
 
-Implementation and local verification are complete. Exact commit evidence and
-main integration require explicit follow-up approval.
+Implementation, local verification, Feature Commit, and Main integration are
+complete. Remote synchronization and release require separate approval.

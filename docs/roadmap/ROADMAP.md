@@ -70,8 +70,9 @@ unchanged writes but still performs a full render, and the official specificatio
 renderer emits one monolithic artifact. RFC-0052 introduces renderer-owned
 artifact descriptors, deterministic Stable-ID impact planning, a multi-artifact
 official layout, and selective rendering so only required CREATE/UPDATE
-documents are generated. Implementation and the 306-test clean regression suite
-are complete on the RFC-0052 feature branch. Git integration is pending.
+documents are generated. Implementation, the 306-test clean regression suite,
+and Main integration at `33503f7` are complete. Remote synchronization is
+pending.
 
 The proposed Product Capability sequence after RFC-0052 is:
 
