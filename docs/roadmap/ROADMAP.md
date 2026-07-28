@@ -109,12 +109,19 @@ readiness is not approved. Legacy analysis determinism, an official
 Reconciliation product workflow, architecture synthesis quality, parser
 accuracy, and independent review must pass the documented re-entry gate.
 
-After Product Validation passes, the Product Capability track may add
-Documentation Evolution Intelligence after RFC-0055. It will explain reasons,
-impact scope, and
-added/removed entities and relationships from Core-owned structured Evidence
-and the RFC-0055 Explanation Report. RFC-0056 is the proposed number, not a
-reserved approval. Its implementation is deferred during validation remediation.
+RFC-0056 Documentation Evolution and Change Intelligence was explicitly
+approved and implemented for the v1.1 Product Capability track on July 29,
+2026. It adds a deterministic format-1 Evolution Report, Stable-ID Entity/API/
+Property/Relationship change extraction, move and rename explanation, RFC-0052
+Artifact impact binding, RFC-0053 Projection integrity verification, RFC-0055
+ownership/reconciliation decision binding, an acyclic causal graph, explicit
+coverage, offline verification, and a narrative-only AI boundary.
+
+Focused RFC-0056 scenarios and RFC-0052/RFC-0053 bridge regressions pass. The
+canonical Gradle full build/test and architecture-samples Evolution fixture
+remain pending because the delivery environment could not download Gradle
+9.3.0. RFC-0056 completion does not change the public v1.0
+`PRODUCT_VALIDATION_FAIL` decision or close PV-009.
 
 ## v1.1 Hardening track
 

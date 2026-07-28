@@ -2,8 +2,32 @@
 
 ## Status
 
-Proposed for post-v1.0 approval. Implementation is not authorized by this
-document.
+Implemented and locally verified on July 29, 2026 after explicit user approval.
+
+This implementation starts the v1.1 Product Capability track. It does not alter
+the `PRODUCT_VALIDATION_FAIL` decision for public v1.0, does not close PV-009,
+and does not modify the immutable `v1.0.0` technical baseline.
+
+
+## Implemented Core surface
+
+The implementation adds:
+
+- format-1 `DocumentationEvolutionReport` and strict canonical codec;
+- stable length-framed change identity and semantic SHA-256 rules;
+- before/after Snapshot, RFC-0052 Plan, RFC-0053 Report, RFC-0055 Plan/Result,
+  and Ownership Manifest validation;
+- Project, Module, Package, Component, API, Property, and Relationship change
+  extraction, including identity-preserving move and rename evidence;
+- Artifact impact binding for direct selection and dependency refresh;
+- ownership, conflict, retained-content, and user-decision binding;
+- deterministic acyclic causal graph construction and offline verification;
+- COMPLETE, PARTIAL, and BLOCKED coverage classification;
+- deterministic Markdown rendering and a narrative-only AI boundary.
+
+The implementation also extracts reusable integrity verification for RFC-0052
+Artifact Plans and RFC-0053 Relationship Projection Reports without changing
+their existing semantic hashes.
 
 ## Purpose
 
@@ -233,19 +257,39 @@ docs/handoffs/RFC-0056-COMPLETION-HANDOFF.md
 
 ## Verification
 
+Implemented local verification covers:
+
 - added/removed/modified Entity and Relationship cases;
-- relationship-only Artifact impact;
-- ownership-only and user-decision change;
-- stable rename/move identity;
-- complete and partial coverage;
-- missing/tampered/incompatible Evidence;
-- graph cycle and dangling-reference rejection;
+- API and Property changes;
+- stable move and identity-preserving rename;
+- relationship-aware Artifact impact and dependency refresh;
+- ownership change, reconciliation conflict, retained content, and user decision;
+- COMPLETE and PARTIAL coverage;
+- incompatible/tampered Snapshot, Plan, and Relationship Report handling;
+- graph cycle, dangling endpoint, and graph-hash rejection;
 - shuffled input determinism;
-- offline codec round trip;
-- optional AI narrative cannot alter Report SHA;
-- clean full build/test and isolated before/after fixture.
+- strict codec round trip, unknown-record rejection, and tamper rejection;
+- optional AI narrative independence from Report SHA;
+- RFC-0052 and RFC-0053 regression scenarios.
+
+Verification performed in this delivery:
+
+```text
+RFC-0056 transformed unit scenarios: 10 PASS
+RFC-0052/RFC-0053 regression scenarios: 8 PASS
+RFC-0052/RFC-0053 baseline semantic hash compatibility: PASS
+RFC-0056 isolated smoke: PASS
+RFC-0056 reconciliation smoke: PASS
+Relevant production-source selective compilation: PASS
+```
+
+The repository requires Gradle 9.3.0 and Kotlin 2.4.0. The execution environment
+could not download the Gradle distribution, so `gradlew clean test` was not
+re-executed here. This limitation is recorded in the completion handoff.
 
 ## Completion criteria
+
+Status: `COMPLETED_WITH_VERIFICATION_LIMITATION`.
 
 - every material documentation change is represented or explicitly uncovered;
 - causal paths use verified Core Evidence;
@@ -258,5 +302,9 @@ docs/handoffs/RFC-0056-COMPLETION-HANDOFF.md
 
 ## Release strategy
 
-RFC-0056 starts v1.1 development on main only after the verified `v1.0.0`
-baseline. It is not merged into `release/v1.0.x`.
+RFC-0056 starts v1.1 development after the verified `v1.0.0` baseline. It must
+not be merged into `release/v1.0.x`.
+
+The public v1.0 Product Validation decision remains `PRODUCT_VALIDATION_FAIL`
+until PV-009 independent review passes. RFC-0056 completion is not evidence of
+public v1.0 approval.

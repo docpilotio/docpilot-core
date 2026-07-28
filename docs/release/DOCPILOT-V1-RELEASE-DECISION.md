@@ -13,7 +13,7 @@ PRODUCT_VALIDATION_FAIL
 - Every self-assessed category: at least 4
 - Independent review: PENDING
 - Public/product v1.0 release: NOT_APPROVED
-- RFC-0056 implementation: DEFERRED
+- RFC-0056 implementation: COMPLETED_SEPARATELY_FOR_V1_1
 
 The existing `v1.0.0` tag remains an immutable technical baseline and must not
 be presented as Product Validation approval.
@@ -49,5 +49,7 @@ This is a hard gate. The implementing execution cannot self-certify it.
 
 ## Next action
 
-Prepare and execute the independent Product Validation review. Do not begin
-RFC-0056 implementation or announce public v1.0 approval before that review.
+Prepare and execute the independent Product Validation review. RFC-0056 was
+subsequently authorized and implemented as a separate v1.1 development action;
+that implementation does not satisfy PV-009 and must not be represented as
+public v1.0 approval.

@@ -8,7 +8,7 @@ Automated Product Validation: PASS
 Quality self-assessment: 21/25
 Independent review: PENDING
 Public v1.0 readiness: NOT_READY
-RFC-0056 implementation: DEFERRED
+RFC-0056 implementation: COMPLETED_SEPARATELY_FOR_V1_1
 ```
 
 The RFC-0056-independent Product Quality remediation corrects all automated
@@ -21,6 +21,10 @@ compact detail.
 The decision remains FAIL solely because this execution was not reviewed by an
 organizationally independent reviewer. The automated PASS and self-assessment
 must not be represented as independent Product Validation approval.
+
+RFC-0056 was later authorized and implemented on the v1.1 development track.
+That separate Product Capability work does not change this report's public v1.0
+decision and is not independent-review evidence for PV-009.
 
 ## Automated evidence
 

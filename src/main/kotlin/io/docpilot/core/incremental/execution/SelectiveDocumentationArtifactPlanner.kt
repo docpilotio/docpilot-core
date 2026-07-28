@@ -3,7 +3,6 @@ package io.docpilot.core.incremental.execution
 import io.docpilot.core.api.DocumentationArtifactDescriptor
 import io.docpilot.core.api.DocumentationArtifactId
 import io.docpilot.core.model.ProjectSpecification
-import java.security.MessageDigest
 
 public enum class DocumentationArtifactOwnership { DOCPILOT, UNKNOWN }
 
@@ -55,8 +54,8 @@ public fun interface SelectiveDocumentationArtifactPlanner {
 
 public class DefaultSelectiveDocumentationArtifactPlanner : SelectiveDocumentationArtifactPlanner {
     override fun plan(request: DocumentationArtifactPlanningRequest): DocumentationArtifactPlan {
-        validateCatalog(request.previousCatalog)
-        validateCatalog(request.currentCatalog)
+        DocumentationArtifactPlanIntegrity.validateCatalog(request.previousCatalog)
+        DocumentationArtifactPlanIntegrity.validateCatalog(request.currentCatalog)
         val previousById = request.previousCatalog.associateBy { it.artifactId }
         val currentById = request.currentCatalog.associateBy { it.artifactId }
         val existingByPath = request.existingArtifacts.associateBy { it.relativePath }
@@ -103,7 +102,7 @@ public class DefaultSelectiveDocumentationArtifactPlanner : SelectiveDocumentati
                         linkedSetOf(DocumentationArtifactReason.DEPENDENCY_REFRESH),
                     ) == null
                 ) {
-                    queue.addLast(dependent)
+                    queue.add(dependent)
                 } else {
                     selected.getValue(dependent) += DocumentationArtifactReason.DEPENDENCY_REFRESH
                 }
@@ -146,75 +145,18 @@ public class DefaultSelectiveDocumentationArtifactPlanner : SelectiveDocumentati
                 else -> null
             }
         }.distinct().sortedBy { it.relativePath }
-        return DocumentationArtifactPlan(actions, orphans, sha256(request, actions, orphans))
+        return DocumentationArtifactPlan(
+            actions,
+            orphans,
+            DocumentationArtifactPlanIntegrity.sha256(
+                request.currentSpecification,
+                request.previousCatalog,
+                request.currentCatalog,
+                request.existingArtifacts,
+                actions,
+                orphans,
+            ),
+        )
     }
 
-    private fun validateCatalog(catalog: List<DocumentationArtifactDescriptor>) {
-        require(catalog.distinctBy { it.artifactId }.size == catalog.size) { "Duplicate artifact id" }
-        require(catalog.distinctBy { it.relativePath }.size == catalog.size) { "Duplicate artifact path" }
-        val ids = catalog.mapTo(hashSetOf()) { it.artifactId }
-        catalog.forEach { descriptor ->
-            require(descriptor.relativePath.isNotBlank() && !descriptor.relativePath.startsWith("/") &&
-                !descriptor.relativePath.contains('\\') &&
-                descriptor.relativePath.split('/').none { it == ".." }
-            ) { "Unsafe artifact path: ${descriptor.relativePath}" }
-            require(descriptor.scopeIds == descriptor.scopeIds.distinct().sorted()) {
-                "Artifact scope ids must be sorted and unique: ${descriptor.artifactId.value}"
-            }
-            require(descriptor.dependencyArtifactIds.all(ids::contains)) {
-                "Unknown artifact dependency: ${descriptor.artifactId.value}"
-            }
-        }
-        val visiting = hashSetOf<DocumentationArtifactId>()
-        val visited = hashSetOf<DocumentationArtifactId>()
-        val byId = catalog.associateBy { it.artifactId }
-        fun visit(id: DocumentationArtifactId) {
-            if (!visiting.add(id)) error("Artifact dependency cycle")
-            if (visited.add(id)) byId.getValue(id).dependencyArtifactIds.forEach(::visit)
-            visiting.remove(id)
-        }
-        ids.forEach(::visit)
-    }
-
-    private fun sha256(
-        request: DocumentationArtifactPlanningRequest,
-        actions: List<DocumentationArtifactPlanAction>,
-        orphans: List<OrphanedDocumentationArtifact>,
-    ): String {
-        val canonical = buildString {
-            append(request.currentSpecification.schemaVersion).append('|')
-                .append(request.currentSpecification.project.id).append('\n')
-            listOf("previous" to request.previousCatalog, "current" to request.currentCatalog)
-                .forEach { (catalogKind, catalog) ->
-                catalog.sortedWith(compareBy({ it.artifactId.value }, { it.relativePath })).forEach { descriptor ->
-                    append(catalogKind).append('|')
-                    append(descriptor.artifactId.value).append('|')
-                        .append(descriptor.relativePath).append('|')
-                        .append(descriptor.mediaType).append('|')
-                        .append(descriptor.kind.name).append('|')
-                        .append(descriptor.scopeIds.joinToString(",")).append('|')
-                        .append(descriptor.dependencyArtifactIds.joinToString(",") { it.value })
-                        .append('\n')
-                }
-            }
-            request.existingArtifacts.sortedBy { it.relativePath }.forEach { existing ->
-                append(existing.relativePath).append('|').append(existing.mediaType).append('|')
-                    .append(existing.ownership.name).append('|')
-                    .append(digest(existing.content)).append('\n')
-            }
-            actions.forEach { action ->
-                append(action.artifactId.value).append('|').append(action.relativePath).append('|')
-                    .append(action.operation.name).append('|')
-                    .append(action.reasons.joinToString(",") { it.name }).append('|')
-                    .append(action.sourceChangeIds.joinToString(",")).append('\n')
-            }
-            orphans.forEach { append(it.relativePath).append('|').append(it.reason.name).append('\n') }
-        }
-        return digest(canonical)
-    }
-
-    private fun digest(value: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
 }

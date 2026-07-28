@@ -2,7 +2,6 @@ package io.docpilot.core.specification
 
 import io.docpilot.core.model.ProjectSpecification
 import io.docpilot.core.model.RelationshipSpecification
-import java.security.MessageDigest
 
 public enum class SemanticRelationshipKind {
     DEPENDS_ON,
@@ -148,39 +147,25 @@ internal object RelationshipProjector {
         val aggregatedOccurrences = occurrencesByKind.mapValues { (kind, count) ->
             count - (logicalByKind[kind] ?: 0)
         }.filterValues { it > 0 }.toSortedMap()
-        val policySha = digest(
-            listOf(
-                policy.formatVersion,
-                policy.policyId,
-                policy.maxCallsPerSource,
-                policy.maxCallsPerProject,
-                policy.maxImportsPerSourcePackage,
-                policy.maxImportsPerProject,
-                policy.overflowBehavior.name,
-            ).joinToString("|"),
-        )
+        val policySha = RelationshipProjectionIntegrity.policySha256(policy)
         val omittedDigests = omittedDistinct.groupBy { it.type }.toSortedMap().mapValues { (_, values) ->
-            digest(values.joinToString("\n") { it.id })
+            RelationshipProjectionIntegrity.sha256(values.joinToString("\n") { it.id })
         }
-        val reportBody = buildString {
-            append(policy.policyId).append('|').append(policySha).append('\n')
-            append(logicalByKind).append('\n').append(emittedByKind).append('\n')
-            append(omittedByKind).append('\n').append(aggregatedOccurrences).append('\n')
-            overflow.sortedWith(compareBy({ it.kind }, { it.sourceId ?: "" })).forEach { append(it).append('\n') }
-            append(omittedDigests)
-        }
+        val unsignedReport = RelationshipProjectionReport(
+            policyId = policy.policyId,
+            policySha256 = policySha,
+            logicalCountByKind = logicalByKind,
+            emittedCountByKind = emittedByKind,
+            omittedCountByKind = omittedByKind,
+            aggregatedOccurrenceCountByKind = aggregatedOccurrences,
+            overflowScopes = overflow.distinct().sortedWith(compareBy({ it.kind }, { it.sourceId ?: "" })),
+            omittedIdentitySha256ByKind = omittedDigests,
+            reportSha256 = "",
+        )
         return RelationshipProjectionResult(
             relationships = retained.sortedWith(order),
-            report = RelationshipProjectionReport(
-                policyId = policy.policyId,
-                policySha256 = policySha,
-                logicalCountByKind = logicalByKind,
-                emittedCountByKind = emittedByKind,
-                omittedCountByKind = omittedByKind,
-                aggregatedOccurrenceCountByKind = aggregatedOccurrences,
-                overflowScopes = overflow.distinct().sortedWith(compareBy({ it.kind }, { it.sourceId ?: "" })),
-                omittedIdentitySha256ByKind = omittedDigests,
-                reportSha256 = digest(reportBody),
+            report = unsignedReport.copy(
+                reportSha256 = RelationshipProjectionIntegrity.reportSha256(unsignedReport),
             ),
         )
     }
@@ -199,7 +184,4 @@ internal object RelationshipProjector {
         else -> 0
     }
 
-    private fun digest(value: String): String =
-        MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
 }
