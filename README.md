@@ -4,9 +4,7 @@
 
 DocPilot Core is the platform-independent foundation of the DocPilot ecosystem.
 
-It helps Android developers transform project structure, architecture, behavior, and source-code evidence into continuously evolving specifications through transparent Human-AI collaboration.
-
-DocPilot does not generate documentation directly from source code. It first builds structured knowledge and specification models, then renders those models into documentation and diagrams.
+It transforms project structure, architecture, behavior, and source-code Evidence into versioned specifications and reviewable documentation through transparent Human-AI collaboration. Source code is first converted into structured knowledge and a canonical specification model; deterministic Core services then plan, render, review, reconcile, and explain documentation changes.
 
 ---
 
@@ -16,25 +14,17 @@ Software projects evolve continuously.
 
 Documentation usually does not.
 
-DocPilot aims to help Android developers keep architecture, specifications, diagrams, APIs, and engineering knowledge synchronized with source code.
+DocPilot helps Android developers keep architecture, specifications, relationships, review decisions, and generated artifacts synchronized with source code while preserving Evidence, Stable IDs, deterministic identities, and human approval boundaries.
 
-The first validation targets are publicly available Android projects hosted on GitHub so that analysis results can be reproduced, reviewed, benchmarked, and improved without exposing proprietary code.
+The first validation target remains the public Android `architecture-samples` project so analysis results can be reproduced and compared without exposing proprietary code.
 
 ---
 
 ## Primary User
 
-The primary user of DocPilot is the Android developer.
+The primary user is the Android developer.
 
-The initial product scope focuses on:
-
-- Android projects
-- Kotlin
-- Gradle
-- Android Studio workflows
-- public GitHub repositories used as validation targets
-
-Specialized domains such as Wear OS, background services, Bluetooth, Wi-Fi, Compose, Room, and WorkManager may be supported through profiles or analyzers.
+The current scope focuses on Kotlin and Gradle Android projects. Specialized domains such as Wear OS, background services, Bluetooth, Wi-Fi, Compose, Room, and WorkManager may later be supported through documentation profiles or analyzers.
 
 ---
 
@@ -46,125 +36,126 @@ Specialized domains such as Wear OS, background services, Bluetooth, Wi-Fi, Comp
 - Evidence Before Assumption
 - Explainable Changes
 - Living Specifications
+- Deterministic Core
+- Stable Identity
 - AI Vendor Independence
 - Platform-Independent Core
 
-AI proposes.
-
-Developers review, decide, apply, and validate.
+AI may propose narrative or bounded patches. Core facts, hashes, graph edges, coverage, ownership, lifecycle state, and accepted changes remain deterministic and reviewable.
 
 ---
 
-## Core Architecture
+## Canonical Architecture
 
 ```text
 Source Code
     ↓
-Project Analyzer
+Project Loader / Source Scanner
     ↓
 Knowledge Model
     ↓
-Specification Model (DIR)
+ProjectSpecification (DIR 0.3)
     ↓
-Renderers
-    ├── Markdown
-    ├── Mermaid
-    ├── JSON
-    ├── HTML
-    └── PDF
+Specification Snapshot format 1
+    ↓
+Artifact Catalog + RFC-0052 Artifact Plan
+    ↓
+Selective Deterministic Rendering
+    ↓
+Review Bundle / Lifecycle / Receipt / Journal
+    ↓
+RFC-0055 Reconciliation
+    ↓
+RFC-0056 Evolution Report + Causal Graph
 ```
 
----
-
-## Initial Validation Strategy
-
-DocPilot will first be validated against publicly available Android repositories.
-
-Validation repositories should:
-
-- use a recognized open-source license,
-- use Kotlin as a primary or significant language,
-- build with Gradle,
-- expose meaningful architecture or component relationships,
-- be pinned to a specific commit,
-- and be suitable for repeatable analysis.
-
-The first validation corpus will include different Android project styles such as:
-
-- simple single-module applications,
-- multi-module applications,
-- MVVM or layered architectures,
-- background services or workers,
-- networking and persistence,
-- Jetpack Compose or traditional View-based applications.
+AI Provider implementations remain adapters behind the Provider SPI. AI output is never the canonical source of structural facts.
 
 ---
 
-## Repositories
+## Repositories and Modules
 
-| Repository | Purpose |
+| Path | Purpose |
 |---|---|
-| `docpilot-core` | Platform-independent specification, knowledge, evidence, and rendering foundation |
-| `docpilot-droid` | Android-specific project analyzer |
-
-Future repositories may provide CLI, IDE, automation, or integration layers.
+| root `docpilot-core` | Core model, specification, incremental, review, reconciliation, validation, and evolution capabilities |
+| `docpilot-cli` | Thin command-line adapters for supported Core workflows |
+| `docpilot-provider-ollama` | Ollama provider adapter |
+| `docpilot-provider-openai` | OpenAI provider adapter |
+| `docpilot-release` | Release Evidence and deterministic release-gate capability |
+| `tools/docpilot-mcp` | Temporary development orchestration tool; not a Gradle production module |
 
 ---
 
 ## Current Status
 
-Current phase:
+| Item | Canonical state |
+|---|---|
+| Active development track | v1.1 Product Capability |
+| Active RFC | RFC-0057 Canonical Baseline and Documentation Expansion Readiness |
+| Implemented RFC sequence | RFC-0001 through RFC-0053, RFC-0055, RFC-0056 |
+| RFC-0054 | Proposed but not approved or completed |
+| Public v1.0 Product Validation | `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED` |
+| PV-009 | `PENDING` |
+| Technical v1 baseline | Documentation reports immutable `v1.0.0`; Git identity is not verifiable from source ZIPs without `.git` |
+| Gradle artifact version | `0.1.0-SNAPSHOT` |
+| Primary validation target | `C:\WorkSpace\architecture-samples` |
 
-> Phase 1 — MVP / POC
+RFC-0056 is implemented for the v1.1 track with selective compilation, focused scenarios, bridge regressions, isolated Evolution smoke, and Reconciliation smoke recorded as PASS. Canonical `./gradlew clean test`, exact XML totals, an `architecture-samples` before/after Evolution fixture, Windows CLI smoke, Git clean-tree evidence, and independent PV-009 review remain unverified in the delivered ZIP baseline.
 
-Completed RFCs:
+### Current technical formats
 
-> RFC-0001 through RFC-0043
+| Contract | Version |
+|---|---|
+| Builder-emitted DIR schema | `0.3` |
+| Legacy manual `ProjectSpecification` default | `0.2` |
+| Specification Snapshot | `1` |
+| Snapshot-supported DIR | `0.3` |
+| Review Bundle | `1` |
+| Evolution Report | `1` |
+| Relationship Projection Report | `1` |
 
-Primary validation target:
+Snapshot format and DIR schema are independent version lines. RFC-0057 does not introduce DIR 0.4 or change any runtime format.
 
-> `C:\WorkSpace\architecture-samples`
+---
 
-Release target:
+## Implemented Capabilities
 
-> v0.5 MVP / POC — runtime gates verified; incremental review implemented
+- Kotlin/Gradle project loading, source scanning, and Evidence indexing
+- deterministic knowledge construction and DIR 0.3 specification building
+- deterministic Markdown and multi-artifact selective rendering
+- Stable-ID specification diffing and incremental planning
+- Specification Snapshot persistence and incremental CLI workflow
+- provider-independent AI target-scoped patch generation
+- deterministic documentation diff, Review Bundle persistence, lifecycle, receipt, journal, recovery, and thin CLI operations
+- deterministic INTERNAL, EXTERNAL, and UNRESOLVED relationship semantics
+- relationship-aware impact planning and Projection Report integrity
+- release Evidence manifest and offline release-gate verification
+- existing-document ownership, preview-first reconciliation, conflict handling, retained content, and user decision binding
+- Documentation Quality Validator used by the product-validation workflow; its presence does not imply RFC-0054 completion
+- deterministic Evolution Report, causal graph, coverage, strict codec, offline verification, and narrative-only AI boundary
 
-Implemented MVP capabilities include source scanning, knowledge construction, DIR 0.3 specification building, deterministic Markdown rendering, Stable-ID-based incremental documentation planning, specification snapshot persistence, incremental CLI execution, AI target-scoped patch generation, deterministic documentation diff/review, prompt-package creation, and AI-assisted architecture generation through the Provider SPI.
-
-Release-gate validation on July 17, 2026 verified:
-
-- `./gradlew clean build`
-- `./gradlew test`
-- core CLI analysis against `C:\WorkSpace\architecture-samples`
-- Ollama generation with `qwen3:8b`
-- invalid-provider error handling
-
-OpenAI real API invocation is not part of the v0.5 validation scope.
-
-### DIR version policy
-
-- DIR `0.2` remains the source-compatible legacy default for manually constructed `ProjectSpecification` instances.
-- DIR `0.3` is the current output produced by `DefaultSpecificationBuilder`.
-- Snapshot schema versions and DIR schema versions are independent version lines.
-- Renderers consume `ProjectSpecification` only; they do not interpret `SourceIndex`, the Knowledge Graph, or `IncrementalUpdatePlan`.
-
-No stable public release has been published yet. The remaining release-policy item is the artifact version, which is still `0.1.0-SNAPSHOT`.
+There is no official CLI or MCP command for RFC-0055 Reconciliation or RFC-0056 Evolution generation in this baseline.
 
 ---
 
 ## Documentation
 
-The current foundation documents include:
+Canonical current-state documents include:
 
-- `CONSTITUTION.md`
 - `docs/vision/VISION.md`
 - `docs/cdd/CDD-0001-Core-Domain-Definition.md`
 - `docs/dsd/DSD-0001-DocPilot-Specification-Language.md`
-- `docs/decisions/DEC-0006-Initial-Validation-Target.md`
 - `ARCHITECTURE.md`
 - `PROJECT_PIPELINE.md`
-- `docs/release/v0.5-MVP-RELEASE-NOTES.md`
-- `snapshots/v0.5-mvp/RELEASE_SUMMARY.md`
+- `docs/roadmap/ROADMAP.md`
+- `docs/planning/DOCPILOT-CANONICAL-BASELINE.properties`
+- `docs/planning/RFC-0057-CANONICAL-BASELINE-REPORT.md`
+- `docs/planning/RFC-0057-CODE-DOCUMENT-CONSISTENCY-REPORT.md`
+- `docs/planning/RFC-0057-DIR-0.4-MIGRATION-READINESS.md`
+- `docs/release/DOCPILOT-V1-PRODUCT-VALIDATION-REPORT.md`
+- `docs/release/DOCPILOT-V1-RELEASE-DECISION.md`
+
+Historical RFC, planning, release, and handoff documents retain their original scope and evidence. Later canonical documents do not retroactively convert unexecuted validation into PASS.
 
 ---
 

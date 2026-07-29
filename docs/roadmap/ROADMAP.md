@@ -2,145 +2,79 @@
 
 ## Current milestone
 
-### v0.5 MVP / POC - RFC-0001 through RFC-0049
+### v1.1 Product Capability — RFC-0057 active
 
-Status: technical runtime gates passed on July 25, 2026. Specification incremental
-execution, snapshot persistence, AI incremental generation, documentation
-diff/review, deterministic Relationship Semantics, and relationship-aware
-incremental diff/review, and review-gated managed-block removal are implemented.
-RFC-0046 through RFC-0048 implementation, focused verification, full regression
-verification, isolated smoke, canonical handoff, main integration, and remote
-synchronization are complete. RFC-0049 is implemented and locally verified as the
-v0.5 Release Provenance and Determinism Gate. Exact clean-commit evidence
-collection and Git integration are pending.
+RFC-0056 Documentation Evolution and Change Intelligence is implemented for the v1.1 track. RFC-0057 establishes a canonical source, documentation, version, verification, and migration-readiness baseline before Documentation Profiles, Feature Specifications, Scenarios, Contracts, and Diagram IR are introduced.
 
-Delivered baseline:
+The public v1.0 Product Validation decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED`. PV-009 remains `PENDING`. RFC-0057 does not alter the documented immutable `v1.0.0` technical baseline and does not backport RFC-0056 to v1.0.
 
-- source scanning
+The supplied source ZIP contains no `.git`; current branch, HEAD, origin divergence, tag presence, and clean-tree status must therefore be verified only in a Git worktree.
+
+## Delivered capability baseline
+
+- source loading, scanning, and Evidence indexing
 - knowledge construction
-- DIR 0.3 specification building
-- deterministic Markdown rendering
-- Stable-ID specification incremental planning
-- specification snapshot persistence and CLI workflow
-- provider-independent AI incremental patch generation
-- deterministic documentation diff and complete-review-before-merge
-- deterministic INTERNAL, EXTERNAL, and UNRESOLVED relationship endpoint semantics
-- direct `DEPENDS_ON` component dependency projection and validation
-- relationship-aware incremental diff, planning, AI context, and review Evidence
-- explicit review-gated managed-block removal with reviewed-base conflict safety
-- durable, integrity-protected Review Bundles and restart-safe apply
-- official thin-adapter CLI review workflow
-- prompt-package generation
-- AI Provider SPI
-- verified Ollama architecture generation
+- DIR 0.3 specification building with Stable IDs
+- deterministic Markdown and multi-artifact selective rendering
+- specification Snapshot format 1 persistence
+- Stable-ID diff and incremental planning
+- incremental CLI execution and AI target-scoped patch generation
+- deterministic documentation review and complete-review-before-merge
+- deterministic INTERNAL, EXTERNAL, and UNRESOLVED relationship semantics
+- relationship-aware impact, Projection Report integrity, and bounded projection
+- managed-block removal review and reviewed-base conflict safety
+- durable Review Bundle format 1, lifecycle, Receipt, Journal, recovery, and thin CLI operations
+- Release Evidence Manifest and offline technical release gate
+- RFC-0055 existing-document ownership and reconciliation
+- Documentation Quality Validator used by the product-validation workflow
+- RFC-0056 deterministic Evolution Report, change extraction, Artifact impact, causal graph, coverage, strict codec, offline verifier, and narrative-only AI boundary
 
-## Product Capability track
+## RFC status baseline
 
-RFC-0049 Plan A, v0.5 Release Provenance and Determinism Gate, is implemented and
-locally verified. It provides Release Evidence Manifest format 1, exact
-clean-commit and embedded MCP binding, strict test aggregation, artifact
-integrity, deterministic JSON/Markdown reporting, atomic evidence storage,
-offline verification, and a fail-closed binary release gate in an independent
-module. Final evidence collection must run after an exact clean feature commit.
+| RFC | State | Canonical interpretation |
+|---|---|---|
+| RFC-0001 through RFC-0053 | Implemented sequence | Historical RFC and planning records retained |
+| RFC-0054 | Proposed, not approved or completed | Candidate documents and validator source do not establish RFC completion |
+| RFC-0055 | Implemented | Existing Documentation Reconciliation |
+| RFC-0056 | `IMPLEMENTATION_COMPLETED_WITH_VERIFICATION_LIMITATION` | v1.1-only; full Gradle and architecture-samples Evolution E2E pending |
+| RFC-0057 | Active | Canonical Baseline and Documentation Expansion Readiness |
+| RFC-0058 | Next planned | Documentation Profiles and Document Contracts |
 
-RFC-0050 Plan A, Review Bundle Lifecycle and Apply Receipt, is implemented and
-locally verified for the path from v0.5 release trust to v1.0 auditability and
-long-term operation. Review Bundle format 1 remains unchanged. Separate
-Lifecycle Metadata, Apply Receipt, and Apply Transaction Journal format 1
-contracts provide Core-owned transitions, atomic Receipt/APPLIED visibility,
-recoverable documentation apply, idempotency, crash recovery, and offline
-verification. The clean build and 291-test regression suite pass, and main
-integration is complete at `0f6b15d`. Remote synchronization is pending.
+## Historical release milestones
 
-Signed Release Evidence and External Attestation remains a later
-release-security candidate.
+### v0.5 MVP / POC
 
-RFC-0051 Plan A, Official Review Lifecycle Operations and Recovery CLI, is
-implemented and locally verified. It exposes Core-owned status, offline
-verification, recovery, supersession, and archive through thin-adapter CLI
-commands. Every mutation defaults to a deterministic Core dry-run Plan and
-requires explicit confirmation; automation may bind confirmation to the Plan
-SHA. The clean build and 301-test regression suite pass. Main integration is
-complete at `2036eb9`. Remote synchronization is pending. Cross-process Review
-Leases and Audit-safe Retention remains deferred.
+RFC-0001 through RFC-0049 delivered the technical MVP/POC baseline, including Source-to-Specification flow, incremental documentation, deterministic review, relationship semantics, durable review persistence, official review CLI operations, and Release Evidence. Historical documents report local/full validation at their completion points. Current ZIP inspection does not independently re-establish Git identity for those results.
 
-RFC-0052 returns to the primary Product Capability roadmap as Selective
-Documentation Artifact Planning and Rendering. The current executor avoids
-unchanged writes but still performs a full render, and the official specification
-renderer emits one monolithic artifact. RFC-0052 introduces renderer-owned
-artifact descriptors, deterministic Stable-ID impact planning, a multi-artifact
-official layout, and selective rendering so only required CREATE/UPDATE
-documents are generated. Implementation, the 306-test clean regression suite,
-and Main integration at `33503f7` are complete. Remote synchronization is
-pending.
+### v1.0 technical baseline
 
-The Product Capability sequence after RFC-0052 is:
+RFC-0050 through RFC-0055 extended review lifecycle, selective artifact planning, semantic relationships, and existing-document reconciliation. Historical planning reports the `v1.0.0` technical tag. Post-tag Product Validation failed, so the public/product v1.0 release is not approved.
 
-1. RFC-0053: Semantic Relationship Expansion (`EXTENDS`, `IMPLEMENTS`, `CALLS`,
-   `IMPORTS`) with deterministic identity and Evidence.
-2. RFC-0054: Documentation Quality Validation for coverage, Evidence
-   traceability, stale claims, unresolved gaps, and relationship consistency.
-3. RFC-0055: Existing Documentation Reconciliation for ownership, drift,
-   adoption, managed/manual boundaries, and orphan disposition.
+### v1.1 Product Capability
 
-RFC-0053 and RFC-0055 are selected. RFC-0054 remains provisional until
-separately approved.
+RFC-0056 adds Documentation Evolution and Change Intelligence. Recorded focused verification includes selective source compilation, 10 transformed RFC-0056 test methods, 8 RFC-0052/RFC-0053 bridge scenarios, isolated Evolution smoke, Reconciliation smoke, and semantic-hash compatibility fixtures. Canonical full Gradle execution and an official `architecture-samples` before/after Evolution fixture remain pending.
 
-RFC-0053 Plan A, Semantic Relationship Expansion, is now selected. Its detailed
-specification defines Evidence-backed deterministic `EXTENDS`, `IMPLEMENTS`,
-`CALLS`, and `IMPORTS`, stable identity, aggregation, bounded Core threshold
-policy, and Relationship Projection Report format 1. Core implementation and
-the 312-test regression suite, and Main integration at `a0c4a9c` are complete
-with documented scanner limitations. Remote synchronization is pending.
-RFC-0054 Documentation Quality Validation remains a proposed follow-up.
+## Next product sequence
 
-RFC-0055 Existing Documentation Reconciliation is implemented and verified.
-Its detailed specification defines Evidence-based Core ownership, preview-first three-way
-reconciliation, deterministic conflict detection, incremental reconciliation,
-proposal-only AI, atomic/recoverable apply, and a versioned Decision Explanation
-Report for every material Ownership/Merge outcome. It is the final v1.0 Product
-Capability RFC. Main integration and the `v1.0.0` release tag are complete.
-RFC-0054 Documentation Quality Validation remains proposed and independently
-approvable.
+1. RFC-0057 — Canonical Baseline and Documentation Expansion Readiness.
+2. RFC-0058 — Documentation Profiles and Document Contracts.
+3. RFC-0059 — Feature, Entry Point, and Scenario Specification foundation.
+4. Later RFCs — Interaction/Contract extraction, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic contracts exist.
 
-The post-tag Product Validation Release Gate is `PRODUCT_VALIDATION_FAIL`.
-`v1.0.0` remains the immutable technical baseline, but public Product Release
-readiness is not approved. Legacy analysis determinism, an official
-Reconciliation product workflow, architecture synthesis quality, parser
-accuracy, and independent review must pass the documented re-entry gate.
+RFC-0057 defines migration readiness only. It does not introduce DIR 0.4, change Snapshot format 1, or add profile/feature/scenario production models.
 
-RFC-0056 Documentation Evolution and Change Intelligence was explicitly
-approved and implemented for the v1.1 Product Capability track on July 29,
-2026. It adds a deterministic format-1 Evolution Report, Stable-ID Entity/API/
-Property/Relationship change extraction, move and rename explanation, RFC-0052
-Artifact impact binding, RFC-0053 Projection integrity verification, RFC-0055
-ownership/reconciliation decision binding, an acyclic causal graph, explicit
-coverage, offline verification, and a narrative-only AI boundary.
+## Unnumbered hardening candidates
 
-Focused RFC-0056 scenarios and RFC-0052/RFC-0053 bridge regressions pass. The
-canonical Gradle full build/test and architecture-samples Evolution fixture
-remain pending because the delivery environment could not download Gradle
-9.3.0. RFC-0056 completion does not change the public v1.0
-`PRODUCT_VALIDATION_FAIL` decision or close PV-009.
+The following remain future candidates and do not reserve RFC-0057 or RFC-0058 numbers:
 
-## v1.1 Hardening track
+- Cross-process Review Leases and Audit-safe Retention
+- Signed Release Evidence and External Attestation
+- persistent Evolution graph partition caching
+- official Reconciliation and Evolution product workflows
+- independent Product Validation re-entry work
 
-The following work is intentionally separated from the Product Capability track:
-
-- RFC-0057+ or v1.1: Cross-process Review Leases and Audit-safe Retention.
-- RFC-0058+ or v1.1: Signed Release Evidence and External Attestation.
-
-These numbers are placeholders, not reserved RFC approvals. Hardening may move
-earlier only if new evidence shows an immediate release or data-integrity
-blocker.
-
-Future work must preserve Clean Architecture, Evidence First, deterministic core
-outputs, the separation between Snapshot Incremental and Specification
-Incremental, and complete-review-before-merge. The primary POC target remains
-`C:\WorkSpace\architecture-samples`.
+Hardening may be scheduled when Evidence shows an immediate integrity, release, or operational blocker.
 
 ## Release validation policy
 
-Each release should retain a versioned snapshot containing build, test, CLI,
-provider, and error-handling evidence. OpenAI runtime validation is not implied
-unless explicitly included in the release scope.
+Each release must preserve versioned build, test, Git, CLI, provider, artifact, and error-handling Evidence. Unexecuted validation is recorded as `NOT_EXECUTED` or `NOT_EXECUTED_ENVIRONMENT_LIMITATION`, never PASS. Public Product Validation remains independent from technical release evidence.

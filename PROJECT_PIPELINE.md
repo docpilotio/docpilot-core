@@ -13,53 +13,34 @@ Pipeline:
 | Stage | Input | Output | Responsibility | Not responsible for |
 |---|---|---|---|---|
 | Project Loader | Project path | Loaded project context | Resolve and validate the project root | Source semantics |
-| Source Scanner | Loaded project | `SourceIndex` | Discover and index supported source evidence | Documentation prose |
+| Source Scanner | Loaded project | `SourceIndex` | Discover and index supported source Evidence | Documentation prose |
 | Knowledge Builder | `SourceIndex` | Knowledge graph/result | Build structured relationships and knowledge | Presentation |
 | Specification Builder | Knowledge result | `ProjectSpecification` DIR 0.3 | Produce canonical specification entities | Rendering format |
-| Markdown Renderer | `ProjectSpecification` | Markdown | Deterministic presentation | Reinterpreting scanner or graph data |
-| Prompt Package | Analysis artifacts | Prompt inputs and evidence | Prepare bounded AI context | Owning canonical truth |
+| Snapshot Codec | `ProjectSpecification` | Snapshot format 1 | Persist deterministic specification identity | Migrating unsupported DIR schemas |
+| Prompt Package | Analysis artifacts | Prompt inputs and Evidence | Prepare bounded AI context | Owning canonical truth |
 | Output Writer | Rendered artifacts | Files | Persist generated outputs | Domain interpretation |
 
-Verified v0.5 sample outputs:
-
-```text
-docs/project-summary.md
-docs/source-index.md
-docs/knowledge-graph.json
-prompt-package/overview.md
-prompt-package/knowledge-graph.json
-prompt-package/evidence.json
-prompt-package/instructions.md
-```
+The legacy `analyze` command and official specification workflows are distinct. Generated Markdown must not be re-ingested as source inventory in deterministic specification validation.
 
 ## 2. Generate an AI architecture document
-
-Command:
 
 ```powershell
 ./gradlew :docpilot-cli:run --args="generate architecture --project C:\WorkSpace\architecture-samples --provider ollama --model qwen3:8b --output C:\WorkSpace\architecture-samples\docs\ai-architecture.md"
 ```
 
-Pipeline:
-
 ```text
-Analysis evidence
+Analysis Evidence
 → Prompt orchestration
 → AI Provider SPI
-→ Ollama provider
-→ qwen3:8b
-→ Generated Markdown
+→ Provider adapter
+→ AI model
+→ Proposed Markdown
 → Output Writer
 ```
 
-v0.5 validation scope:
+Ollama `qwen3:8b` was historically verified for the v0.5 smoke scope. OpenAI real API invocation was outside that validation scope.
 
-- Required runtime provider: Ollama
-- Verified model: `qwen3:8b`
-- OpenAI runtime invocation: out of scope
-- Invalid-provider handling: verified
-
-## 3. Incremental documentation
+## 3. Specification incremental planning
 
 ```text
 Previous ProjectSpecification
@@ -67,21 +48,37 @@ Previous ProjectSpecification
 Current ProjectSpecification
 → Stable-ID diff
 → Specification changes
-→ Deterministic update plan
+→ Deterministic IncrementalUpdatePlan
 ```
 
 Nested API and Property changes propagate to owning Type and Package scopes. Ownership moves preserve both previous and current affected scopes.
 
-## 4. AI incremental documentation review
+## 4. Selective documentation artifacts
 
 ```text
-IncrementalUpdatePlan
+Current ProjectSpecification
++
+Previous and current Artifact Catalogs
++
+Existing Artifact inventory
+→ RFC-0052 DocumentationArtifactPlan
+→ CREATE / UPDATE / RETAIN
+→ selective deterministic rendering
+```
+
+The Plan semantic hash binds specification, catalogs, inventory, operation, dependency, and selection inputs. Unchanged artifacts are not rewritten.
+
+## 5. AI incremental documentation review
+
+```text
+IncrementalUpdatePlan / Artifact Plan
 +
 AI target-scoped patches
 +
 Existing managed documentation blocks
 → deterministic documentation diff
 → DocumentationReviewProposal
+→ Review Bundle format 1
 → complete human decisions
 → accepted patches only
 → managed-block merge
@@ -89,10 +86,73 @@ Existing managed documentation blocks
 
 Safety rules:
 
-- patches outside the update plan are rejected;
+- targets outside the plan are rejected;
 - missing patches keep the proposal incomplete;
 - partial decisions do not modify documentation;
 - rejected patches never reach the merger;
 - accepted `NO_CHANGE` entries do not rewrite content;
-- Evidence references and stable target IDs remain visible in the review report.
+- Evidence references and Stable IDs remain visible;
+- stale reviewed bases and managed-block conflicts fail closed.
 
+## 6. Review lifecycle and recovery
+
+```text
+Stored Review Bundle
+→ status / verify / recover / supersede / archive
+→ deterministic dry-run Plan
+→ explicit confirmation
+→ Lifecycle Metadata / Receipt / Journal
+```
+
+Core owns state transitions. CLI commands are thin adapters. Every mutation is preview-first and integrity-bound.
+
+## 7. Existing-document reconciliation
+
+```text
+Artifact Plan
++
+Existing documentation
++
+Ownership Manifests
++
+User Decisions
+→ RFC-0055 Reconciliation Plan
+→ conflict and retained-content review
+→ atomic/recoverable Result
+```
+
+The current source baseline exposes Core APIs but no official Reconciliation CLI command. Product-level E2E validation must not claim CLI support that does not exist.
+
+## 8. Documentation evolution intelligence
+
+```text
+Verified before/after Specification Snapshots
++
+Artifact Catalogs and verified Artifact Plan
++
+Optional Relationship / Ownership / Reconciliation Evidence
+→ deterministic change extraction
+→ Artifact impact binding
+→ acyclic causal graph
+→ coverage classification
+→ Evolution Report format 1
+→ offline verification
+```
+
+The current source baseline exposes Core APIs and strict codecs but no official Evolution CLI or MCP adapter. AI may render narrative only after Report verification.
+
+## 9. Release and Product Validation
+
+Technical Release Evidence and public Product Validation are separate gates.
+
+```text
+Build/Test/Git/Artifact Evidence
+→ Release Evidence Manifest
+→ offline technical gate
+
+Independent product criteria and reviewer Evidence
+→ Product Validation
+→ public release decision
+```
+
+The canonical public v1.0 decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED`, and PV-009 remains `PENDING` until independently reproduced.

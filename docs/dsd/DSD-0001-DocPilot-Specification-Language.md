@@ -1,9 +1,9 @@
 # DSD-0001 — DocPilot Specification Language
 
-Status: Baseline  
-Version: 0.2 with DIR 0.3 runtime extension
+Status: Active baseline  
+Version: 0.2 authoring baseline with DIR 0.3 runtime extension
 
-> Version policy: DIR 0.2 remains the legacy, source-compatible baseline for manual `ProjectSpecification` construction. `DefaultSpecificationBuilder` emits DIR 0.3, which extends the model with package, API, property, and deterministic rendering data established by RFC-0035. Snapshot schema versions are independent from DIR schema versions.
+> Version policy: DIR 0.2 remains the legacy, source-compatible baseline for manual `ProjectSpecification` construction. `DefaultSpecificationBuilder` emits DIR 0.3, which extends the runtime model with package, API, property, relationship, and deterministic rendering data. Specification Snapshot format 1 accepts DIR 0.3 only. Snapshot format and DIR schema remain independent version lines.
 
 ## Purpose
 
@@ -438,3 +438,41 @@ Version 0.2 does not define:
 - binary serialization,
 - a graph database implementation,
 - or provider-specific prompts.
+
+
+---
+
+## RFC-0057 Canonical Runtime Baseline
+
+The canonical runtime baseline is derived from source constants rather than inferred from document version labels.
+
+| Contract | Current value |
+|---|---|
+| Manual `ProjectSpecification` default | DIR `0.2` |
+| `DefaultSpecificationBuilder` output | DIR `0.3` |
+| Specification Snapshot | format `1` |
+| Snapshot-supported DIR | `0.3` |
+| Review Bundle | format `1` |
+| Relationship Projection Report | format `1` |
+| Evolution Report | format `1` |
+
+DIR 0.2 authoring examples in this document remain historical/source-compatible guidance. Runtime code and current generated specifications use DIR 0.3.
+
+## DIR 0.4 Migration Readiness
+
+RFC-0057 does not define or implement DIR 0.4. It establishes the following requirements for later RFCs:
+
+1. Existing DIR 0.3 Snapshot data must remain readable through the format-1 reader or a retained legacy reader.
+2. Stored DIR 0.3 data must not be silently rewritten in place.
+3. A DIR 0.3 to 0.4 conversion, when required, must be an explicit deterministic migration operation with input and output identities.
+4. Existing Project, Module, Package, Component, API, Property, Relationship, Evidence, and Unresolved Stable IDs must be preserved.
+5. Feature and Scenario IDs must use deterministic namespaces that cannot collide with existing entity IDs.
+6. New fields must remain absent or explicitly unresolved when Evidence is insufficient; renderers and AI must not invent values.
+7. RFC-0052 Artifact Plan semantic hashes for existing DIR 0.3 fixtures must remain compatible.
+8. RFC-0055 ownership, reconciliation, retained-content, and user-decision contracts must remain compatible.
+9. RFC-0056 must continue to verify and compare DIR 0.3 states after DIR 0.4 support is introduced.
+10. Rollback must preserve the original DIR 0.3 Snapshot and document artifacts.
+
+The preferred direction is to retain Snapshot format 1 for DIR 0.3 and introduce Snapshot format 2 only when DIR 0.4 storage is actually required. Format 1 readers must remain available. RFC-0057 itself changes neither schema nor Snapshot format.
+
+Planned documentation-expansion concepts include `FeatureSpecification`, `EntryPointSpecification`, `ScenarioSpecification`, `InteractionStep`, `ContractSpecification`, `DocumentationClaim`, and `DiagramSpecification`. Their exact fields and identities are deferred to RFC-0058 and later RFCs.
