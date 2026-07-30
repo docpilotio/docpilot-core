@@ -1,7 +1,9 @@
 # RFC-0060 architecture-samples Discovery Report
 
-Validation date: 2026-07-31  
-Source: `C:\WorkSpace\architecture-samples`, copied to an isolated temporary fixture  
+Validation date: 2026-07-31
+
+Source: `C:\WorkSpace\architecture-samples`, copied to an isolated temporary fixture
+
 Original checkout mutation: none
 
 ## Result
