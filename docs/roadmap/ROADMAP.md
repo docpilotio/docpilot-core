@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-### v1.1 Product Capability — RFC-0057 active
+### v1.1 Product Capability — RFC-0058 implemented
 
-RFC-0056 Documentation Evolution and Change Intelligence is implemented for the v1.1 track. RFC-0057 establishes a canonical source, documentation, version, verification, and migration-readiness baseline before Documentation Profiles, Feature Specifications, Scenarios, Contracts, and Diagram IR are introduced.
+RFC-0057 established the canonical readiness baseline. RFC-0058 now implements runtime-only Documentation Profiles and deterministic Document Contracts while preserving the existing Artifact, Snapshot, Review, Reconciliation, and Evolution formats.
 
-The public v1.0 Product Validation decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED`. PV-009 remains `PENDING`. RFC-0057 does not alter the documented immutable `v1.0.0` technical baseline and does not backport RFC-0056 to v1.0.
+The public v1.0 Product Validation decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED`. PV-009 remains `PENDING`. RFC-0058 does not alter the documented immutable `v1.0.0` technical baseline or declare a v1.1 Release Candidate.
 
 The supplied source ZIP contains no `.git`; current branch, HEAD, origin divergence, tag presence, and clean-tree status must therefore be verified only in a Git worktree.
 
@@ -28,6 +28,7 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 - RFC-0055 existing-document ownership and reconciliation
 - Documentation Quality Validator used by the product-validation workflow
 - RFC-0056 deterministic Evolution Report, change extraction, Artifact impact, causal graph, coverage, strict codec, offline verifier, and narrative-only AI boundary
+- RFC-0058 `kotlin-android@1` Profile, Document/Section contracts, Evidence and capability policy, completeness findings, ownership safety, semantic hashes, and additive RFC-0052 compatibility binding
 
 ## RFC status baseline
 
@@ -37,8 +38,9 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 | RFC-0054 | Proposed, not approved or completed | Candidate documents and validator source do not establish RFC completion |
 | RFC-0055 | Implemented | Existing Documentation Reconciliation |
 | RFC-0056 | `IMPLEMENTATION_COMPLETED_WITH_VERIFICATION_LIMITATION` | v1.1-only; full Gradle and architecture-samples Evolution E2E pending |
-| RFC-0057 | Active | Canonical Baseline and Documentation Expansion Readiness |
-| RFC-0058 | Next planned | Documentation Profiles and Document Contracts |
+| RFC-0057 | Implemented | Canonical Baseline and Documentation Expansion Readiness |
+| RFC-0058 | `IMPLEMENTED_WITH_ENVIRONMENT_VERIFICATION_LIMITATION` | Documentation Profiles and Document Contracts |
+| RFC-0059 | Proposed next | Feature, Entry Point, and Scenario Specification Foundation |
 
 ## Historical release milestones
 
@@ -52,20 +54,20 @@ RFC-0050 through RFC-0055 extended review lifecycle, selective artifact planning
 
 ### v1.1 Product Capability
 
-RFC-0056 adds Documentation Evolution and Change Intelligence. Recorded focused verification includes selective source compilation, 10 transformed RFC-0056 test methods, 8 RFC-0052/RFC-0053 bridge scenarios, isolated Evolution smoke, Reconciliation smoke, and semantic-hash compatibility fixtures. Canonical full Gradle execution and an official `architecture-samples` before/after Evolution fixture remain pending.
+RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds runtime-only Profile policy and deterministic Resolution. Recorded RFC-0058 verification includes changed-source subset compilation, 18 targeted Profile tests, and 4 existing Renderer regression methods. Canonical full Gradle execution and official architecture-samples Evolution/Profile fixtures remain pending.
 
 ## Next product sequence
 
-1. RFC-0057 — Canonical Baseline and Documentation Expansion Readiness.
-2. RFC-0058 — Documentation Profiles and Document Contracts.
-3. RFC-0059 — Feature, Entry Point, and Scenario Specification foundation.
-4. Later RFCs — Interaction/Contract extraction, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic contracts exist.
+1. RFC-0057 — Canonical Baseline and Documentation Expansion Readiness — implemented.
+2. RFC-0058 — Documentation Profiles and Document Contracts — implemented with environment verification limitation.
+3. RFC-0059 — Feature, Entry Point, and Scenario Specification Foundation — proposed next.
+4. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
 
-RFC-0057 defines migration readiness only. It does not introduce DIR 0.4, change Snapshot format 1, or add profile/feature/scenario production models.
+RFC-0058 keeps Profiles and Resolutions runtime-only. It does not introduce DIR 0.4, change Snapshot format 1, or add Feature/Scenario production entities.
 
 ## Unnumbered hardening candidates
 
-The following remain future candidates and do not reserve RFC-0057 or RFC-0058 numbers:
+The following remain future candidates and do not reserve RFC-0059 or later product-sequence numbers:
 
 - Cross-process Review Leases and Audit-safe Retention
 - Signed Release Evidence and External Attestation

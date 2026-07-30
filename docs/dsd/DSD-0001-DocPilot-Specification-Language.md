@@ -1,6 +1,6 @@
 # DSD-0001 — DocPilot Specification Language
 
-Status: Active baseline  
+Status: Active baseline
 Version: 0.2 authoring baseline with DIR 0.3 runtime extension
 
 > Version policy: DIR 0.2 remains the legacy, source-compatible baseline for manual `ProjectSpecification` construction. `DefaultSpecificationBuilder` emits DIR 0.3, which extends the runtime model with package, API, property, relationship, and deterministic rendering data. Specification Snapshot format 1 accepts DIR 0.3 only. Snapshot format and DIR schema remain independent version lines.
@@ -475,4 +475,48 @@ RFC-0057 does not define or implement DIR 0.4. It establishes the following requ
 
 The preferred direction is to retain Snapshot format 1 for DIR 0.3 and introduce Snapshot format 2 only when DIR 0.4 storage is actually required. Format 1 readers must remain available. RFC-0057 itself changes neither schema nor Snapshot format.
 
-Planned documentation-expansion concepts include `FeatureSpecification`, `EntryPointSpecification`, `ScenarioSpecification`, `InteractionStep`, `ContractSpecification`, `DocumentationClaim`, and `DiagramSpecification`. Their exact fields and identities are deferred to RFC-0058 and later RFCs.
+Planned documentation-expansion concepts include `FeatureSpecification`, `EntryPointSpecification`, `ScenarioSpecification`, `InteractionStep`, `ContractSpecification`, `DocumentationClaim`, and `DiagramSpecification`. Documentation Profiles are defined by RFC-0058; the exact fields and identities of Feature, Entry Point, Scenario, Interaction, Contract, Claim, and Diagram production concepts remain deferred to RFC-0059 and later RFCs.
+
+## RFC-0058 Documentation Profiles and Document Contracts
+
+RFC-0058 adds a runtime-only policy layer beside DIR 0.3. It does not change `ProjectSpecification`, Snapshot format 1, or any persisted DIR contract.
+
+```text
+DocumentationProfile
+  id
+  version
+  documentDefinitions[]
+
+DocumentDefinition
+  stableKey
+  type
+  purpose
+  audience
+  multiplicity
+  pathPolicy
+  sections[]
+  rendererCapabilities[]
+  completenessPolicy
+  ownershipPolicy
+  dependencyRules[]
+  requiredModel
+
+DocumentationProfileResolution
+  profileSemanticSha256
+  documents[]
+  artifactBindings[]
+  findings[]
+  resolutionSha256
+```
+
+The first built-in Profile is `kotlin-android@1`. Profile Resolution consumes DIR 0.3 but never writes back into DIR. Feature and Contract requirements remain `DEFERRED` until a later RFC introduces canonical production entities. The Profile layer may be persisted only through an explicitly versioned future format; it must not be silently embedded into Snapshot format 1.
+
+Stable IDs preserve semantic continuity:
+
+```text
+document-definition:{profileId}:{stableKey}
+document:{profileId}:{stableKey}:{scopeId}
+section:{profileId}:{stableKey}:{sectionId}
+```
+
+Titles, purposes, Evidence policies, paths, capabilities, completeness, ownership, and dependencies affect semantic SHA-256. Timestamps, absolute paths, filesystem order, object identity, and AI narrative do not.

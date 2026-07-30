@@ -56,9 +56,11 @@ Knowledge Model
     ↓
 ProjectSpecification (DIR 0.3)
     ↓
-Specification Snapshot format 1
+RFC-0058 Documentation Profile Resolution (optional, runtime-only)
     ↓
-Artifact Catalog + RFC-0052 Artifact Plan
+Specification Snapshot format 1 / existing Artifact Catalog
+    ↓
+RFC-0052 Artifact Plan
     ↓
 Selective Deterministic Rendering
     ↓
@@ -91,16 +93,17 @@ AI Provider implementations remain adapters behind the Provider SPI. AI output i
 | Item | Canonical state |
 |---|---|
 | Active development track | v1.1 Product Capability |
-| Active RFC | RFC-0057 Canonical Baseline and Documentation Expansion Readiness |
-| Implemented RFC sequence | RFC-0001 through RFC-0053, RFC-0055, RFC-0056 |
+| Current RFC state | RFC-0058 Documentation Profiles and Document Contracts implemented with environment verification limitation |
+| Implemented RFC sequence | RFC-0001 through RFC-0053, RFC-0055 through RFC-0058 |
 | RFC-0054 | Proposed but not approved or completed |
 | Public v1.0 Product Validation | `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED` |
 | PV-009 | `PENDING` |
 | Technical v1 baseline | Documentation reports immutable `v1.0.0`; Git identity is not verifiable from source ZIPs without `.git` |
 | Gradle artifact version | `0.1.0-SNAPSHOT` |
+| Next proposed RFC | RFC-0059 Feature, Entry Point, and Scenario Specification Foundation |
 | Primary validation target | `C:\WorkSpace\architecture-samples` |
 
-RFC-0056 is implemented for the v1.1 track with selective compilation, focused scenarios, bridge regressions, isolated Evolution smoke, and Reconciliation smoke recorded as PASS. Canonical `./gradlew clean test`, exact XML totals, an `architecture-samples` before/after Evolution fixture, Windows CLI smoke, Git clean-tree evidence, and independent PV-009 review remain unverified in the delivered ZIP baseline.
+RFC-0058 adds the runtime-only `kotlin-android@1` Documentation Profile, deterministic Document and Section contracts, Profile/Resolution hashes, explicit completeness findings, Renderer capability declarations, RFC-0055 ownership checks, and additive RFC-0052 compatibility binding. Canonical `./gradlew clean test`, exact XML totals, an official `architecture-samples` Profile fixture, Windows CLI smoke, Git clean-tree evidence, and independent PV-009 review remain unverified in the delivered ZIP baseline.
 
 ### Current technical formats
 
@@ -113,8 +116,9 @@ RFC-0056 is implemented for the v1.1 track with selective compilation, focused s
 | Review Bundle | `1` |
 | Evolution Report | `1` |
 | Relationship Projection Report | `1` |
+| Documentation Profile | `kotlin-android@1` runtime-only |
 
-Snapshot format and DIR schema are independent version lines. RFC-0057 does not introduce DIR 0.4 or change any runtime format.
+Snapshot format and DIR schema are independent version lines. RFC-0058 does not introduce DIR 0.4, persist Profiles, or change Snapshot, Review, Reconciliation, Projection, or Evolution formats.
 
 ---
 
@@ -133,8 +137,9 @@ Snapshot format and DIR schema are independent version lines. RFC-0057 does not 
 - existing-document ownership, preview-first reconciliation, conflict handling, retained content, and user decision binding
 - Documentation Quality Validator used by the product-validation workflow; its presence does not imply RFC-0054 completion
 - deterministic Evolution Report, causal graph, coverage, strict codec, offline verification, and narrative-only AI boundary
+- immutable Documentation Profiles, Document and Section contracts, section-level Evidence policy, Renderer capability requirements, completeness states, ownership conflict handling, and deterministic Profile Resolution
 
-There is no official CLI or MCP command for RFC-0055 Reconciliation or RFC-0056 Evolution generation in this baseline.
+There is no official CLI or MCP command for RFC-0055 Reconciliation, RFC-0056 Evolution generation, or RFC-0058 Profile Resolution in this baseline.
 
 ---
 
@@ -152,6 +157,9 @@ Canonical current-state documents include:
 - `docs/planning/RFC-0057-CANONICAL-BASELINE-REPORT.md`
 - `docs/planning/RFC-0057-CODE-DOCUMENT-CONSISTENCY-REPORT.md`
 - `docs/planning/RFC-0057-DIR-0.4-MIGRATION-READINESS.md`
+- `docs/rfc/RFC-0058-Documentation-Profiles-and-Document-Contracts.md`
+- `docs/planning/RFC-0058-MAIN-PLANNING-UPDATE.md`
+- `docs/handoffs/RFC-0058-COMPLETION-HANDOFF.md`
 - `docs/release/DOCPILOT-V1-PRODUCT-VALIDATION-REPORT.md`
 - `docs/release/DOCPILOT-V1-RELEASE-DECISION.md`
 

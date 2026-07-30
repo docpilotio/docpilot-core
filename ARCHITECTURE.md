@@ -2,9 +2,9 @@
 
 ## Status
 
-This document reflects the canonical source-tree baseline through RFC-0056 and the RFC-0057 documentation synchronization boundary.
+This document reflects the canonical source-tree baseline through RFC-0058.
 
-RFC-0057 adds no runtime feature and changes no public production contract. It records the implemented architecture, separates historical evidence from currently reproducible evidence, and establishes migration readiness for future documentation expansion.
+RFC-0058 adds an optional runtime-only Documentation Profile and Document Contract boundary. It preserves the existing Renderer-owned Artifact Catalog, RFC-0052 operation Plan, legacy paths, and all persisted formats.
 
 ## Core specification pipeline
 
@@ -35,9 +35,13 @@ Specification Snapshot format 1
 ```text
 Current ProjectSpecification
 +
-Previous Specification / Existing Artifact Inventory
+Optional RFC-0058 Profile / Renderer capabilities / Ownership state
+    ↓
+DocumentationProfileResolution + legacy compatibility binding
     ↓
 Renderer-owned Artifact Catalog
++
+Previous Specification / Existing Artifact Inventory
     ↓
 RFC-0052 DocumentationArtifactPlan
     ↓
@@ -48,7 +52,25 @@ Selective deterministic rendering
 Versioned documentation artifacts
 ```
 
-The renderer consumes canonical specification and plan inputs. It does not reinterpret source files or invent Evidence. RFC-0052 semantic Plan hashes remain part of the integrity boundary.
+The Profile Resolver consumes canonical specification, declared Renderer capabilities, Artifact descriptors, and Ownership Manifests. It does not render content or create RFC-0052 operations. The renderer consumes canonical specification and plan inputs; it does not reinterpret source files or invent Evidence. RFC-0052 semantic Plan hashes remain unchanged.
+
+## Documentation Profiles and Document Contracts
+
+```text
+Immutable kotlin-android@1 Profile
++
+ProjectSpecification DIR 0.3
++
+Renderer capability declaration
++
+Artifact Catalog / Ownership Manifests
+    ↓
+Deterministic DocumentationProfileResolution
+    ↓
+READY / PARTIAL / DEFERRED / BLOCKED / UNSUPPORTED
+```
+
+RFC-0058 defines purpose, audience, multiplicity, safe path policy, required and optional Sections, section-level Evidence, Renderer capabilities, completeness, ownership, dependency rules, Stable IDs, and semantic SHA-256. Feature and Contract documents remain DEFERRED because DIR 0.3 has no canonical production model for them. Profile paths are additive contracts and are not written or migrated by RFC-0058.
 
 ## Relationship semantics and projection
 
@@ -156,8 +178,9 @@ Provider output is non-canonical until accepted through the relevant Core workfl
 - Knowledge Builder constructs structured knowledge.
 - Specification Builder creates canonical DIR entities.
 - Snapshot persistence preserves exact specification identity.
+- Documentation Profile Resolver evaluates deterministic document readiness without creating Artifact operations.
 - Artifact Planner selects deterministic documentation work.
-- Renderer is presentation-only.
+- Renderer is presentation-only and declares only capabilities it supports.
 - Review and lifecycle services own authorization and apply state.
 - Reconciliation owns existing-document adoption and conflict decisions.
 - Evolution owns verified before/after explanation and causal integrity.
@@ -167,7 +190,7 @@ Provider output is non-canonical until accepted through the relevant Core workfl
 
 ## Canonical version policy
 
-| Contract | Current value | RFC-0057 policy |
+| Contract | Current value | RFC-0058 policy |
 |---|---:|---|
 | Manual `ProjectSpecification` default | DIR 0.2 | Retain for source compatibility |
 | Builder output | DIR 0.3 | Canonical current runtime output |
@@ -175,8 +198,9 @@ Provider output is non-canonical until accepted through the relevant Core workfl
 | Review Bundle | format 1 | Retain |
 | Evolution Report | format 1 | Retain |
 | Relationship Projection Report | format 1 | Retain |
+| Documentation Profile | `kotlin-android@1` | Runtime-only; no codec |
 
-DIR 0.4 is not implemented by RFC-0057. Future schema expansion must preserve DIR 0.3 readers or introduce an explicit new Snapshot format and migration operation rather than silently rewriting stored state.
+DIR 0.4 is not implemented by RFC-0058. Future schema expansion must preserve DIR 0.3 readers or introduce an explicit new Snapshot format and migration operation rather than silently rewriting stored state.
 
 ## Verification boundary
 

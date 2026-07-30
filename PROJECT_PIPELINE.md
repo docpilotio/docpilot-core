@@ -53,7 +53,24 @@ Current ProjectSpecification
 
 Nested API and Property changes propagate to owning Type and Package scopes. Ownership moves preserve both previous and current affected scopes.
 
-## 4. Selective documentation artifacts
+## 4. Documentation Profile resolution
+
+```text
+Documentation Profile
++
+Current ProjectSpecification
++
+Renderer capabilities
++
+Artifact Catalog and Ownership Manifests
+→ deterministic Document Contract Resolution
+→ READY / PARTIAL / DEFERRED / BLOCKED / UNSUPPORTED
+→ compatibility binding to RFC-0052 Artifacts
+```
+
+RFC-0058 Profile Resolution is policy evaluation, not rendering. `kotlin-android@1` defines nine document contracts. Feature and Contract documents remain `DEFERRED` under DIR 0.3. User-owned or unknown path collisions are `BLOCKED`; shared-managed paths require RFC-0055 Reconciliation. Profile paths are not automatically written.
+
+## 5. Selective documentation artifacts
 
 ```text
 Current ProjectSpecification
@@ -68,7 +85,7 @@ Existing Artifact inventory
 
 The Plan semantic hash binds specification, catalogs, inventory, operation, dependency, and selection inputs. Unchanged artifacts are not rewritten.
 
-## 5. AI incremental documentation review
+## 6. AI incremental documentation review
 
 ```text
 IncrementalUpdatePlan / Artifact Plan
@@ -94,7 +111,7 @@ Safety rules:
 - Evidence references and Stable IDs remain visible;
 - stale reviewed bases and managed-block conflicts fail closed.
 
-## 6. Review lifecycle and recovery
+## 7. Review lifecycle and recovery
 
 ```text
 Stored Review Bundle
@@ -106,7 +123,7 @@ Stored Review Bundle
 
 Core owns state transitions. CLI commands are thin adapters. Every mutation is preview-first and integrity-bound.
 
-## 7. Existing-document reconciliation
+## 8. Existing-document reconciliation
 
 ```text
 Artifact Plan
@@ -123,7 +140,7 @@ User Decisions
 
 The current source baseline exposes Core APIs but no official Reconciliation CLI command. Product-level E2E validation must not claim CLI support that does not exist.
 
-## 8. Documentation evolution intelligence
+## 9. Documentation evolution intelligence
 
 ```text
 Verified before/after Specification Snapshots
@@ -141,7 +158,7 @@ Optional Relationship / Ownership / Reconciliation Evidence
 
 The current source baseline exposes Core APIs and strict codecs but no official Evolution CLI or MCP adapter. AI may render narrative only after Report verification.
 
-## 9. Release and Product Validation
+## 10. Release and Product Validation
 
 Technical Release Evidence and public Product Validation are separate gates.
 

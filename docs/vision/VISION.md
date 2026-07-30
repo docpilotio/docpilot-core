@@ -67,10 +67,10 @@ Specialized profiles may later cover Wear OS, Bluetooth, Wi-Fi, background servi
 
 ## Documentation Expansion Direction
 
-The next expansion begins only after the DIR 0.3 and Snapshot format 1 baseline is fixed. Planned concepts include:
+The DIR 0.3 and Snapshot format 1 baseline is fixed. RFC-0058 now implements Documentation Profile and Document Contract policy; the remaining planned production concepts include:
 
-- Documentation Profile
-- Document Contract
+- Documentation Profile — implemented as runtime-only `kotlin-android@1` policy
+- Document Contract — implemented with deterministic Profile Resolution
 - Feature Specification
 - Entry Point Specification
 - Scenario Specification
@@ -108,6 +108,6 @@ The current public v1.0 decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROV
 
 - Status: Active product direction
 - Version: 0.3
-- Canonical baseline: RFC-0057
+- Canonical baseline: RFC-0058
 - Current development track: v1.1 Product Capability
 - Authority: Product Owner

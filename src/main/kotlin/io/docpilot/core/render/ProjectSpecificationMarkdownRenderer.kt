@@ -4,6 +4,8 @@ import io.docpilot.core.api.DocumentationArtifactDescriptor
 import io.docpilot.core.api.DocumentationArtifactId
 import io.docpilot.core.api.DocumentationArtifactKind
 import io.docpilot.core.api.SelectiveSpecificationRenderer
+import io.docpilot.core.documentation.profile.DocumentationRendererCapabilityProvider
+import io.docpilot.core.documentation.profile.RendererCapability
 import io.docpilot.core.model.ApiSpecification
 import io.docpilot.core.model.ComponentSpecification
 import io.docpilot.core.model.Evidence
@@ -22,7 +24,15 @@ import java.security.MessageDigest
  * This renderer is intentionally presentation-only: it does not inspect source files,
  * SourceIndex, or the Knowledge Graph and it does not infer missing specification data.
  */
-public class ProjectSpecificationMarkdownRenderer : SelectiveSpecificationRenderer {
+public class ProjectSpecificationMarkdownRenderer :
+    SelectiveSpecificationRenderer,
+    DocumentationRendererCapabilityProvider {
+    override fun capabilities(): Set<RendererCapability> = setOf(
+        RendererCapability.MARKDOWN_SECTION_RENDERING,
+        RendererCapability.EVIDENCE_REFERENCE_RENDERING,
+        RendererCapability.UNKNOWN_FINDING_RENDERING,
+    )
+
     override fun describe(specification: ProjectSpecification): List<DocumentationArtifactDescriptor> {
         val componentDescriptors = specification.components.map { component ->
             descriptor(
