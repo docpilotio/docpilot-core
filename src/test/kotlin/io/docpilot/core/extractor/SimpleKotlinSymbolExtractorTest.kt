@@ -14,6 +14,21 @@ class SimpleKotlinSymbolExtractorTest {
         SimpleKotlinSymbolExtractor()
 
     @Test
+    fun `extracts a supertype constructor after the inheritance colon`() {
+        val file = extractor.extract(
+            "Launcher.kt",
+            lexer.tokenize(
+                """
+                import androidx.activity.ComponentActivity
+                class Launcher : ComponentActivity()
+                """.trimIndent(),
+            ),
+        )
+
+        assertEquals(listOf("ComponentActivity()"), file.symbols.single().superTypes)
+    }
+
+    @Test
     fun `property accessor is not included in declared type and operators remain intact`() {
         val file = extractor.extract(
             "Task.kt",

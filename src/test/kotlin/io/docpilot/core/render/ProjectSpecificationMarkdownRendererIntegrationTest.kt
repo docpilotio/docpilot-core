@@ -44,7 +44,7 @@ class ProjectSpecificationMarkdownRendererIntegrationTest {
         val content = firstArtifacts.joinToString("\n") { it.content }
 
         assertEquals(firstArtifacts, secondArtifacts)
-        assertTrue(content.contains("- Schema version: `0.3`"))
+        assertTrue(content.contains("- Schema version: `0.4`"))
         assertTrue(content.contains("**io.sample.UserRepository**"))
         assertTrue(content.contains("`findUser(id: String): User?`"))
         assertTrue(content.contains("`cache`"))

@@ -324,12 +324,14 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
         }
 
         private fun extractSuperTypes(start: Int, end: Int): List<String> {
-            var cursor = start
-            val constructorOpen = (start until end).firstOrNull { tokens[it].text == "(" }
-            if (constructorOpen != null) {
-                cursor = matching(constructorOpen, "(", ")", end) + 1
-            }
-            val colon = (cursor until end).firstOrNull { tokens[it].text == ":" } ?: return emptyList()
+            var depth = 0
+            val colon = (start until end).firstOrNull {
+                when (tokens[it].text) {
+                    "(", "<", "[" -> depth++
+                    ")", ">", "]" -> depth--
+                }
+                depth == 0 && tokens[it].text == ":"
+            } ?: return emptyList()
             val whereIndex = (colon + 1 until end).firstOrNull { tokens[it].text == "where" } ?: end
             return splitTopLevel(colon + 1, whereIndex, ",")
                 .map { (s, e) -> render(s, e) }

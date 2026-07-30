@@ -1,5 +1,12 @@
 # DocPilot Project Pipeline
 
+The default specification pipeline is:
+
+`SourceIndex → Knowledge Graph → base DIR → deterministic Feature Discovery → DIR 0.4 validation → Snapshot format 2`
+
+Feature Discovery is AI-independent and Evidence-bounded. Projects without proven Feature
+Evidence still emit valid DIR 0.4 with empty collections.
+
 ## 1. Analyze a project
 
 Command:

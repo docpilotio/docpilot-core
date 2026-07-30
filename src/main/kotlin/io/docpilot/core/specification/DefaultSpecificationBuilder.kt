@@ -15,6 +15,7 @@ import io.docpilot.core.model.source.SourceFile
 import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
+import io.docpilot.core.specification.discovery.DeterministicFeatureDiscoveryEngine
 
 public class DefaultSpecificationBuilder : SpecificationBuilder {
     override fun build(request: SpecificationBuildRequest): ProjectSpecification =
@@ -132,7 +133,7 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
             component.copy(dependencyIds = dependencyIdsByComponent[component.id].orEmpty())
         }
 
-        val specification = ProjectSpecification(
+        val baseSpecification = ProjectSpecification(
             schemaVersion = CURRENT_SCHEMA_VERSION,
             project = request.project,
             modules = modules,
@@ -141,6 +142,19 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
             relationships = relationships,
             evidence = request.knowledge.evidence.items.sortedBy { it.id.value }.map(DirEvidenceMapper::map),
             unresolved = unresolved.distinctBy { it.id }.sortedBy { it.id },
+        )
+        val discovery = DeterministicFeatureDiscoveryEngine().discover(
+            graph = request.knowledge.graph,
+            baseSpecification = baseSpecification,
+            sourceIndex = request.sourceIndex,
+        )
+        val specification = baseSpecification.copy(
+            features = discovery.features,
+            entryPoints = discovery.entryPoints,
+            scenarios = discovery.scenarios,
+            unresolved = (baseSpecification.unresolved + discovery.unresolved)
+                .distinctBy { it.id }
+                .sortedBy { it.id },
         )
         ProjectSpecificationValidator.validate(specification)
         return SpecificationBuildResult(specification, projection.report)
@@ -303,6 +317,6 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
     private fun packageId(moduleId: String, packageName: String?): String = "$moduleId:package:${packageName ?: "<default>"}"
 
     public companion object {
-        public const val CURRENT_SCHEMA_VERSION: String = "0.3"
+        public const val CURRENT_SCHEMA_VERSION: String = "0.4"
     }
 }

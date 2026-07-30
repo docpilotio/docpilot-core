@@ -34,7 +34,7 @@ class DefaultSpecificationBuilderTest {
         val first = DefaultSpecificationBuilder().build(request)
         val second = DefaultSpecificationBuilder().build(request.copy(sourceIndex = sourceIndex.copy(files = sourceIndex.files.reversed())))
 
-        assertEquals("0.3", first.schemaVersion)
+        assertEquals("0.4", first.schemaVersion)
         assertEquals(first, second)
         assertEquals(listOf("module:app"), first.modules.map { it.id })
         assertEquals("io.sample", first.packages.single().qualifiedName)
