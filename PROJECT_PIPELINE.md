@@ -46,6 +46,9 @@ Ollama `qwen3:8b` was historically verified for the v0.5 smoke scope. OpenAI rea
 Previous ProjectSpecification
 +
 Current ProjectSpecification
+  -> optional explicit DIR 0.3 to 0.4 migration
+  -> Snapshot format 2 for DIR 0.4 (format 1 remains DIR 0.3)
+  -> Stable-ID Feature / Entry Point / Scenario / Step diff and planning
 → Stable-ID diff
 → Specification changes
 → Deterministic IncrementalUpdatePlan

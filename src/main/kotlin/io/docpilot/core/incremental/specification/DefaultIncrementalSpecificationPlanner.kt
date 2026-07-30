@@ -29,6 +29,10 @@ public class DefaultIncrementalSpecificationPlanner : IncrementalSpecificationPl
             addAll(diff.apiChanges.map { it.toAction(IncrementalUpdateTarget.API) })
             addAll(diff.propertyChanges.map { it.toAction(IncrementalUpdateTarget.PROPERTY) })
             addAll(diff.relationshipChanges.map { it.toAction(IncrementalUpdateTarget.RELATIONSHIP) })
+            addAll(diff.featureChanges.map { it.toAction(IncrementalUpdateTarget.FEATURE) })
+            addAll(diff.entryPointChanges.map { it.toAction(IncrementalUpdateTarget.ENTRY_POINT) })
+            addAll(diff.scenarioChanges.map { it.toAction(IncrementalUpdateTarget.SCENARIO) })
+            addAll(diff.scenarioStepChanges.map { it.toAction(IncrementalUpdateTarget.SCENARIO_STEP) })
         }.sortedWith(compareBy({ it.target.ordinal }, { it.parentId ?: "" }, { it.id }, { it.changeKind.ordinal }))
 
         val changedTypeIds = buildSet {

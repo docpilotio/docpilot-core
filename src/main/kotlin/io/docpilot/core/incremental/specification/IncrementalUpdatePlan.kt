@@ -7,6 +7,10 @@ public enum class IncrementalUpdateTarget {
     API,
     PROPERTY,
     RELATIONSHIP,
+    FEATURE,
+    ENTRY_POINT,
+    SCENARIO,
+    SCENARIO_STEP,
 }
 
 public data class IncrementalUpdateAction(

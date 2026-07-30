@@ -6,6 +6,9 @@ import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.ProjectSpecification
 import io.docpilot.core.model.PropertySpecification
 import io.docpilot.core.model.RelationshipSpecification
+import io.docpilot.core.model.FeatureSpecification
+import io.docpilot.core.model.EntryPointSpecification
+import io.docpilot.core.model.ScenarioSpecification
 
 /** Stable-id based, deterministic ProjectSpecification differ. */
 public class DefaultSpecificationDiffer : SpecificationDiffer {
@@ -45,6 +48,25 @@ public class DefaultSpecificationDiffer : SpecificationDiffer {
                 ),
                 parentId = RelationshipSpecification::sourceId,
             ),
+            featureChanges = compare(
+                indexByStableId(previous.features, FeatureSpecification::id, "previous features"),
+                indexByStableId(current.features, FeatureSpecification::id, "current features"),
+            ),
+            entryPointChanges = compare(
+                indexByStableId(previous.entryPoints, EntryPointSpecification::id, "previous entry points"),
+                indexByStableId(current.entryPoints, EntryPointSpecification::id, "current entry points"),
+                parentId = EntryPointSpecification::ownerComponentId,
+            ),
+            scenarioChanges = compare(
+                indexByStableId(previous.scenarios, ScenarioSpecification::id, "previous scenarios"),
+                indexByStableId(current.scenarios, ScenarioSpecification::id, "current scenarios"),
+                comparable = { it.copy(steps = emptyList()) },
+                parentId = ScenarioSpecification::featureId,
+            ),
+            scenarioStepChanges = compareOwned(
+                flattenSteps(previous.scenarios),
+                flattenSteps(current.scenarios),
+            ),
         )
     }
 
@@ -60,6 +82,11 @@ public class DefaultSpecificationDiffer : SpecificationDiffer {
             types.values.forEach { type ->
                 type.properties.forEach { property -> add(property.id, Owned(type.id, property)) }
             }
+        }
+
+    private fun flattenSteps(scenarios: List<ScenarioSpecification>) =
+        buildOwnedIndex<io.docpilot.core.model.ScenarioStepSpecification>("scenario steps") {
+            scenarios.forEach { scenario -> scenario.steps.forEach { add(it.id, Owned(scenario.id, it)) } }
         }
 
     private fun <T> compareOwned(

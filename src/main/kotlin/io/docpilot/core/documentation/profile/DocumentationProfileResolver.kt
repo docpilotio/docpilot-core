@@ -69,7 +69,7 @@ public class DefaultDocumentationProfileResolver(
         catalog: List<DocumentationArtifactDescriptor>,
         manifestsByPath: Map<String, DocumentationOwnershipManifest>,
     ): List<ResolvedDocumentContract> {
-        val missingModelFinding = missingModelFinding(profile, definition)
+        val missingModelFinding = missingModelFinding(profile, definition, specification)
         val scopes = scopes(definition.multiplicity, specification)
         if (scopes.isEmpty()) {
             val kind = when (definition.multiplicity) {
@@ -380,7 +380,14 @@ public class DefaultDocumentationProfileResolver(
         DocumentMultiplicity.PER_COMPONENT -> specification.components.sortedBy { it.id }.map {
             Scope(it.id, it.qualifiedName ?: it.name, listOfNotNull(it.id, it.moduleId, it.packageId))
         }
-        DocumentMultiplicity.PER_FEATURE -> emptyList()
+        DocumentMultiplicity.PER_FEATURE -> specification.features.map {
+            Scope(
+                it.id,
+                it.name,
+                (listOf(it.id, it.ownerComponentId) + it.participantComponentIds + it.entryPointIds + it.scenarioIds)
+                    .distinct().sorted(),
+            )
+        }
         DocumentMultiplicity.PER_EXTERNAL_SYSTEM -> specification.relationships.map { it.targetId }
             .filter { it.startsWith("external:") }.distinct().sorted().map {
                 Scope(it, it.removePrefix("external:"), listOf(it))
@@ -397,6 +404,12 @@ public class DefaultDocumentationProfileResolver(
             addAll(component.properties.map { it.id })
         }
         addAll(specification.relationships.map { it.id })
+        addAll(specification.features.map { it.id })
+        addAll(specification.entryPoints.map { it.id })
+        specification.scenarios.forEach { scenario ->
+            add(scenario.id)
+            addAll(scenario.steps.map { it.id })
+        }
     }.distinct().sorted()
 
     private fun evidenceFor(scope: Scope, specification: ProjectSpecification): List<Evidence> {
@@ -417,6 +430,13 @@ public class DefaultDocumentationProfileResolver(
             specification.relationships.filter {
                 it.id in scope.sourceElementIds || it.sourceId in scope.sourceElementIds || it.targetId in scope.sourceElementIds
             }.forEach { refs += it.evidenceRefs }
+            specification.features.filter { it.id in scope.sourceElementIds }.forEach {
+                refs += it.evidenceRefs
+                refs += specification.entryPoints.filter { entry -> entry.id in it.entryPointIds }.flatMap { entry -> entry.evidenceRefs }
+                refs += specification.scenarios.filter { scenario -> scenario.id in it.scenarioIds }.flatMap { scenario ->
+                    scenario.evidenceRefs + scenario.steps.flatMap { step -> step.evidenceRefs }
+                }
+            }
         }
         return specification.evidence.filter { it.id in refs }.sortedBy { it.id }
     }
@@ -449,15 +469,16 @@ public class DefaultDocumentationProfileResolver(
     private fun missingModelFinding(
         profile: DocumentationProfile,
         definition: DocumentDefinition,
+        specification: ProjectSpecification,
     ): DocumentPlanningFinding? = when (definition.requiredModel) {
         DocumentationModelRequirement.NONE -> null
-        DocumentationModelRequirement.FEATURE_MODEL -> DocumentPlanningFinding(
+        DocumentationModelRequirement.FEATURE_MODEL -> if (specification.features.isEmpty()) DocumentPlanningFinding(
             DocumentPlanningFindingKind.MISSING_FEATURE_MODEL,
             documentStableId(profile, definition, "deferred"),
             definition.stableKey.value,
-            "DIR 0.3 does not provide a Feature production model.",
+            "No validated DIR 0.4 Feature production entities are available.",
             blocking = false,
-        )
+        ) else null
         DocumentationModelRequirement.CONTRACT_MODEL -> DocumentPlanningFinding(
             DocumentPlanningFindingKind.MISSING_CONTRACT_MODEL,
             documentStableId(profile, definition, "deferred"),

@@ -5,11 +5,16 @@ import io.docpilot.core.specification.ProjectSpecificationValidator
 
 public class JsonSpecificationSnapshotCodec {
     public fun encode(specification: ProjectSpecification): String {
+        val formatVersion = when (specification.schemaVersion) {
+            SpecificationSnapshotFormat.LEGACY_DIR_SCHEMA_VERSION -> SpecificationSnapshotFormat.LEGACY_VERSION
+            SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION -> SpecificationSnapshotFormat.DIR_0_4_VERSION
+            else -> require(false) { "Unsupported DIR schema version: ${specification.schemaVersion}" }
+        }
         val payload = encodePayload(specification)
         val integrity = SpecificationSnapshotIntegrity.sha256(payload)
         return buildString {
             append("{\n")
-            append("  \"snapshotFormatVersion\": ").append(SpecificationSnapshotFormat.CURRENT_VERSION).append(",\n")
+            append("  \"snapshotFormatVersion\": ").append(formatVersion).append(",\n")
             append("  \"dirSchemaVersion\": ").appendJsonString(specification.schemaVersion).append(",\n")
             append("  \"projectIdentity\": {\"projectId\": ").appendJsonString(specification.project.id).append("},\n")
             append("  \"specification\": ").append(payload).append(",\n")
@@ -23,14 +28,19 @@ public class JsonSpecificationSnapshotCodec {
         return try {
         val root = JsonParser(value).parseRootObject()
         val version = root.requiredLong("snapshotFormatVersion").toIntExact("snapshotFormatVersion")
-        if (version != SpecificationSnapshotFormat.CURRENT_VERSION) {
+        if (version !in setOf(SpecificationSnapshotFormat.LEGACY_VERSION, SpecificationSnapshotFormat.DIR_0_4_VERSION)) {
             return SpecificationSnapshotLoadResult.Invalid(
                 SnapshotValidationFailure.UNSUPPORTED_VERSION,
                 "Unsupported specification snapshot format version: $version",
             )
         }
         val dirVersion = root.requiredString("dirSchemaVersion")
-        if (dirVersion != SpecificationSnapshotFormat.SUPPORTED_DIR_SCHEMA_VERSION) {
+        val expectedDirVersion = if (version == SpecificationSnapshotFormat.LEGACY_VERSION) {
+            SpecificationSnapshotFormat.LEGACY_DIR_SCHEMA_VERSION
+        } else {
+            SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION
+        }
+        if (dirVersion != expectedDirVersion) {
             return SpecificationSnapshotLoadResult.Invalid(
                 SnapshotValidationFailure.SCHEMA_MISMATCH,
                 "Unsupported DIR schema version: $dirVersion",
@@ -109,6 +119,15 @@ public class JsonSpecificationSnapshotCodec {
         append(','); field("relationships", array(specification.relationships.sortedBy { it.id }.map(::encodeRelationship)), raw = true)
         append(','); field("evidence", array(specification.evidence.sortedBy { it.id }.map(::encodeEvidence)), raw = true)
         append(','); field("unresolved", array(specification.unresolved.sortedBy { it.id }.map(::encodeUnresolved)), raw = true)
+        if (specification.schemaVersion == SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION) {
+            append(','); field("features", array(specification.features.sortedBy { it.id }.map(::encodeFeature)), raw = true)
+            append(','); field("entryPoints", array(specification.entryPoints.sortedBy { it.id }.map(::encodeEntryPoint)), raw = true)
+            append(','); field(
+                "scenarios",
+                array(specification.scenarios.sortedWith(compareBy({ it.featureId }, { it.id })).map(::encodeScenario)),
+                raw = true,
+            )
+        }
         append('}')
     }
 
@@ -159,6 +178,29 @@ public class JsonSpecificationSnapshotCodec {
     private fun encodeUnresolved(v: UnresolvedItem) = obj(
         "id" to str(v.id), "subject" to str(v.subject), "question" to str(v.question), "requiredAction" to nullable(v.requiredAction),
     )
+    private fun encodeFeature(v: FeatureSpecification) = obj(
+        "id" to str(v.id), "name" to str(v.name), "description" to nullable(v.description),
+        "ownerComponentId" to str(v.ownerComponentId), "participantComponentIds" to strings(v.participantComponentIds),
+        "entryPointIds" to array(v.entryPointIds.map(::str)), "scenarioIds" to array(v.scenarioIds.map(::str)),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
+    private fun encodeEntryPoint(v: EntryPointSpecification) = obj(
+        "id" to str(v.id), "name" to str(v.name), "kind" to str(v.kind),
+        "ownerComponentId" to str(v.ownerComponentId), "apiId" to nullable(v.apiId),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
+    private fun encodeScenario(v: ScenarioSpecification) = obj(
+        "id" to str(v.id), "featureId" to str(v.featureId), "name" to str(v.name),
+        "entryPointId" to nullable(v.entryPointId),
+        "steps" to array(v.steps.sortedWith(compareBy({ it.order }, { it.id })).map(::encodeScenarioStep)),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
+    private fun encodeScenarioStep(v: ScenarioStepSpecification) = obj(
+        "id" to str(v.id), "order" to v.order.toString(), "action" to str(v.action),
+        "ownerComponentId" to str(v.ownerComponentId), "targetComponentId" to nullable(v.targetComponentId),
+        "apiId" to nullable(v.apiId), "evidenceRefs" to strings(v.evidenceRefs),
+        "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
 
     private fun decodeSpecification(o: JsonValue.ObjectValue): ProjectSpecification = ProjectSpecification(
         schemaVersion = o.requiredString("schemaVersion"),
@@ -169,6 +211,9 @@ public class JsonSpecificationSnapshotCodec {
         relationships = o.requiredArray("relationships").mapObject(::decodeRelationship),
         evidence = o.requiredArray("evidence").mapObject(::decodeEvidence),
         unresolved = o.requiredArray("unresolved").mapObject(::decodeUnresolved),
+        features = o.optionalArray("features").mapObject(::decodeFeature),
+        entryPoints = o.optionalArray("entryPoints").mapObject(::decodeEntryPoint),
+        scenarios = o.optionalArray("scenarios").mapObject(::decodeScenario),
     )
     private fun decodeProject(o: JsonValue.ObjectValue) = ProjectDescriptor(
         o.requiredString("id"), o.requiredString("name"), o.optionalString("description"),
@@ -215,6 +260,27 @@ public class JsonSpecificationSnapshotCodec {
     private fun decodeUnresolved(o: JsonValue.ObjectValue) = UnresolvedItem(
         o.requiredString("id"), o.requiredString("subject"), o.requiredString("question"), o.optionalString("requiredAction"),
     )
+    private fun decodeFeature(o: JsonValue.ObjectValue) = FeatureSpecification(
+        id=o.requiredString("id"), name=o.requiredString("name"), description=o.optionalString("description"),
+        ownerComponentId=o.requiredString("ownerComponentId"), participantComponentIds=o.stringSet("participantComponentIds"),
+        entryPointIds=o.stringList("entryPointIds"), scenarioIds=o.stringList("scenarioIds"),
+        evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
+    private fun decodeEntryPoint(o: JsonValue.ObjectValue) = EntryPointSpecification(
+        id=o.requiredString("id"), name=o.requiredString("name"), kind=o.requiredString("kind"),
+        ownerComponentId=o.requiredString("ownerComponentId"), apiId=o.optionalString("apiId"),
+        evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
+    private fun decodeScenario(o: JsonValue.ObjectValue) = ScenarioSpecification(
+        id=o.requiredString("id"), featureId=o.requiredString("featureId"), name=o.requiredString("name"),
+        entryPointId=o.optionalString("entryPointId"), steps=o.requiredArray("steps").mapObject(::decodeScenarioStep),
+        evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
+    private fun decodeScenarioStep(o: JsonValue.ObjectValue) = ScenarioStepSpecification(
+        id=o.requiredString("id"), order=o.requiredLong("order").toIntExact("order"), action=o.requiredString("action"),
+        ownerComponentId=o.requiredString("ownerComponentId"), targetComponentId=o.optionalString("targetComponentId"),
+        apiId=o.optionalString("apiId"), evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
 
     private fun StringBuilder.field(name: String, value: String, raw: Boolean = false) {
         appendJsonString(name).append(':')
@@ -255,6 +321,7 @@ private fun JsonValue.ObjectValue.optionalBoolean(n:String)= when(val v=values[n
 private fun JsonValue.ObjectValue.optionalInt(n:String)= when(val v=values[n]) { null, JsonValue.NullValue -> null; is JsonValue.NumberValue -> v.value.toIntExact(n); else -> error("Invalid JSON number: $n") }
 private fun JsonValue.ObjectValue.requiredObject(n:String)= values[n] as? JsonValue.ObjectValue ?: error("Missing or invalid JSON object: $n")
 private fun JsonValue.ObjectValue.requiredArray(n:String)= (values[n] as? JsonValue.ArrayValue)?.values ?: error("Missing or invalid JSON array: $n")
+private fun JsonValue.ObjectValue.optionalArray(n:String)= when(val v=values[n]) { null -> emptyList(); is JsonValue.ArrayValue -> v.values; else -> error("Invalid JSON array: $n") }
 private fun JsonValue.ObjectValue.stringList(n:String)=requiredArray(n).mapIndexed { i,v -> (v as? JsonValue.StringValue)?.value ?: error("Invalid string at $n[$i]") }
 private fun JsonValue.ObjectValue.stringSet(n:String)=stringList(n).toSet()
 private fun <T> List<JsonValue>.mapObject(f:(JsonValue.ObjectValue)->T)=mapIndexed { i,v -> f(v as? JsonValue.ObjectValue ?: error("Expected object at index $i")) }

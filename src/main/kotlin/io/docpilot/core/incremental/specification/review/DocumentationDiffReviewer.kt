@@ -176,6 +176,10 @@ public class DefaultDocumentationDiffReviewer(
         IncrementalUpdateTarget.PROPERTY ->
             specification.components.any { component -> component.properties.any { it.id == id } }
         IncrementalUpdateTarget.RELATIONSHIP -> specification.relationships.any { it.id == id }
+        IncrementalUpdateTarget.FEATURE -> specification.features.any { it.id == id }
+        IncrementalUpdateTarget.ENTRY_POINT -> specification.entryPoints.any { it.id == id }
+        IncrementalUpdateTarget.SCENARIO -> specification.scenarios.any { it.id == id }
+        IncrementalUpdateTarget.SCENARIO_STEP -> specification.scenarios.any { scenario -> scenario.steps.any { it.id == id } }
     }
 
     private fun sha256(documentation: String): String =
@@ -213,5 +217,10 @@ public class DefaultDocumentationDiffReviewer(
             ?.evidenceRefs
         IncrementalUpdateTarget.RELATIONSHIP ->
             specification.relationships.firstOrNull { it.id == id }?.evidenceRefs
+        IncrementalUpdateTarget.FEATURE -> specification.features.firstOrNull { it.id == id }?.evidenceRefs
+        IncrementalUpdateTarget.ENTRY_POINT -> specification.entryPoints.firstOrNull { it.id == id }?.evidenceRefs
+        IncrementalUpdateTarget.SCENARIO -> specification.scenarios.firstOrNull { it.id == id }?.evidenceRefs
+        IncrementalUpdateTarget.SCENARIO_STEP -> specification.scenarios.asSequence().flatMap { it.steps.asSequence() }
+            .firstOrNull { it.id == id }?.evidenceRefs
     } ?: emptySet()
 }

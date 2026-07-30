@@ -62,6 +62,15 @@ public class DefaultSpecificationIncrementalPromptBuilder : SpecificationIncreme
                         "targetKind=${RelationshipEndpointSemantics.kindOf(it.targetId, internalIds)}; " +
                         "description=${it.description.orEmpty()}; evidence=${it.evidenceRefs.sorted().joinToString()}"
                 }
+            IncrementalUpdateTarget.FEATURE -> specification.features.firstOrNull { it.id == action.id }
+                ?.let { "id=${it.id}; name=${it.name}; owner=${it.ownerComponentId}; evidence=${it.evidenceRefs.sorted().joinToString()}" }
+            IncrementalUpdateTarget.ENTRY_POINT -> specification.entryPoints.firstOrNull { it.id == action.id }
+                ?.let { "id=${it.id}; name=${it.name}; kind=${it.kind}; owner=${it.ownerComponentId}; api=${it.apiId.orEmpty()}" }
+            IncrementalUpdateTarget.SCENARIO -> specification.scenarios.firstOrNull { it.id == action.id }
+                ?.let { "id=${it.id}; feature=${it.featureId}; name=${it.name}; steps=${it.steps.map { step -> step.id }.joinToString()}" }
+            IncrementalUpdateTarget.SCENARIO_STEP -> specification.scenarios.asSequence().flatMap { it.steps.asSequence() }
+                .firstOrNull { it.id == action.id }
+                ?.let { "id=${it.id}; order=${it.order}; action=${it.action}; owner=${it.ownerComponentId}" }
         }
         return value?.let { "$label $it" } ?: if (action.changeKind == ChangeKind.REMOVED) "$label id=${action.id}; removed=true" else null
     }

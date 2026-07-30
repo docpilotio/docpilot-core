@@ -2,7 +2,7 @@
 
 ## Proposed status
 
-`PROPOSED / NOT_STARTED`
+`APPROVED / IMPLEMENTED`
 
 ## Motivation
 
@@ -43,14 +43,12 @@ Profile Resolution re-evaluation
 
 RFC-0059 should not implement runtime call-path extraction, AI Feature invention, Diagram IR, Mermaid, or full business behavior inference.
 
-## Required design comparison
+## Approved design
 
-At least two candidates should be compared:
-
-1. DIR 0.4 additive entities with Snapshot format 2 and retained format 1 readers.
-2. Runtime-only Feature projection beside DIR 0.3, followed by later persistence.
-
-The selected candidate must explain compatibility with RFC-0037 diff, RFC-0040 Snapshot, RFC-0045 relationship impact, RFC-0052 Artifact Plan, RFC-0056 Evolution, and RFC-0058 Profile Resolution.
+The approved Work Order selected additive DIR 0.4 entities with Snapshot format
+2 and retained format 1/DIR 0.3 behavior. No candidate comparison is required.
+RFC-0037 diff/planning and RFC-0058 Profile Resolution are extended; RFC-0052
+Artifact Plans and RFC-0056 Evolution Report format 1 remain unchanged.
 
 ## Proposed completion conditions
 

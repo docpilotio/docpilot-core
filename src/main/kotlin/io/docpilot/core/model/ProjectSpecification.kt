@@ -9,6 +9,9 @@ public data class ProjectSpecification(
     public val relationships: List<RelationshipSpecification> = emptyList(),
     public val evidence: List<Evidence> = emptyList(),
     public val unresolved: List<UnresolvedItem> = emptyList(),
+    public val features: List<FeatureSpecification> = emptyList(),
+    public val entryPoints: List<EntryPointSpecification> = emptyList(),
+    public val scenarios: List<ScenarioSpecification> = emptyList(),
 )
 
 public data class ProjectDescriptor(
@@ -125,3 +128,74 @@ public data class UnresolvedItem(
     public val question: String,
     public val requiredAction: String? = null,
 )
+
+/** Evidence-backed user-visible or system capability. IDs are supplied by deterministic producers, never inferred here. */
+public data class FeatureSpecification(
+    public val id: String,
+    public val name: String,
+    public val description: String? = null,
+    public val ownerComponentId: String,
+    public val participantComponentIds: Set<String> = emptySet(),
+    public val entryPointIds: List<String> = emptyList(),
+    public val scenarioIds: List<String> = emptyList(),
+    public val evidenceRefs: Set<String> = emptySet(),
+    public val unresolvedRefs: Set<String> = emptySet(),
+)
+
+/** A concrete API or component boundary through which a Feature is activated. */
+public data class EntryPointSpecification(
+    public val id: String,
+    public val name: String,
+    public val kind: String,
+    public val ownerComponentId: String,
+    public val apiId: String? = null,
+    public val evidenceRefs: Set<String> = emptySet(),
+    public val unresolvedRefs: Set<String> = emptySet(),
+)
+
+public enum class EntryPointKind {
+    ANDROID_ACTIVITY,
+    ANDROID_FRAGMENT,
+    ANDROID_SERVICE,
+    ANDROID_RECEIVER,
+    ANDROID_PROVIDER,
+    COMPOSE_DESTINATION,
+    PUBLIC_API,
+    CLI_COMMAND,
+    BACKGROUND_WORKER,
+    SCHEDULED_JOB,
+    UNKNOWN,
+}
+
+/** An explicitly ordered, Evidence-backed flow belonging to one Feature. */
+public data class ScenarioSpecification(
+    public val id: String,
+    public val featureId: String,
+    public val name: String,
+    public val entryPointId: String? = null,
+    public val steps: List<ScenarioStepSpecification>,
+    public val evidenceRefs: Set<String> = emptySet(),
+    public val unresolvedRefs: Set<String> = emptySet(),
+)
+
+public data class ScenarioStepSpecification(
+    public val id: String,
+    public val order: Int,
+    public val action: String,
+    public val ownerComponentId: String,
+    public val targetComponentId: String? = null,
+    public val apiId: String? = null,
+    public val evidenceRefs: Set<String> = emptySet(),
+    public val unresolvedRefs: Set<String> = emptySet(),
+)
+
+public enum class ScenarioStepKind {
+    CALL,
+    READ,
+    WRITE,
+    EMIT,
+    OBSERVE,
+    TRIGGER,
+    RETURN,
+    UNKNOWN,
+}

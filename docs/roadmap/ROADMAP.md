@@ -40,7 +40,7 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 | RFC-0056 | `IMPLEMENTATION_COMPLETED_WITH_VERIFICATION_LIMITATION` | v1.1-only; full Gradle and architecture-samples Evolution E2E pending |
 | RFC-0057 | Implemented | Canonical Baseline and Documentation Expansion Readiness |
 | RFC-0058 | `IMPLEMENTED_WITH_ENVIRONMENT_VERIFICATION_LIMITATION` | Documentation Profiles and Document Contracts |
-| RFC-0059 | Proposed next | Feature, Entry Point, and Scenario Specification Foundation |
+| RFC-0059 | Implemented | Feature, Entry Point, and Scenario Specification Foundation |
 
 ## Historical release milestones
 
@@ -60,7 +60,8 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 
 1. RFC-0057 — Canonical Baseline and Documentation Expansion Readiness — implemented.
 2. RFC-0058 — Documentation Profiles and Document Contracts — implemented with environment verification limitation.
-3. RFC-0059 — Feature, Entry Point, and Scenario Specification Foundation — proposed next.
+3. RFC-0059 — Feature, Entry Point, and Scenario Specification Foundation — implemented.
+4. RFC-0060 — deterministic Evidence-bounded DIR 0.4 projection — proposed next.
 4. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
 
 RFC-0058 keeps Profiles and Resolutions runtime-only. It does not introduce DIR 0.4, change Snapshot format 1, or add Feature/Scenario production entities.

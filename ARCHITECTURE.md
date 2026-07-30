@@ -200,7 +200,12 @@ Provider output is non-canonical until accepted through the relevant Core workfl
 | Relationship Projection Report | format 1 | Retain |
 | Documentation Profile | `kotlin-android@1` | Runtime-only; no codec |
 
-DIR 0.4 is not implemented by RFC-0058. Future schema expansion must preserve DIR 0.3 readers or introduce an explicit new Snapshot format and migration operation rather than silently rewriting stored state.
+RFC-0059 implements additive DIR 0.4 Feature, Entry Point, Scenario, and ordered
+Scenario Step entities. Snapshot format 2 is strict for DIR 0.4; format 1/DIR
+0.3 remains supported, and migration is explicit. Manual construction still
+defaults to DIR 0.2 and the default builder still emits DIR 0.3 with empty
+additive collections. Feature Markdown and Evolution Report integration remain
+deferred.
 
 ## Verification boundary
 

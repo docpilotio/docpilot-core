@@ -5,6 +5,10 @@ import io.docpilot.core.model.ComponentSpecification
 import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.PropertySpecification
 import io.docpilot.core.model.RelationshipSpecification
+import io.docpilot.core.model.FeatureSpecification
+import io.docpilot.core.model.EntryPointSpecification
+import io.docpilot.core.model.ScenarioSpecification
+import io.docpilot.core.model.ScenarioStepSpecification
 
 /** A deterministic change entry identified by the entity's stable DIR id. */
 public data class SpecificationChange<T>(
@@ -37,13 +41,21 @@ public data class SpecificationDiff(
     public val apiChanges: List<SpecificationChange<ApiSpecification>> = emptyList(),
     public val propertyChanges: List<SpecificationChange<PropertySpecification>> = emptyList(),
     public val relationshipChanges: List<SpecificationChange<RelationshipSpecification>> = emptyList(),
+    public val featureChanges: List<SpecificationChange<FeatureSpecification>> = emptyList(),
+    public val entryPointChanges: List<SpecificationChange<EntryPointSpecification>> = emptyList(),
+    public val scenarioChanges: List<SpecificationChange<ScenarioSpecification>> = emptyList(),
+    public val scenarioStepChanges: List<SpecificationChange<ScenarioStepSpecification>> = emptyList(),
 ) {
     public val hasChanges: Boolean
         get() = packageChanges.isNotEmpty() ||
             typeChanges.isNotEmpty() ||
             apiChanges.isNotEmpty() ||
             propertyChanges.isNotEmpty() ||
-            relationshipChanges.isNotEmpty()
+            relationshipChanges.isNotEmpty() ||
+            featureChanges.isNotEmpty() ||
+            entryPointChanges.isNotEmpty() ||
+            scenarioChanges.isNotEmpty() ||
+            scenarioStepChanges.isNotEmpty()
 
     public companion object {
         public val EMPTY: SpecificationDiff = SpecificationDiff()

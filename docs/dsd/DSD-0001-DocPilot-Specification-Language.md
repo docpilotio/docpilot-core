@@ -520,3 +520,21 @@ section:{profileId}:{stableKey}:{sectionId}
 ```
 
 Titles, purposes, Evidence policies, paths, capabilities, completeness, ownership, and dependencies affect semantic SHA-256. Timestamps, absolute paths, filesystem order, object identity, and AI narrative do not.
+
+## RFC-0059 DIR 0.4 Feature, Entry Point, and Scenario Foundation
+
+DIR 0.4 additively extends `ProjectSpecification` with canonical Feature, Entry
+Point, and Scenario collections. Scenario Steps are nested in their owning
+Scenario. Existing DIR 0.2 manual construction and the DIR 0.3 automatic builder
+remain supported; RFC-0059 performs no Feature discovery.
+
+Every new entity has an externally supplied deterministic Stable ID and explicit
+Evidence references. Entry Point and Step kinds use fixed allowlists. Ambiguous
+or unsupported facts reference existing `UnresolvedItem` records and are never
+selected implicitly. Scenario Step Stable IDs are semantic and independent of
+their numeric order; canonical order is `order` followed by Stable ID.
+
+Snapshot format 2 stores DIR 0.4. Snapshot format 1 remains the DIR 0.3 format.
+The explicit format-1-to-format-2 migration preserves existing entities,
+Evidence, unresolved records, and Stable IDs, initializes the new collections
+empty, and never calls AI or overwrites its input.

@@ -11,10 +11,25 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import io.docpilot.core.specification.FeatureDir04SpecificationTest
 
 class DocumentationProfileResolverTest {
     private val renderer = ProjectSpecificationMarkdownRenderer()
     private val resolver = DefaultDocumentationProfileResolver()
+
+    @Test
+    fun `validated DIR 0_4 features enable feature catalog and specifications without markdown rendering`() {
+        val specification = FeatureDir04SpecificationTest().specification()
+        val resolution = resolve(specification)
+        val catalog = resolution.documents.single { it.type == DocumentType.FEATURE_CATALOG }
+        val featureDocuments = resolution.documents.filter { it.type == DocumentType.FEATURE_SPECIFICATION }
+
+        assertTrue(catalog.status in setOf(DocumentPlanningStatus.READY, DocumentPlanningStatus.PARTIAL))
+        assertEquals(specification.features.size, featureDocuments.size)
+        assertTrue(featureDocuments.all { it.status in setOf(DocumentPlanningStatus.READY, DocumentPlanningStatus.PARTIAL) })
+        assertTrue(renderer.describe(specification).none { it.relativePath.contains("feature", ignoreCase = true) })
+        assertTrue(DocumentationProfileIntegrity.verifyResolution(resolution))
+    }
 
     @Test
     fun `resolves built-in profile and defers unsupported DIR models without inventing elements`() {
