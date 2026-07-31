@@ -57,6 +57,33 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
                 )
             }
         }
+        sourceIndex?.files.orEmpty().sortedBy { it.relativePath }.forEach { file ->
+            val composeFunctions = file.symbols.filter {
+                it.kind == SourceSymbolKind.FUNCTION &&
+                    it.annotations.any { annotation -> annotation.substringAfterLast('.') == "Composable" }
+            }
+            if (composeFunctions.isEmpty()) return@forEach
+            val apis = composeFunctions.map { symbol ->
+                val node = nodeById["symbol:${symbol.id}"]
+                val apiId = node?.id ?: "symbol:${symbol.id}"
+                if (node != null) symbolSpecIdByNodeId[node.id] = apiId
+                symbol.toApi(apiId, node)
+            }.sortedBy { it.id }
+            components += ComponentSpecification(
+                id = "compose-file:${file.relativePath}",
+                name = file.relativePath.substringAfterLast('/').substringBeforeLast('.'),
+                moduleId = moduleId(file),
+                packageId = packageByFile.getValue(file.relativePath),
+                qualifiedName = file.packageName?.let {
+                    "$it.${file.relativePath.substringAfterLast('/').substringBeforeLast('.')}"
+                },
+                kind = "COMPOSE_FILE",
+                role = "Container for top-level Compose destination APIs.",
+                visibility = "INTERNAL",
+                apis = apis,
+                evidenceRefs = apis.flatMapTo(sortedSetOf()) { it.evidenceRefs },
+            )
+        }
 
         request.knowledge.graph.unresolved.sortedBy { it.id }.forEach { item ->
             unresolved += UnresolvedItem(

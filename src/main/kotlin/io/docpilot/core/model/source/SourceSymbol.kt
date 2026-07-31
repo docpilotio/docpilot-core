@@ -22,6 +22,7 @@ data class SourceSymbol(
     val superTypes: List<String> = emptyList(),
     val superTypeReferences: List<SourceSuperTypeReference> = emptyList(),
     val calls: List<SourceCall> = emptyList(),
+    val initializerExpression: String? = null,
 ) {
     init { require(name.isNotBlank()) { "name must not be blank." } }
 }

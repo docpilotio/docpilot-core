@@ -541,3 +541,7 @@ empty, and never calls AI or overwrites its input.
 ## RFC-0060 deterministic Feature Discovery
 
 The default Builder emits DIR 0.4 after an AI-independent discovery stage. Exact Android framework supertype Evidence creates Entry Points; Features are rooted at those components; participant traversal is limited to CALLS, DEPENDS_ON, IMPLEMENTS, and EXTENDS with depth 4 and at most 32 participants. Scenarios contain only direct Evidence-backed CALLS steps. Stable IDs exclude display names and step order. Discovery results use canonical ordering and SHA-256 semantic integrity. Unsupported Compose routes, dynamic flow, callbacks, and ambiguous targets are not inferred.
+
+## RFC-0061 Compose Navigation Evidence
+
+DIR 0.4 Compose destination production entities require a resolved route declaration, a known navigation registration, and one actual destination API. Route, registration, destination-link, and unresolved identities are canonical and order-independent. Plain composables, dynamic routes, and ambiguous targets are not promoted; ambiguity remains an UnresolvedItem. Snapshot format 2 stores the resulting Entry Point, Feature, Scenario, and Evidence references while format 1 remains unchanged.

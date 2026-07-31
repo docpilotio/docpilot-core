@@ -31,6 +31,8 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 - RFC-0058 `kotlin-android@1` Profile, Document/Section contracts, Evidence and capability policy, completeness findings, ownership safety, semantic hashes, and additive RFC-0052 compatibility binding
 - RFC-0059 Feature, Entry Point, Scenario, and Scenario Step production contracts
 - RFC-0060 Evidence-bounded Android Entry Point, participant, and direct-call Scenario discovery
+- RFC-0061 deterministic Compose route, registration, destination, Entry Point, Feature,
+  and Scenario Evidence
 
 ## RFC status baseline
 
@@ -44,6 +46,7 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 | RFC-0058 | `IMPLEMENTED_WITH_ENVIRONMENT_VERIFICATION_LIMITATION` | Documentation Profiles and Document Contracts |
 | RFC-0059 | Implemented | Feature, Entry Point, and Scenario Specification Foundation |
 | RFC-0060 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Deterministic Feature Discovery; Compose routes remain unsupported |
+| RFC-0061 | `IMPLEMENTED_WITH_DOCUMENTED_LIMITATIONS` | Deterministic Compose Navigation Evidence and destination discovery |
 
 ## Historical release milestones
 

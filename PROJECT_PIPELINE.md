@@ -7,6 +7,11 @@ The default specification pipeline is:
 Feature Discovery is AI-independent and Evidence-bounded. Projects without proven Feature
 Evidence still emit valid DIR 0.4 with empty collections.
 
+RFC-0061 inserts structured Compose Navigation Evidence before Feature Discovery.
+A Compose destination requires a resolved route, a known navigation registration, and
+one actual destination API. Plain composables and user-defined calls named `composable`
+are not promoted.
+
 ## 1. Analyze a project
 
 Command:

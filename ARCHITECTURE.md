@@ -1,13 +1,13 @@
 # DocPilot Architecture
 
-RFC-0060 adds an Evidence-first Feature Discovery stage between base DIR projection and
-validation. It recognizes exact Android framework contracts, performs bounded relationship
-traversal, projects only direct-call Scenarios, verifies a deterministic discovery hash,
-and emits canonical DIR 0.4. Renderers still consume only ProjectSpecification.
+RFC-0061 extends the Evidence-first Feature Discovery stage with structured Compose
+route declarations, navigation registrations, and verified destination links. It emits
+canonical DIR 0.4 Compose Entry Points, route-bounded Features, and trigger-first
+Scenarios. Renderers still consume only ProjectSpecification.
 
 ## Status
 
-This document reflects the canonical source-tree baseline through RFC-0058.
+This document reflects the canonical source-tree baseline through RFC-0061.
 
 RFC-0058 adds an optional runtime-only Documentation Profile and Document Contract boundary. It preserves the existing Renderer-owned Artifact Catalog, RFC-0052 operation Plan, legacy paths, and all persisted formats.
 

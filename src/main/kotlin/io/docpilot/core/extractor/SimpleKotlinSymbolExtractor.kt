@@ -8,14 +8,245 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
     override fun extract(relativePath: String, tokens: List<KotlinToken>): SourceFile {
         require(relativePath.isNotBlank()) { "relativePath must not be blank." }
         val packageName = extractPackageName(tokens)
+        val normalizedPath = relativePath.replace('\\', '/')
+        val imports = extractImports(tokens)
+        val symbols = Parser(normalizedPath, packageName, tokens).parse()
         return SourceFile(
-            relativePath = relativePath.replace('\\', '/'),
+            relativePath = normalizedPath,
             language = SourceLanguage.KOTLIN,
             packageName = packageName,
-            imports = extractImports(tokens),
-            symbols = Parser(relativePath.replace('\\', '/'), packageName, tokens).parse(),
+            imports = imports,
+            symbols = symbols,
+            composeNavigation = extractComposeNavigation(normalizedPath, tokens, imports, symbols),
         )
     }
+
+    private fun extractComposeNavigation(
+        path: String,
+        tokens: List<KotlinToken>,
+        imports: List<SourceImport>,
+        symbols: List<SourceSymbol>,
+    ): ComposeNavigationSourceObservations {
+        val allSymbols = symbols.flatMap(::flatten)
+        val routes = allSymbols.mapNotNull { symbol ->
+            val qualifiedName = symbol.qualifiedName ?: return@mapNotNull null
+            val location = symbol.location ?: return@mapNotNull null
+            when {
+                symbol.kind == SourceSymbolKind.PROPERTY &&
+                    SourceModifier.CONST in symbol.modifiers &&
+                    symbol.initializerExpression != null ->
+                    ComposeRouteDeclarationObservation(
+                        id = "compose-route:$qualifiedName",
+                        symbolId = "symbol:${symbol.id}",
+                        qualifiedName = qualifiedName,
+                        kind = ComposeRouteDeclarationKind.CONST_STRING_ROUTE,
+                        expression = symbol.initializerExpression,
+                        location = location,
+                    )
+                symbol.kind in setOf(SourceSymbolKind.OBJECT, SourceSymbolKind.CLASS) &&
+                    symbol.annotations.any { it.substringAfterLast('.') == "Serializable" } ->
+                    ComposeRouteDeclarationObservation(
+                        id = "compose-route:$qualifiedName",
+                        symbolId = "symbol:${symbol.id}",
+                        qualifiedName = qualifiedName,
+                        kind = if (symbol.kind == SourceSymbolKind.OBJECT) {
+                            if (SourceModifier.DATA in symbol.modifiers) ComposeRouteDeclarationKind.DATA_OBJECT_ROUTE
+                            else ComposeRouteDeclarationKind.SERIALIZABLE_OBJECT_ROUTE
+                        } else {
+                            ComposeRouteDeclarationKind.SERIALIZABLE_CLASS_ROUTE
+                        },
+                        expression = qualifiedName,
+                        location = location,
+                    )
+                else -> null
+            }
+        }.distinctBy { it.id }.sortedBy { it.id }
+
+        val importByLocalName = imports.groupBy { it.alias ?: it.qualifiedName.substringAfterLast('.') }
+        val localFunctions = allSymbols.filter { it.kind == SourceSymbolKind.FUNCTION }
+            .groupBy { it.name }
+        val registrations = mutableListOf<ComposeNavigationRegistrationObservation>()
+        var index = 0
+        while (index < tokens.size) {
+            val token = tokens[index]
+            if (token.type != KotlinTokenType.IDENTIFIER) {
+                index++
+                continue
+            }
+            val imported = importByLocalName[token.text].orEmpty().map { it.qualifiedName }.distinct()
+            val callee = imported.singleOrNull()?.takeIf(NAVIGATION_APIS::containsKey)
+            if (callee == null) {
+                index++
+                continue
+            }
+            var cursor = index + 1
+            var genericRoute: String? = null
+            if (tokens.getOrNull(cursor)?.text == "<") {
+                val close = matching(tokens, cursor, "<", ">")
+                genericRoute = render(tokens, cursor + 1, close).takeIf(String::isNotBlank)
+                cursor = close + 1
+            }
+            if (tokens.getOrNull(cursor)?.text != "(") {
+                index++
+                continue
+            }
+            val close = matching(tokens, cursor, "(", ")")
+            val routeExpression = genericRoute ?: routeArgument(tokens, cursor + 1, close)
+            if (routeExpression == null) {
+                index = close + 1
+                continue
+            }
+            val ownerCandidates = allSymbols.filter { symbol ->
+                val location = symbol.location ?: return@filter false
+                val startLine = location.lineStart ?: return@filter false
+                symbol.kind == SourceSymbolKind.FUNCTION &&
+                    token.line >= startLine && token.line <= (location.lineEnd ?: startLine)
+            }
+            val owner = ownerCandidates.singleOrNull()
+            if (owner == null) {
+                index = close + 1
+                continue
+            }
+            val lambdaOpen = (close + 1 until minOf(tokens.size, close + 16))
+                .filter { tokens[it].text == "{" }
+                .minOrNull()
+            val destinationCalls = if (lambdaOpen == null) emptyList() else {
+                val lambdaClose = matching(tokens, lambdaOpen, "{", "}")
+                destinationCalls(
+                    path, tokens, lambdaOpen + 1, lambdaClose, importByLocalName, localFunctions,
+                )
+            }
+            val kind = NAVIGATION_APIS.getValue(callee)
+            val semanticRoute = routeExpression.replace(" ", "")
+            val ownerId = "symbol:${owner.id}"
+            registrations += ComposeNavigationRegistrationObservation(
+                id = "compose-registration:$ownerId:$semanticRoute:${kind.name.lowercase()}",
+                apiKind = kind,
+                calleeQualifiedName = callee,
+                ownerSymbolId = ownerId,
+                ownerQualifiedName = owner.qualifiedName ?: owner.name,
+                routeExpression = routeExpression,
+                genericRouteType = genericRoute,
+                destinationCalls = destinationCalls,
+                location = SourceLocation(path, token.line, token.column),
+            )
+            index = close + 1
+        }
+        return ComposeNavigationSourceObservations(
+            routes = routes,
+            registrations = registrations.distinctBy { it.id }.sortedBy { it.id },
+        )
+    }
+
+    private fun destinationCalls(
+        path: String,
+        tokens: List<KotlinToken>,
+        start: Int,
+        end: Int,
+        imports: Map<String, List<SourceImport>>,
+        localFunctions: Map<String, List<SourceSymbol>>,
+    ): List<ComposeDestinationCallObservation> {
+        val result = mutableListOf<ComposeDestinationCallObservation>()
+        var depth = 0
+        for (index in start until end) {
+            when (tokens[index].text) {
+                "{" -> depth++
+                "}" -> depth--
+            }
+            if (tokens.getOrNull(index + 1)?.text !in setOf("(", "{")) continue
+            val imported = imports[tokens[index].text].orEmpty().map { it.qualifiedName }.distinct()
+            val local = localFunctions[tokens[index].text].orEmpty()
+                .mapNotNull { it.qualifiedName }.distinct()
+            val qualifiedName = (imported + local).distinct().singleOrNull() ?: continue
+            result += ComposeDestinationCallObservation(
+                calleeQualifiedName = qualifiedName,
+                nestingDepth = depth,
+                location = SourceLocation(path, tokens[index].line, tokens[index].column),
+            )
+        }
+        return result.distinctBy { Triple(it.calleeQualifiedName, it.nestingDepth, it.location.lineStart) }
+            .sortedWith(compareBy({ it.nestingDepth }, { it.calleeQualifiedName }, { it.location.lineStart }))
+    }
+
+    private fun routeArgument(tokens: List<KotlinToken>, start: Int, end: Int): String? {
+        val segments = splitTopLevel(tokens, start, end, ",")
+        val named = segments.mapNotNull { (from, to) ->
+            val equals = topLevelIndexOf(tokens, from, to, "=") ?: return@mapNotNull null
+            val name = render(tokens, from, equals)
+            if (name == "route") render(tokens, equals + 1, to) else null
+        }
+        if (named.size == 1) return named.single().takeIf(String::isNotBlank)
+        if (named.size > 1) return null
+        val first = segments.singleOrNull { (from, to) ->
+            topLevelIndexOf(tokens, from, to, "=") == null
+        } ?: return null
+        return render(tokens, first.first, first.second).takeIf(String::isNotBlank)
+    }
+
+    private fun flatten(symbol: SourceSymbol): List<SourceSymbol> =
+        listOf(symbol) + symbol.children.flatMap(::flatten)
+
+    private fun matching(tokens: List<KotlinToken>, open: Int, left: String, right: String): Int {
+        var depth = 0
+        for (index in open until tokens.size) {
+            if (tokens[index].text == left) depth++
+            if (tokens[index].text == right && --depth == 0) return index
+        }
+        return tokens.lastIndex
+    }
+
+    private fun splitTopLevel(
+        tokens: List<KotlinToken>,
+        start: Int,
+        end: Int,
+        delimiter: String,
+    ): List<Pair<Int, Int>> {
+        val result = mutableListOf<Pair<Int, Int>>()
+        var segmentStart = start
+        var depth = 0
+        for (index in start until end) {
+            when (tokens[index].text) {
+                "(", "<", "[", "{" -> depth++
+                ")", ">", "]", "}" -> depth--
+            }
+            if (tokens[index].text == delimiter && depth == 0) {
+                result += segmentStart to index
+                segmentStart = index + 1
+            }
+        }
+        if (segmentStart < end) result += segmentStart to end
+        return result
+    }
+
+    private fun topLevelIndexOf(
+        tokens: List<KotlinToken>,
+        start: Int,
+        end: Int,
+        value: String,
+    ): Int? {
+        var depth = 0
+        for (index in start until end) {
+            when (tokens[index].text) {
+                "(", "<", "[", "{" -> depth++
+                ")", ">", "]", "}" -> depth--
+            }
+            if (tokens[index].text == value && depth == 0) return index
+        }
+        return null
+    }
+
+    private fun render(tokens: List<KotlinToken>, start: Int, end: Int): String =
+        tokens.subList(start.coerceAtLeast(0), end.coerceAtMost(tokens.size))
+            .filter { it.type != KotlinTokenType.END_OF_FILE }
+            .joinToString(" ") { it.text }
+            .replace(" . ", ".")
+            .replace(" < ", "<")
+            .replace(" >", ">")
+            .replace(" ( ", "(")
+            .replace(" )", ")")
+            .replace(" ,", ",")
+            .replace(" : ", ": ")
+            .trim()
 
     private fun extractPackageName(tokens: List<KotlinToken>): String? {
         val i = tokens.indexOfFirst { it.text == "package" }
@@ -158,6 +389,7 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
                 hasInitializer = if (kind == SourceSymbolKind.PROPERTY) containsAtTopLevel(nameIndex + 1, declarationEnd, "=") else null,
                 typeParameters = extractTypeParameters(nameIndex + 1, if (bodyStart >= 0) bodyStart else declarationEnd),
                 superTypes = if (kind in classKinds) extractSuperTypes(nameIndex + 1, if (bodyStart >= 0) bodyStart else declarationEnd) else emptyList(),
+                initializerExpression = extractInitializer(kind, nameIndex + 1, declarationEnd),
             )
             return Parsed(symbol, if (bodyStart >= 0) declarationEnd + 1 else maxOf(index + 1, declarationEnd))
         }
@@ -338,6 +570,12 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
                 .filter(String::isNotBlank)
         }
 
+        private fun extractInitializer(kind: SourceSymbolKind, start: Int, end: Int): String? {
+            if (kind != SourceSymbolKind.PROPERTY) return null
+            val equals = (start until end).firstOrNull { tokens[it].text == "=" } ?: return null
+            return render(equals + 1, end).takeIf(String::isNotBlank)
+        }
+
         private fun extractReceiver(funIndex: Int, nameIndex: Int): String? {
             val dot = (funIndex + 1 until nameIndex).lastOrNull { tokens[it].text == "." } ?: return null
             return render(funIndex + 1, dot).takeIf(String::isNotBlank)
@@ -359,5 +597,13 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
             private val symbolComparator = compareBy<SourceSymbol>({ it.location?.lineStart ?: Int.MAX_VALUE }, { it.location?.columnStart ?: Int.MAX_VALUE }, { it.name }, { it.kind.name })
             private fun stableId(path: String, name: String, kind: SourceSymbolKind, line: Int, column: Int): String { val raw="$path|$name|${kind.name}|$line|$column"; return MessageDigest.getInstance("SHA-256").digest(raw.toByteArray()).take(12).joinToString(""){"%02x".format(it)} }
         }
+    }
+
+    private companion object {
+        val NAVIGATION_APIS = mapOf(
+            "androidx.navigation.compose.composable" to ComposeNavigationRegistrationKind.COMPOSABLE,
+            "androidx.navigation.compose.navigation" to ComposeNavigationRegistrationKind.NAVIGATION,
+            "androidx.navigation.compose.dialog" to ComposeNavigationRegistrationKind.DIALOG,
+        )
     }
 }

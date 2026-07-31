@@ -302,6 +302,42 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                 evidence = evidence,
             )
         }
+        file.composeNavigation.routes.forEach { route ->
+            addEvidence(
+                evidence = evidence,
+                type = EvidenceType.COMPOSE_ROUTE_DECLARATION,
+                relativePath = route.location.relativePath,
+                lineStart = route.location.lineStart,
+                columnStart = route.location.columnStart,
+                lineEnd = route.location.lineEnd,
+                columnEnd = route.location.columnEnd,
+                summary = "Compose route ${route.qualifiedName} is declared.",
+                attributes = mapOf(
+                    "routeId" to route.id,
+                    "routeKind" to route.kind.name,
+                    "routeSymbolId" to route.symbolId,
+                    "routeExpression" to route.expression,
+                ),
+            )
+        }
+        file.composeNavigation.registrations.forEach { registration ->
+            addEvidence(
+                evidence = evidence,
+                type = EvidenceType.COMPOSE_NAVIGATION_REGISTRATION,
+                relativePath = registration.location.relativePath,
+                lineStart = registration.location.lineStart,
+                columnStart = registration.location.columnStart,
+                lineEnd = registration.location.lineEnd,
+                columnEnd = registration.location.columnEnd,
+                summary = "Compose ${registration.apiKind.name} registration is declared.",
+                attributes = mapOf(
+                    "registrationId" to registration.id,
+                    "callee" to registration.calleeQualifiedName,
+                    "ownerSymbolId" to registration.ownerSymbolId,
+                    "routeExpression" to registration.routeExpression,
+                ),
+            )
+        }
     }
 
     private fun addImport(

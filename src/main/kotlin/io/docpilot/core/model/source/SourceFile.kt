@@ -11,6 +11,7 @@ data class SourceFile(
     val symbols: List<SourceSymbol> = emptyList(),
     val candidateModulePath: String? = null,
     val sourceSetName: String? = null,
+    val composeNavigation: ComposeNavigationSourceObservations = ComposeNavigationSourceObservations(),
 ) {
     init {
         require(relativePath.isNotBlank()) {

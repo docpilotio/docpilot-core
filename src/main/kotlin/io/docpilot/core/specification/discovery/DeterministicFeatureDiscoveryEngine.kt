@@ -82,17 +82,29 @@ public class DeterministicFeatureDiscoveryEngine(
                 evidenceRefs = owner.evidenceRefs.toSortedSet(),
             )
         }
-        val entryPoints = (graphEntryPoints + sourceEntryPoints)
+        val composeNavigation = ComposeNavigationEvidenceResolver().resolve(sourceIndex, baseSpecification)
+        val entryPoints = (graphEntryPoints + sourceEntryPoints + composeNavigation.entryPoints)
             .distinctBy { it.id }
             .sortedBy { it.id }
 
-        val unresolved = mutableListOf<UnresolvedItem>()
+        val unresolved = composeNavigation.unresolved.toMutableList()
         val scenarioDrafts = mutableMapOf<String, ScenarioSpecification>()
-        val featureDrafts = entryPoints.groupBy { it.ownerComponentId }.entries.map { (ownerId, ownedEntryPoints) ->
+        val featureDrafts = entryPoints.groupBy { entryPoint ->
+            if (entryPoint.kind == EntryPointKind.COMPOSE_DESTINATION.name) entryPoint.id
+            else entryPoint.ownerComponentId
+        }.entries.map { (_, ownedEntryPoints) ->
+            val ownerId = ownedEntryPoints.map { it.ownerComponentId }.distinct().single()
             val owner = baseSpecification.components.single { it.id == ownerId }
             val traversal = resolveParticipants(owner, graph, componentByEntityId)
             unresolved += traversal.unresolved
-            val featureId = "feature:${owner.id}"
+            val composeEntryPoint = ownedEntryPoints.singleOrNull {
+                it.kind == EntryPointKind.COMPOSE_DESTINATION.name
+            }
+            val featureId = if (composeEntryPoint == null) {
+                "feature:${owner.id}"
+            } else {
+                "feature:${composeEntryPoint.id.removePrefix("entry-point:compose-destination:")}"
+            }
             val scenarios = ownedEntryPoints.sortedBy { it.id }.mapNotNull { entryPoint ->
                 projectScenario(featureId, entryPoint, traversal.components, graph, componentByEntityId)
             }
@@ -196,12 +208,25 @@ public class DeterministicFeatureDiscoveryEngine(
             .distinctBy { it.first.id }
             .sortedBy { it.first.id }
             .toList()
-        if (calls.isEmpty()) return null
         val scenarioId = "scenario:$featureId:${entryPoint.id}"
-        val steps = calls.mapIndexed { index, (edge, source, target) ->
+        val triggerSteps = if (entryPoint.kind == EntryPointKind.COMPOSE_DESTINATION.name) {
+            listOf(
+                ScenarioStepSpecification(
+                    id = "scenario-step:$scenarioId:trigger:${entryPoint.id}",
+                    order = 0,
+                    action = ScenarioStepKind.TRIGGER.name,
+                    ownerComponentId = entryPoint.ownerComponentId,
+                    targetComponentId = entryPoint.ownerComponentId,
+                    apiId = entryPoint.apiId,
+                    evidenceRefs = entryPoint.evidenceRefs,
+                ),
+            )
+        } else emptyList()
+        if (calls.isEmpty() && triggerSteps.isEmpty()) return null
+        val callSteps = calls.mapIndexed { index, (edge, source, target) ->
             ScenarioStepSpecification(
                 id = "scenario-step:$scenarioId:${edge.id}",
-                order = index,
+                order = index + triggerSteps.size,
                 action = ScenarioStepKind.CALL.name,
                 ownerComponentId = source.id,
                 targetComponentId = target.id,
@@ -209,6 +234,7 @@ public class DeterministicFeatureDiscoveryEngine(
                 evidenceRefs = edge.evidenceRefs.toSortedSet(),
             )
         }
+        val steps = triggerSteps + callSteps
         return ScenarioSpecification(
             id = scenarioId,
             featureId = featureId,
