@@ -27,7 +27,7 @@ class ProjectSpecificationMarkdownRendererTest {
 
         assertEquals("docs/project-specification.md", artifact.relativePath)
         assertEquals("text/markdown", artifact.mediaType)
-        assertEquals(9, artifacts.size)
+        assertEquals(10, artifacts.size)
         assertTrue(artifacts.any { it.relativePath == "docs/architecture/overview.md" })
         assertTrue(content.contains("# Sample\\#Project"))
         assertTrue(content.contains("## Modules"))

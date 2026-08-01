@@ -18,7 +18,7 @@ class DocumentationProfileResolverTest {
     private val resolver = DefaultDocumentationProfileResolver()
 
     @Test
-    fun `validated DIR 0_4 features enable feature catalog and specifications without markdown rendering`() {
+    fun `validated DIR 0_4 features enable bound feature catalog and specifications`() {
         val specification = FeatureDir04SpecificationTest().specification()
         val resolution = resolve(specification)
         val catalog = resolution.documents.single { it.type == DocumentType.FEATURE_CATALOG }
@@ -27,7 +27,17 @@ class DocumentationProfileResolverTest {
         assertTrue(catalog.status in setOf(DocumentPlanningStatus.READY, DocumentPlanningStatus.PARTIAL))
         assertEquals(specification.features.size, featureDocuments.size)
         assertTrue(featureDocuments.all { it.status in setOf(DocumentPlanningStatus.READY, DocumentPlanningStatus.PARTIAL) })
-        assertTrue(renderer.describe(specification).none { it.relativePath.contains("feature", ignoreCase = true) })
+        assertTrue(renderer.describe(specification).any { it.kind == DocumentationArtifactKind.FEATURE_CATALOG })
+        assertEquals(
+            specification.features.size,
+            renderer.describe(specification).count { it.kind == DocumentationArtifactKind.FEATURE_DETAIL },
+        )
+        assertTrue(
+            resolution.artifactBindings.filter { binding ->
+                binding.documentStableId == catalog.documentStableId ||
+                    featureDocuments.any { it.documentStableId == binding.documentStableId }
+            }.all { it.status == ProfileArtifactBindingStatus.EXACT_PATH },
+        )
         assertTrue(DocumentationProfileIntegrity.verifyResolution(resolution))
     }
 

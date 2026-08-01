@@ -102,7 +102,7 @@ AI Provider implementations remain adapters behind the Provider SPI. AI output i
 | PV-009 | `PENDING` |
 | Technical v1 baseline | Documentation reports immutable `v1.0.0`; Git identity is not verifiable from source ZIPs without `.git` |
 | Gradle artifact version | `0.1.0-SNAPSHOT` |
-| Next RFC | RFC-0064 scope not yet approved; Main Planning/Roadmap approval required |
+| Next RFC | RFC-0064 Profile-aware Feature Documentation Rendering; detailed start approval required |
 | Primary validation target | `C:\WorkSpace\architecture-samples` |
 
 RFC-0059 introduced additive DIR 0.4 Feature, Entry Point, Scenario, and ordered Scenario Step contracts. RFC-0060 added AI-independent Evidence-bounded Feature Discovery, RFC-0061 added verified Compose route/registration/destination Evidence, and RFC-0062 added function-reference resolution, bounded external lambdas, nested graph ownership, and navigation argument Evidence. RFC-0062 targeted and full Gradle verification passed; isolated real-project generation produced `FULL_REGENERATION` followed by `NO_CHANGES` with a valid Snapshot. The sample still contains no RFC-0062-specific syntax. The public v1.0 Product Validation decision and PV-009 state are unchanged.
@@ -123,6 +123,11 @@ RFC-0059 introduced additive DIR 0.4 Feature, Entry Point, Scenario, and ordered
 | Documentation Profile | `kotlin-android@1` runtime-only |
 
 Snapshot format and DIR schema are independent version lines. Format 1/DIR 0.3 remains readable; format 2 stores DIR 0.4. Documentation Profiles remain runtime-only, and Review, Reconciliation, Projection, and Evolution formats remain unchanged.
+
+The Product Owner has fixed RFC-0064 through RFC-0074 as the first post-RFC-0063 product-development
+sequence. The fixed baseline is recorded in
+`docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`; each RFC still requires
+separate approval of its detailed design, Acceptance Criteria, and verification plan at start.
 
 ---
 

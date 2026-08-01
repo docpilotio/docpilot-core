@@ -11,6 +11,7 @@ public enum class IncrementalUpdateTarget {
     ENTRY_POINT,
     SCENARIO,
     SCENARIO_STEP,
+    EVIDENCE,
 }
 
 public data class IncrementalUpdateAction(

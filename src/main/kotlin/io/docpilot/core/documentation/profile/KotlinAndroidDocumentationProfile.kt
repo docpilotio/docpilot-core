@@ -56,7 +56,13 @@ public object KotlinAndroidDocumentationProfile {
         requiredModel = DocumentationModelRequirement.FEATURE_MODEL,
         sections = listOf(
             section("overview", "Overview", 10),
-            section("features", "Features", 20, missing = MissingDataBehavior.DEFER_DOCUMENT),
+            section(
+                "features",
+                "Features",
+                20,
+                capability = RendererCapability.FEATURE_DOCUMENTATION_RENDERING,
+                missing = MissingDataBehavior.DEFER_DOCUMENT,
+            ),
             section("ownership", "Feature Ownership", 30, missing = MissingDataBehavior.DEFER_DOCUMENT),
             section("evidence", "Evidence", 40, capability = RendererCapability.EVIDENCE_REFERENCE_RENDERING),
             section("unknowns", "Unknowns", 50, capability = RendererCapability.UNKNOWN_FINDING_RENDERING),
@@ -131,6 +137,7 @@ public object KotlinAndroidDocumentationProfile {
             RendererCapability.MARKDOWN_SECTION_RENDERING,
             RendererCapability.EVIDENCE_REFERENCE_RENDERING,
             RendererCapability.UNKNOWN_FINDING_RENDERING,
+            RendererCapability.FEATURE_DOCUMENTATION_RENDERING,
         ),
         requiredModel = DocumentationModelRequirement.FEATURE_MODEL,
     )

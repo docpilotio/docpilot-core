@@ -9,6 +9,7 @@ import io.docpilot.core.model.RelationshipSpecification
 import io.docpilot.core.model.FeatureSpecification
 import io.docpilot.core.model.EntryPointSpecification
 import io.docpilot.core.model.ScenarioSpecification
+import io.docpilot.core.model.Evidence
 
 /** Stable-id based, deterministic ProjectSpecification differ. */
 public class DefaultSpecificationDiffer : SpecificationDiffer {
@@ -66,6 +67,10 @@ public class DefaultSpecificationDiffer : SpecificationDiffer {
             scenarioStepChanges = compareOwned(
                 flattenSteps(previous.scenarios),
                 flattenSteps(current.scenarios),
+            ),
+            evidenceChanges = compare(
+                indexByStableId(previous.evidence, Evidence::id, "previous evidence"),
+                indexByStableId(current.evidence, Evidence::id, "current evidence"),
             ),
         )
     }

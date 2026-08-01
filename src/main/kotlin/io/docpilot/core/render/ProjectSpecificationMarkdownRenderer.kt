@@ -5,10 +5,12 @@ import io.docpilot.core.api.DocumentationArtifactId
 import io.docpilot.core.api.DocumentationArtifactKind
 import io.docpilot.core.api.SelectiveSpecificationRenderer
 import io.docpilot.core.documentation.profile.DocumentationRendererCapabilityProvider
+import io.docpilot.core.documentation.profile.DocumentationProfileCanonicalizer
 import io.docpilot.core.documentation.profile.RendererCapability
 import io.docpilot.core.model.ApiSpecification
 import io.docpilot.core.model.ComponentSpecification
 import io.docpilot.core.model.Evidence
+import io.docpilot.core.model.FeatureSpecification
 import io.docpilot.core.model.ModuleSpecification
 import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.ProjectSpecification
@@ -31,6 +33,7 @@ public class ProjectSpecificationMarkdownRenderer :
         RendererCapability.MARKDOWN_SECTION_RENDERING,
         RendererCapability.EVIDENCE_REFERENCE_RENDERING,
         RendererCapability.UNKNOWN_FINDING_RENDERING,
+        RendererCapability.FEATURE_DOCUMENTATION_RENDERING,
     )
 
     override fun describe(specification: ProjectSpecification): List<DocumentationArtifactDescriptor> {
@@ -104,6 +107,21 @@ public class ProjectSpecificationMarkdownRenderer :
             scopes = specification.modules.map { it.id } + specification.relationships.map { it.id },
             dependencies = moduleDescriptors.map { it.artifactId } + listOf(relationship.artifactId),
         )
+        val featureDetails = specification.features.sortedBy { it.id }.map { feature ->
+            descriptor(
+                id = "feature:${feature.id}",
+                path = featurePath(feature),
+                kind = DocumentationArtifactKind.FEATURE_DETAIL,
+                scopes = featureScopeIds(specification, feature),
+            )
+        }
+        val featureCatalog = descriptor(
+            id = "feature-catalog:${specification.project.id}",
+            path = "docs/project/feature-catalog.md",
+            kind = DocumentationArtifactKind.FEATURE_CATALOG,
+            scopes = specification.features.map { it.id },
+            dependencies = featureDetails.map { it.artifactId },
+        )
         val index = descriptor(
             id = "index:${specification.project.id}",
             path = OUTPUT_PATH,
@@ -111,8 +129,8 @@ public class ProjectSpecificationMarkdownRenderer :
             scopes = emptyList(),
             dependencies = listOf(overview.artifactId, architecture.artifactId),
         )
-        return (listOf(index, overview, architecture) + moduleDescriptors + packageDescriptors +
-            componentDescriptors + relationship + evidence).sortedBy { it.artifactId.value }
+        return (listOf(index, overview, architecture, featureCatalog) + featureDetails + moduleDescriptors +
+            packageDescriptors + componentDescriptors + relationship + evidence).sortedBy { it.artifactId.value }
     }
 
     override fun render(
@@ -208,6 +226,11 @@ public class ProjectSpecificationMarkdownRenderer :
                 relationships = emptyList()),
         )
         DocumentationArtifactKind.ARCHITECTURE_OVERVIEW -> buildArchitectureOverview(specification)
+        DocumentationArtifactKind.FEATURE_CATALOG -> buildFeatureCatalog(specification)
+        DocumentationArtifactKind.FEATURE_DETAIL -> buildFeatureDetail(
+            specification,
+            specification.features.single { "feature:${it.id}" == descriptor.artifactId.value },
+        )
     }
 
     private fun buildIndex(specification: ProjectSpecification): String = buildString {
@@ -243,7 +266,144 @@ public class ProjectSpecificationMarkdownRenderer :
         DocumentationArtifactKind.PROJECT_OVERVIEW -> "Project facts"
         DocumentationArtifactKind.RELATIONSHIP -> "Relationships"
         DocumentationArtifactKind.EVIDENCE -> "Evidence and unresolved items"
+        DocumentationArtifactKind.FEATURE_CATALOG -> "Feature catalog"
+        DocumentationArtifactKind.FEATURE_DETAIL -> "Feature — ${specification.features.single {
+            "feature:${it.id}" == descriptor.artifactId.value
+        }.name}"
         DocumentationArtifactKind.INDEX -> "Index"
+    }
+
+    private fun featurePath(feature: FeatureSpecification): String {
+        val slug = DocumentationProfileCanonicalizer.slug(feature.name)
+        val identity = "$slug-${DocumentationProfileCanonicalizer.scopeHash(feature.id).take(8)}"
+        return "docs/features/$identity-$slug.md"
+    }
+
+    private fun featureScopeIds(specification: ProjectSpecification, feature: FeatureSpecification): List<String> = buildList {
+        add(feature.id)
+        add(feature.ownerComponentId)
+        addAll(feature.participantComponentIds)
+        addAll(feature.entryPointIds)
+        addAll(featureEvidenceRefs(specification, feature))
+        addAll(featureUnresolvedRefs(specification, feature))
+        feature.scenarioIds.forEach { scenarioId ->
+            add(scenarioId)
+            specification.scenarios.find { it.id == scenarioId }?.steps?.forEach { add(it.id) }
+        }
+    }.distinct().sorted()
+
+    private fun featureEvidenceRefs(specification: ProjectSpecification, feature: FeatureSpecification): List<String> {
+        val entryPoints = specification.entryPoints.filter { it.id in feature.entryPointIds }
+        val scenarios = specification.scenarios.filter { it.id in feature.scenarioIds }
+        return (feature.evidenceRefs +
+            entryPoints.flatMap { it.evidenceRefs } +
+            scenarios.flatMap { it.evidenceRefs } +
+            scenarios.flatMap { scenario -> scenario.steps.flatMap { it.evidenceRefs } })
+            .distinct().sorted()
+    }
+
+    private fun featureUnresolvedRefs(specification: ProjectSpecification, feature: FeatureSpecification): List<String> {
+        val entryPoints = specification.entryPoints.filter { it.id in feature.entryPointIds }
+        val scenarios = specification.scenarios.filter { it.id in feature.scenarioIds }
+        return (feature.unresolvedRefs +
+            entryPoints.flatMap { it.unresolvedRefs } +
+            scenarios.flatMap { it.unresolvedRefs } +
+            scenarios.flatMap { scenario -> scenario.steps.flatMap { it.unresolvedRefs } })
+            .distinct().sorted()
+    }
+
+    private fun buildFeatureCatalog(specification: ProjectSpecification): String = buildString {
+        appendLine("# Feature catalog")
+        appendLine()
+        appendLine("- Project: ${code(specification.project.id)}")
+        appendLine("- DIR: ${code(specification.schemaVersion)}")
+        appendLine("- Features: ${specification.features.size}")
+        appendLine()
+        appendLine("## Features")
+        appendLine()
+        if (specification.features.isEmpty()) appendLine("- None")
+        specification.features.sortedBy { it.id }.forEach { feature ->
+            val entries = specification.entryPoints.count { it.id in feature.entryPointIds }
+            val scenarios = specification.scenarios.count { it.id in feature.scenarioIds }
+            val unresolved = featureUnresolvedRefs(specification, feature).size
+            val completeness = if (unresolved == 0) "READY" else "PARTIAL"
+            appendLine("- [${escapeText(feature.name)}](../features/${featurePath(feature).substringAfterLast('/')})")
+            appendLine("  - Stable ID: ${code(feature.id)}")
+            appendLine("  - Root: ${code(feature.ownerComponentId)}")
+            appendLine("  - Entry points: $entries; scenarios: $scenarios; participants: ${feature.participantComponentIds.size}")
+            appendLine("  - Completeness: $completeness; unresolved: $unresolved")
+        }
+    }
+
+    private fun buildFeatureDetail(specification: ProjectSpecification, feature: FeatureSpecification): String = buildString {
+        val evidenceById = specification.evidence.associateBy { it.id }
+        val unresolvedById = specification.unresolved.associateBy { it.id }
+        appendLine("# ${escapeText(feature.name)}")
+        appendLine()
+        appendLine("- Stable ID: ${code(feature.id)}")
+        appendLine("- Root: ${code(feature.ownerComponentId)}")
+        val evidenceRefs = featureEvidenceRefs(specification, feature)
+        val unresolvedRefs = featureUnresolvedRefs(specification, feature)
+        appendLine("- Completeness: ${if (unresolvedRefs.isEmpty()) "READY" else "PARTIAL"}")
+        feature.description?.let { appendLine("- Description: ${escapeText(it)}") }
+        appendLine()
+        appendLine("## Entry Points")
+        appendLine()
+        val entryPoints = specification.entryPoints.filter { it.id in feature.entryPointIds }.sortedBy { it.id }
+        if (entryPoints.isEmpty()) appendLine("- None")
+        entryPoints.forEach { entry ->
+            appendLine("- **${escapeText(entry.name)}** — ${code(entry.kind)}; ID ${code(entry.id)}; owner ${code(entry.ownerComponentId)}")
+            appendLine("  - Evidence: ${renderCodeCollection(entry.evidenceRefs)}")
+            appendLine("  - Unresolved: ${renderCodeCollection(entry.unresolvedRefs)}")
+        }
+        appendLine()
+        appendLine("## Participants")
+        appendLine()
+        if (feature.participantComponentIds.isEmpty()) appendLine("- None")
+        feature.participantComponentIds.sorted().forEach { appendLine("- ${code(it)}") }
+        appendLine()
+        appendLine("## Scenarios")
+        appendLine()
+        val scenarios = specification.scenarios.filter { it.id in feature.scenarioIds }.sortedBy { it.id }
+        if (scenarios.isEmpty()) appendLine("- None")
+        scenarios.forEach { scenario ->
+            appendLine("### ${escapeText(scenario.name)}")
+            appendLine()
+            appendLine("- Stable ID: ${code(scenario.id)}")
+            appendLine("- Trigger: ${scenario.entryPointId?.let(::code) ?: "Unspecified"}")
+            appendLine("- Evidence: ${renderCodeCollection(scenario.evidenceRefs)}")
+            appendLine("- Unresolved: ${renderCodeCollection(scenario.unresolvedRefs)}")
+            appendLine()
+            scenario.steps.sortedWith(compareBy({ it.order }, { it.id })).forEach { step ->
+                appendLine("${step.order}. ${escapeText(step.action)}")
+                appendLine("   - Stable ID: ${code(step.id)}; owner: ${code(step.ownerComponentId)}")
+                appendLine("   - Target: ${step.targetComponentId?.let(::code) ?: "Unspecified"}; API: ${step.apiId?.let(::code) ?: "Unspecified"}")
+                appendLine("   - Evidence: ${renderCodeCollection(step.evidenceRefs)}")
+                appendLine("   - Unresolved: ${renderCodeCollection(step.unresolvedRefs)}")
+            }
+            appendLine()
+        }
+        appendLine("## Evidence")
+        appendLine()
+        val evidence = evidenceRefs.mapNotNull(evidenceById::get)
+        if (evidence.isEmpty()) appendLine("- None")
+        evidence.forEach {
+            val location = buildString {
+                append(it.file?.let(::code) ?: "location Unspecified")
+                it.symbol?.let { symbol -> append("; symbol ${code(symbol)}") }
+                it.lineStart?.let { start ->
+                    append("; lines $start")
+                    it.lineEnd?.takeIf { end -> end != start }?.let { end -> append("-$end") }
+                }
+            }
+            appendLine("- ${code(it.id)} — ${escapeText(it.summary)}; $location")
+        }
+        appendLine()
+        appendLine("## Unresolved")
+        appendLine()
+        val unresolved = unresolvedRefs.mapNotNull(unresolvedById::get)
+        if (unresolved.isEmpty()) appendLine("- None")
+        unresolved.forEach { appendLine("- ${code(it.id)} — ${escapeText(it.question)}") }
     }
 
     private fun buildArchitectureOverview(specification: ProjectSpecification): String = buildString {

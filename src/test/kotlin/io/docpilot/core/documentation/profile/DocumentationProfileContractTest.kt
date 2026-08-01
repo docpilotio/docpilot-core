@@ -41,6 +41,7 @@ class DocumentationProfileContractTest {
                 RendererCapability.MARKDOWN_SECTION_RENDERING,
                 RendererCapability.EVIDENCE_REFERENCE_RENDERING,
                 RendererCapability.UNKNOWN_FINDING_RENDERING,
+                RendererCapability.FEATURE_DOCUMENTATION_RENDERING,
             ),
             renderer.capabilities(),
         )

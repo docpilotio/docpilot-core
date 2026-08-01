@@ -71,6 +71,11 @@ public class DefaultSpecificationIncrementalPromptBuilder : SpecificationIncreme
             IncrementalUpdateTarget.SCENARIO_STEP -> specification.scenarios.asSequence().flatMap { it.steps.asSequence() }
                 .firstOrNull { it.id == action.id }
                 ?.let { "id=${it.id}; order=${it.order}; action=${it.action}; owner=${it.ownerComponentId}" }
+            IncrementalUpdateTarget.EVIDENCE -> specification.evidence.firstOrNull { it.id == action.id }
+                ?.let {
+                    "id=${it.id}; type=${it.type}; file=${it.file.orEmpty()}; symbol=${it.symbol.orEmpty()}; " +
+                        "lines=${it.lineStart ?: ""}-${it.lineEnd ?: ""}; summary=${it.summary}; confidence=${it.confidence}"
+                }
         }
         return value?.let { "$label $it" } ?: if (action.changeKind == ChangeKind.REMOVED) "$label id=${action.id}; removed=true" else null
     }

@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-### v1.1 Product Capability — RFC-0062 implemented with validation limitations
+### v1.1 Product Capability — RFC-0063 implemented; RFC-0064 through RFC-0074 baseline fixed
 
 RFC-0057 established the canonical readiness baseline. RFC-0058 introduced runtime-only Documentation Profiles; RFC-0059 through RFC-0062 now provide DIR 0.4 Feature contracts, deterministic discovery, Compose destination Evidence, function-reference resolution, nested graph ownership, and navigation argument Evidence while preserving established Artifact, Review, Reconciliation, and Evolution identities.
 
@@ -75,8 +75,20 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 5. RFC-0061 — deterministic Compose Navigation Evidence — implemented with documented limitations.
 6. RFC-0062 — function references, nested graph ownership, and navigation argument Evidence — implemented; real-project repeat validation passed, syntax coverage absent.
 7. RFC-0063 — standalone Core Release Evidence format 2 and MCP removal — implemented.
-8. RFC-0064 — scope not approved. Approve Main Planning before selecting capability scope.
-9. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
+8. RFC-0064 — Profile-aware Feature Documentation Rendering — next; detailed design and Acceptance Criteria require start approval.
+9. RFC-0065 — Contract Specification Foundation.
+10. RFC-0066 — Deterministic Contract Extraction.
+11. RFC-0067 — Contract Documentation Rendering.
+12. RFC-0068 — Diagram IR and Mermaid Rendering.
+13. RFC-0069 — Documentation Claims and Traceability.
+14. RFC-0070 / RFC-0071 — official Reconciliation and Evolution CLI workflows after shared Core contracts stabilize.
+15. RFC-0072 — Structured AI Documentation Enrichment.
+16. RFC-0073 — Documentation Quality Gate.
+17. RFC-0074 — Product Validation Re-entry and independent PV-009 reassessment.
+
+The Product Owner fixed this numbering, order, and scope boundary in
+`docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,
+data contracts, Acceptance Criteria, and verification methods are approved when each RFC starts.
 
 Profiles and Resolutions remain runtime-only. RFC-0059 introduced DIR 0.4 and Snapshot format 2 while retaining format 1/DIR 0.3 compatibility; RFC-0060 through RFC-0062 extend deterministic discovery without changing those persisted formats.
 
@@ -87,8 +99,7 @@ The following remain future candidates and do not reserve RFC-0059 or later prod
 - Cross-process Review Leases and Audit-safe Retention
 - Signed Release Evidence and External Attestation
 - persistent Evolution graph partition caching
-- official Reconciliation and Evolution product workflows
-- independent Product Validation re-entry work
+- post-RFC-0074 operational hardening supported by new Evidence
 
 Hardening may be scheduled when Evidence shows an immediate integrity, release, or operational blocker.
 

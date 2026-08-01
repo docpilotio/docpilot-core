@@ -108,5 +108,7 @@ public class DefaultAiIncrementalDocumentationGenerator(
             specification.scenarios.any { it.id == id }
         io.docpilot.core.incremental.specification.IncrementalUpdateTarget.SCENARIO_STEP ->
             specification.scenarios.any { scenario -> scenario.steps.any { it.id == id } }
+        io.docpilot.core.incremental.specification.IncrementalUpdateTarget.EVIDENCE ->
+            specification.evidence.any { it.id == id }
     }
 }

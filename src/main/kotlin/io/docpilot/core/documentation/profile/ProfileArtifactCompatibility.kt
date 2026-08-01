@@ -8,9 +8,9 @@ public object ProfileArtifactCompatibility {
         documents: List<ResolvedDocumentContract>,
         artifactCatalog: List<DocumentationArtifactDescriptor>,
     ): List<ProfileArtifactBinding> {
-        val byPath = artifactCatalog.groupBy { it.relativePath }
+        val byPath = artifactCatalog.groupBy { logicalPath(it.relativePath) }
         return documents.sortedBy { it.documentStableId }.map { document ->
-            val exact = document.relativePath?.let(byPath::get).orEmpty()
+            val exact = document.relativePath?.let(::logicalPath)?.let(byPath::get).orEmpty()
             when {
                 exact.size == 1 -> ProfileArtifactBinding(
                     document.documentStableId,
@@ -29,6 +29,9 @@ public object ProfileArtifactCompatibility {
         }
     }
 
+    private fun logicalPath(path: String): String =
+        DocumentationProfileCanonicalizer.normalizeRelativePath(path).removePrefix("docs/")
+
     private fun legacyKindBinding(
         document: ResolvedDocumentContract,
         artifactCatalog: List<DocumentationArtifactDescriptor>,
@@ -36,6 +39,8 @@ public object ProfileArtifactCompatibility {
         val compatibleKind = when (document.type) {
             DocumentType.PROJECT_OVERVIEW -> DocumentationArtifactKind.PROJECT_OVERVIEW
             DocumentType.ARCHITECTURE_OVERVIEW -> DocumentationArtifactKind.ARCHITECTURE_OVERVIEW
+            DocumentType.FEATURE_CATALOG -> DocumentationArtifactKind.FEATURE_CATALOG
+            DocumentType.FEATURE_SPECIFICATION -> DocumentationArtifactKind.FEATURE_DETAIL
             else -> null
         }
         val candidates = compatibleKind?.let { kind -> artifactCatalog.filter { it.kind == kind } }.orEmpty()

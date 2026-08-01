@@ -18,6 +18,8 @@ public enum class DocumentationArtifactKind {
     RELATIONSHIP,
     EVIDENCE,
     ARCHITECTURE_OVERVIEW,
+    FEATURE_CATALOG,
+    FEATURE_DETAIL,
     INDEX,
 }
 

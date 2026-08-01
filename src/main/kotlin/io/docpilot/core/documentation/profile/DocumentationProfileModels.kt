@@ -85,6 +85,7 @@ public enum class RendererCapability {
     DATA_FLOW_DIAGRAM,
     EVIDENCE_REFERENCE_RENDERING,
     UNKNOWN_FINDING_RENDERING,
+    FEATURE_DOCUMENTATION_RENDERING,
 }
 
 public enum class EvidenceClass {

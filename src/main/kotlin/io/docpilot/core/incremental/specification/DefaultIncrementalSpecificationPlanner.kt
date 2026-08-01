@@ -33,6 +33,7 @@ public class DefaultIncrementalSpecificationPlanner : IncrementalSpecificationPl
             addAll(diff.entryPointChanges.map { it.toAction(IncrementalUpdateTarget.ENTRY_POINT) })
             addAll(diff.scenarioChanges.map { it.toAction(IncrementalUpdateTarget.SCENARIO) })
             addAll(diff.scenarioStepChanges.map { it.toAction(IncrementalUpdateTarget.SCENARIO_STEP) })
+            addAll(diff.evidenceChanges.map { it.toAction(IncrementalUpdateTarget.EVIDENCE) })
         }.sortedWith(compareBy({ it.target.ordinal }, { it.parentId ?: "" }, { it.id }, { it.changeKind.ordinal }))
 
         val changedTypeIds = buildSet {

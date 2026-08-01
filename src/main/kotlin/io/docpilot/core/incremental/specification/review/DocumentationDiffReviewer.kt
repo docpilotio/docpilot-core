@@ -180,6 +180,7 @@ public class DefaultDocumentationDiffReviewer(
         IncrementalUpdateTarget.ENTRY_POINT -> specification.entryPoints.any { it.id == id }
         IncrementalUpdateTarget.SCENARIO -> specification.scenarios.any { it.id == id }
         IncrementalUpdateTarget.SCENARIO_STEP -> specification.scenarios.any { scenario -> scenario.steps.any { it.id == id } }
+        IncrementalUpdateTarget.EVIDENCE -> specification.evidence.any { it.id == id }
     }
 
     private fun sha256(documentation: String): String =
@@ -222,5 +223,6 @@ public class DefaultDocumentationDiffReviewer(
         IncrementalUpdateTarget.SCENARIO -> specification.scenarios.firstOrNull { it.id == id }?.evidenceRefs
         IncrementalUpdateTarget.SCENARIO_STEP -> specification.scenarios.asSequence().flatMap { it.steps.asSequence() }
             .firstOrNull { it.id == id }?.evidenceRefs
+        IncrementalUpdateTarget.EVIDENCE -> specification.evidence.firstOrNull { it.id == id }?.let { setOf(it.id) }
     } ?: emptySet()
 }
