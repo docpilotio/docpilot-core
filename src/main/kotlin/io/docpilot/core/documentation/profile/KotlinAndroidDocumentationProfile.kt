@@ -18,6 +18,8 @@ public object KotlinAndroidDocumentationProfile {
                 domainModel(),
                 databaseSchema(),
                 externalApiContract(),
+                contractCatalog(),
+                contractDetail(),
                 testStrategy(),
             ),
         ),
@@ -190,6 +192,47 @@ public object KotlinAndroidDocumentationProfile {
             section("coverage-gaps", "Coverage Gaps", 50, capability = RendererCapability.UNKNOWN_FINDING_RENDERING),
             section("evidence", "Evidence", 60, capability = RendererCapability.EVIDENCE_REFERENCE_RENDERING),
         ),
+    )
+
+    private fun contractCatalog(): DocumentDefinition = definition(
+        type = DocumentType.CONTRACT_CATALOG,
+        stableKey = "contract-catalog",
+        purpose = "Inventory canonical DIR 0.5 Contracts and link their deterministic detail documents.",
+        primary = setOf(DocumentAudience.DEVELOPER, DocumentAudience.ARCHITECT, DocumentAudience.REVIEWER),
+        path = "contracts/catalog.md",
+        requiredModel = DocumentationModelRequirement.CONTRACT_MODEL,
+        sections = listOf(
+            section("identity", "Generation Identity", 10),
+            section("summary", "Contract Summary", 20),
+            section("contracts", "Contracts", 30, capability = RendererCapability.CONTRACT_DOCUMENTATION_RENDERING),
+            section("evidence", "Evidence Policy", 40, capability = RendererCapability.EVIDENCE_REFERENCE_RENDERING),
+            section("unresolved", "Unresolved Policy", 50, capability = RendererCapability.UNKNOWN_FINDING_RENDERING),
+        ),
+    ).copy(rendererCapabilities = setOf(
+        RendererCapability.MARKDOWN_SECTION_RENDERING,
+        RendererCapability.EVIDENCE_REFERENCE_RENDERING,
+        RendererCapability.UNKNOWN_FINDING_RENDERING,
+        RendererCapability.CONTRACT_DOCUMENTATION_RENDERING,
+    ))
+
+    private fun contractDetail(): DocumentDefinition = DocumentDefinition(
+        type = DocumentType.CONTRACT_DETAIL,
+        stableKey = DocumentStableKey("contract-detail"),
+        purpose = "Render one canonical DIR 0.5 Contract without source rescanning or inferred facts.",
+        primaryAudiences = setOf(DocumentAudience.DEVELOPER, DocumentAudience.REVIEWER),
+        multiplicity = DocumentMultiplicity.PER_CONTRACT,
+        pathPolicy = DocumentPathPolicy.Pattern("contracts/details/{contractId}.md"),
+        sections = listOf(
+            "identity", "classification", "ownership", "source-bindings", "inputs", "outputs",
+            "members", "relationships", "evidence", "unresolved", "generation-metadata",
+        ).mapIndexed { index, id -> section(id, id.replace('-', ' ').replaceFirstChar(Char::uppercase), (index + 1) * 10) },
+        rendererCapabilities = setOf(
+            RendererCapability.MARKDOWN_SECTION_RENDERING,
+            RendererCapability.EVIDENCE_REFERENCE_RENDERING,
+            RendererCapability.UNKNOWN_FINDING_RENDERING,
+            RendererCapability.CONTRACT_DOCUMENTATION_RENDERING,
+        ),
+        requiredModel = DocumentationModelRequirement.CONTRACT_MODEL,
     )
 
     private fun contractSections(inventoryTitle: String): List<SectionDefinition> = listOf(

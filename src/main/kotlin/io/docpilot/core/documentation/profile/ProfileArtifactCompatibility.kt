@@ -41,6 +41,8 @@ public object ProfileArtifactCompatibility {
             DocumentType.ARCHITECTURE_OVERVIEW -> DocumentationArtifactKind.ARCHITECTURE_OVERVIEW
             DocumentType.FEATURE_CATALOG -> DocumentationArtifactKind.FEATURE_CATALOG
             DocumentType.FEATURE_SPECIFICATION -> DocumentationArtifactKind.FEATURE_DETAIL
+            DocumentType.CONTRACT_CATALOG -> DocumentationArtifactKind.CONTRACT_CATALOG
+            DocumentType.CONTRACT_DETAIL -> DocumentationArtifactKind.CONTRACT_DETAIL
             else -> null
         }
         val candidates = compatibleKind?.let { kind -> artifactCatalog.filter { it.kind == kind } }.orEmpty()

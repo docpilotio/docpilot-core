@@ -20,6 +20,8 @@ public enum class DocumentationArtifactKind {
     ARCHITECTURE_OVERVIEW,
     FEATURE_CATALOG,
     FEATURE_DETAIL,
+    CONTRACT_CATALOG,
+    CONTRACT_DETAIL,
     INDEX,
 }
 

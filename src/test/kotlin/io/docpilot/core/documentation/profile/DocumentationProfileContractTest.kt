@@ -13,7 +13,7 @@ class DocumentationProfileContractTest {
         assertEquals("kotlin-android", profile.id.value)
         assertEquals(1, profile.version.value)
         assertEquals(DocumentationProfileCompatibilityPolicy.EXACT_VERSION, profile.compatibilityPolicy)
-        assertEquals(9, profile.documentDefinitions.size)
+        assertEquals(11, profile.documentDefinitions.size)
         assertEquals(
             profile.documentDefinitions.sortedBy { it.stableKey.value },
             profile.documentDefinitions,
@@ -30,6 +30,10 @@ class DocumentationProfileContractTest {
             DocumentMultiplicity.PER_FEATURE,
             profile.documentDefinitions.single { it.type == DocumentType.FEATURE_SPECIFICATION }.multiplicity,
         )
+        assertEquals(
+            DocumentMultiplicity.PER_CONTRACT,
+            profile.documentDefinitions.single { it.type == DocumentType.CONTRACT_DETAIL }.multiplicity,
+        )
     }
 
     @Test
@@ -42,6 +46,7 @@ class DocumentationProfileContractTest {
                 RendererCapability.EVIDENCE_REFERENCE_RENDERING,
                 RendererCapability.UNKNOWN_FINDING_RENDERING,
                 RendererCapability.FEATURE_DOCUMENTATION_RENDERING,
+                RendererCapability.CONTRACT_DOCUMENTATION_RENDERING,
             ),
             renderer.capabilities(),
         )

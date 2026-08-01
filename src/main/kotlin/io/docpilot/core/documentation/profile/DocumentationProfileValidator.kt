@@ -9,7 +9,7 @@ public object DocumentationProfileValidator {
     private val placeholderPattern = Regex("\\{([A-Za-z][A-Za-z0-9]*)}")
     private val allowedPlaceholders = setOf(
         "scopeId", "scopeHash", "slug", "moduleId", "packageId", "componentId",
-        "featureId", "externalSystemId",
+        "featureId", "externalSystemId", "contractId",
     )
 
     public fun validate(profile: DocumentationProfile): DocumentationProfile {
@@ -153,6 +153,7 @@ public object DocumentationProfileValidator {
         DocumentMultiplicity.PER_COMPONENT -> setOf("componentId", "scopeId", "scopeHash", "slug")
         DocumentMultiplicity.PER_FEATURE -> setOf("featureId", "scopeId", "scopeHash", "slug")
         DocumentMultiplicity.PER_EXTERNAL_SYSTEM -> setOf("externalSystemId", "scopeId", "scopeHash", "slug")
+        DocumentMultiplicity.PER_CONTRACT -> setOf("contractId", "scopeId", "scopeHash", "slug")
     }
 
     private val PORTABLE_PATH_FORBIDDEN_CHARACTERS: Set<Char> = setOf('<', '>', ':', '"', '|', '?', '*')
