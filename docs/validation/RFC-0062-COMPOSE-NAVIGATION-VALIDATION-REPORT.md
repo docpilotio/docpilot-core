@@ -19,6 +19,8 @@ Status: `PARTIAL_PASS`
 | architecture-samples read-only DIR build | PASS: 55 files, 0 parser failures |
 | architecture-samples file-order determinism | PASS |
 | architecture-samples Snapshot format 2 round-trip | PASS |
+| architecture-samples first generation | PASS: `FULL_REGENERATION` / `NOT_FOUND` |
+| architecture-samples repeated generation | PASS: `NO_CHANGES` / `VALID` |
 | architecture-samples RFC-0061 regression | PASS: 4 Compose Entry Points, 5 Features, 4 Scenarios |
 | architecture-samples RFC-0062 syntax coverage | NOT PRESENT: fixture tests provide coverage |
 
@@ -31,3 +33,11 @@ Scenarios. It produced semantic hash
 `9524453cb7debece08a2693f857bcf0fecebb0278cd8f2c60d78b6544157bd59`. The project currently
 contains no observed function-reference registration, nested navigation graph, or navigation
 argument, so it proves regression safety rather than real-project RFC-0062 syntax coverage.
+
+Follow-up repeat-generation validation ran on 2026-08-01 against an isolated copy of the
+workspace `architecture-samples` checkout. The first CLI execution selected
+`FULL_REGENERATION` with `PREVIOUS_SPECIFICATION_MISSING`; the second selected `NO_CHANGES`
+and loaded a `VALID` Snapshot. Both executions exited 0. The persisted Snapshot file was
+1,455,636 bytes with SHA-256
+`49fc343e52fe32c47d83525d8fde0e729159dc7ca2565fa18d30f0823105ba9d`. The original sample
+checkout was not modified.

@@ -18,6 +18,22 @@ class ReleaseEvidenceCodecTest {
         assertEquals(encoded, codec.encode(decoded))
         assertTrue(encoded.endsWith("\n"))
         assertTrue(manifest.integrity.payloadSha256.isSha256())
+        assertEquals(2, manifest.releaseEvidenceFormatVersion)
+        assertTrue("mcpMode" !in encoded)
+        assertTrue("mcpCommit" !in encoded)
+        assertTrue("mcpVersion" !in encoded)
+    }
+
+    @Test
+    fun `legacy format one manifest is rejected instead of being interpreted as core only`() {
+        val encoded = codec.encode(codec.create(passingInput()))
+        val legacyVersion = encoded.replaceFirst(
+            "\"releaseEvidenceFormatVersion\": 2",
+            "\"releaseEvidenceFormatVersion\": 1",
+        )
+
+        val failure = assertFailsWith<IllegalArgumentException> { codec.decode(legacyVersion) }
+        assertTrue(failure.message.orEmpty().contains("Unsupported Release Evidence Manifest format: 1"))
     }
 
     @Test

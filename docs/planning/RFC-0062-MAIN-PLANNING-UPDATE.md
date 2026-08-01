@@ -6,8 +6,10 @@ external-lambda, graph ownership, argument, and argument-link Evidence before Fe
 Discovery.
 
 Completed gates: targeted Compose tests, core test suite, multi-module Gradle test,
-`git diff --check`, read-only architecture-samples DIR build, file-order determinism, and
-Snapshot format 2 round-trip. The real project contains no RFC-0062-specific syntax, so
-real-project syntax coverage remains a documented limitation. Public v1.0 remains
+`git diff --check`, read-only architecture-samples DIR build, file-order determinism,
+Snapshot format 2 round-trip, and isolated real-project repeat generation. The repeat run
+produced `FULL_REGENERATION` followed by `NO_CHANGES` with `VALID` Snapshot validation. The
+real project contains no RFC-0062-specific syntax, so real-project syntax coverage remains a
+documented limitation. Public v1.0 remains
 `PRODUCT_VALIDATION_FAIL / NOT_APPROVED`; PV-009 remains `PENDING`; no Release Candidate is
 declared.

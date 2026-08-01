@@ -14,6 +14,9 @@ Verification: 15 targeted Compose tests PASS; core tests PASS; all Gradle module
 parser failures, preserved four Compose Entry Points/five Features/four Scenarios, produced a
 valid format 2 Snapshot round-trip, and remained identical with reversed file order. The real
 project contains no RFC-0062-specific syntax, so completion retains a syntax-coverage limitation.
+Follow-up isolated real-project validation on 2026-08-01 produced `FULL_REGENERATION` on the
+first run and `NO_CHANGES` with `VALID` Snapshot validation on the second run. The persisted
+Snapshot file SHA-256 was `49fc343e52fe32c47d83525d8fde0e729159dc7ca2565fa18d30f0823105ba9d`.
 
 No commit, push, merge, tag, release, CLI addition, MCP production change, or public release
 state change was performed.

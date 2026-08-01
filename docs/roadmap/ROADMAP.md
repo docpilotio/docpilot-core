@@ -49,7 +49,8 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 | RFC-0059 | Implemented | Feature, Entry Point, and Scenario Specification Foundation |
 | RFC-0060 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Deterministic Feature Discovery; Compose routes remain unsupported |
 | RFC-0061 | `IMPLEMENTED_WITH_DOCUMENTED_LIMITATIONS` | Deterministic Compose Navigation Evidence and destination discovery |
-| RFC-0062 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Function references, nested graph ownership, and navigation argument Evidence; real-project repeat validation pending |
+| RFC-0062 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Function references, nested graph ownership, and navigation argument Evidence; real-project repeat validation passed, syntax coverage absent |
+| RFC-0063 | Implemented | Standalone Core Release Evidence format 2 and removal of the temporary in-repository MCP implementation |
 
 ## Historical release milestones
 
@@ -72,9 +73,10 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 3. RFC-0059 — Feature, Entry Point, and Scenario Specification Foundation — implemented.
 4. RFC-0060 — deterministic Evidence-bounded DIR 0.4 projection — implemented with validation limitations.
 5. RFC-0061 — deterministic Compose Navigation Evidence — implemented with documented limitations.
-6. RFC-0062 — function references, nested graph ownership, and navigation argument Evidence — implemented; real-project repeat validation pending.
-7. RFC-0063 — scope not approved. Complete RFC-0062 validation and approve Main Planning before selecting capability scope.
-8. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
+6. RFC-0062 — function references, nested graph ownership, and navigation argument Evidence — implemented; real-project repeat validation passed, syntax coverage absent.
+7. RFC-0063 — standalone Core Release Evidence format 2 and MCP removal — implemented.
+8. RFC-0064 — scope not approved. Approve Main Planning before selecting capability scope.
+9. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
 
 Profiles and Resolutions remain runtime-only. RFC-0059 introduced DIR 0.4 and Snapshot format 2 while retaining format 1/DIR 0.3 compatibility; RFC-0060 through RFC-0062 extend deterministic discovery without changing those persisted formats.
 

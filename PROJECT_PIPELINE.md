@@ -190,7 +190,7 @@ Technical Release Evidence and public Product Validation are separate gates.
 
 ```text
 Build/Test/Git/Artifact Evidence
-→ Release Evidence Manifest
+→ Release Evidence Manifest format 2 with Core-only candidate identity
 → offline technical gate
 
 Independent product criteria and reviewer Evidence
