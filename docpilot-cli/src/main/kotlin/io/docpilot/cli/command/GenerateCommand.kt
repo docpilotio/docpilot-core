@@ -4,6 +4,7 @@ import io.docpilot.cli.bootstrap.CliBootstrap
 import io.docpilot.cli.bootstrap.ProjectKnowledgeLoader
 import io.docpilot.cli.io.ConsolePrinter
 import io.docpilot.cli.io.OutputWriter
+import io.docpilot.cli.logging.ProjectLogSession
 import io.docpilot.core.document.DocumentRenderer
 import io.docpilot.core.generator.adr.AdrGenerationRequest
 import io.docpilot.core.generator.adr.AdrStatus
@@ -39,9 +40,11 @@ class GenerateCommand(
 
     private fun architecture(args: CliArguments) {
         val project = Path.of(args.required("project"))
+        val log = ProjectLogSession.create(project)
+        log.info("Architecture generation started for ${project.toAbsolutePath().normalize()}.")
         val provider = args.required("provider")
         val model = AiModelId(args.required("model"))
-        val facade = bootstrap.create(provider)
+        val facade = bootstrap.create(provider, log)
         val document = facade.generateArchitecture(
             ArchitectureGenerationRequest(
                 knowledge = knowledgeLoader.load(project),
@@ -50,13 +53,16 @@ class GenerateCommand(
             ),
         )
         emit(renderer.render(document), args.optional("output"))
+        log.info("Architecture generation completed.")
     }
 
     private fun adr(args: CliArguments) {
         val project = Path.of(args.required("project"))
+        val log = ProjectLogSession.create(project)
+        log.info("ADR generation started for ${project.toAbsolutePath().normalize()}.")
         val provider = args.required("provider")
         val model = AiModelId(args.required("model"))
-        val facade = bootstrap.create(provider)
+        val facade = bootstrap.create(provider, log)
         val status = args.optional("status")?.let(::parseAdrStatus) ?: AdrStatus.ACCEPTED
         val document = facade.generateAdr(
             AdrGenerationRequest(
@@ -71,11 +77,14 @@ class GenerateCommand(
             ),
         )
         emit(renderer.render(document), args.optional("output"))
+        log.info("ADR generation completed.")
     }
 
 
     private fun specification(args: CliArguments) {
         val project = Path.of(args.required("project"))
+        val log = ProjectLogSession.create(project)
+        log.info("Specification analysis and generation started for ${project.toAbsolutePath().normalize()}.")
         val outputRoot = Path.of(args.optional("output") ?: project.toString())
         val result = specificationWorkflow.execute(project, outputRoot)
 
@@ -99,6 +108,7 @@ class GenerateCommand(
             if (result.snapshotSaved) "Specification generated and snapshot saved."
             else "Specification generation completed; snapshot unchanged.",
         )
+        log.info("Specification analysis and generation completed in ${result.execution.mode} mode.")
     }
 
     private fun snapshotValidation(

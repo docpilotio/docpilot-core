@@ -3,6 +3,7 @@ package io.docpilot.cli.command.review
 import io.docpilot.cli.bootstrap.CliBootstrap
 import io.docpilot.cli.bootstrap.ProjectKnowledgeLoader
 import io.docpilot.cli.io.AtomicDocumentationFileWriter
+import io.docpilot.cli.logging.ProjectLogSession
 import io.docpilot.core.incremental.specification.IncrementalDocumentationEngine
 import io.docpilot.core.incremental.specification.ai.AiIncrementalDocumentationGenerator
 import io.docpilot.core.incremental.specification.ai.AiIncrementalGenerationRequest
@@ -302,6 +303,8 @@ class ReviewCommand(
             setOf("json"),
         )
         val projectRoot = directory(args.required("project"))
+        val log = ProjectLogSession.create(projectRoot)
+        log.info("Incremental review analysis and AI generation started for $projectRoot.")
         val documentationPath = regularFile(args.required("documentation"))
         val documentation = Files.readString(documentationPath, StandardCharsets.UTF_8)
         val analysis = knowledgeLoader.analyze(projectRoot)
@@ -316,7 +319,9 @@ class ReviewCommand(
         val repository = bundlePath?.let(FileReviewBundleRepository::atPath)
             ?: FileReviewBundleRepository(projectRoot)
         val generator: AiIncrementalDocumentationGenerator =
-            DefaultAiIncrementalDocumentationGenerator(bootstrap.createProvider(args.required("provider")))
+            DefaultAiIncrementalDocumentationGenerator(
+                log.logging(bootstrap.createProvider(args.required("provider"))),
+            )
         val lifecycleRepository = FileReviewLifecycleRepository(projectRoot)
         val workflow = DefaultPersistentDocumentationReviewWorkflow(
             generator, repository, codec, lifecycleRepository = lifecycleRepository,
@@ -330,6 +335,7 @@ class ReviewCommand(
                 AiModelId(args.required("model")),
             ),
         )
+        log.info("Incremental review preparation completed with ${result::class.simpleName}.")
         return when (result) {
             is PersistentReviewPreparationResult.Saved -> {
                 val path = bundlePath ?: defaultBundlePath(projectRoot, result.bundle.proposalId)
