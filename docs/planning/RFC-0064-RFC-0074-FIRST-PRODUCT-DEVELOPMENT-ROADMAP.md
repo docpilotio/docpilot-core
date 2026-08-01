@@ -21,13 +21,15 @@ those require Product Owner approval when that RFC starts.
 | RFC-0065 | Contract Specification Foundation | Define the canonical Contract model, Stable IDs, Evidence policy, validation, and evolution extension points |
 | RFC-0066 | Deterministic Contract Extraction | Extract Evidence-bounded Kotlin and Android Contracts deterministically |
 | RFC-0067 | Contract Documentation Rendering | Render API, data, event, and individual Contract documentation |
-| RFC-0068 | Diagram IR and Mermaid Rendering | Introduce deterministic Diagram IR with Mermaid as its first renderer |
-| RFC-0069 | Documentation Claims and Traceability | Trace Source, Evidence, Specification, Claim, Document Section, and Review Decision |
-| RFC-0070 | Official Reconciliation CLI Workflow | Expose preview, decision, apply, Receipt, JSON, and exit-code behavior through the product CLI |
-| RFC-0071 | Official Evolution CLI Workflow | Expose change, impact, causal graph, coverage, persistence, and offline verification through the product CLI |
-| RFC-0072 | Structured AI Documentation Enrichment | Permit Evidence-bounded narrative and scoped patch proposals without canonical authority |
-| RFC-0073 | Documentation Quality Gate | Define and enforce the official deterministic documentation quality contract |
-| RFC-0074 | Product Validation Re-entry | Re-run the public-project product flow and independently reassess PV-009 and public approval |
+| RFC-0068 | Official Documentation Generation CLI | Expose preview/apply, selection, JSON, ownership protection, and Snapshot-safe generation |
+| RFC-0069 | Documentation Bundle and Manifest | Bind generated Artifacts, hashes, Profile, Snapshot, and Receipt |
+| RFC-0070 | Structured AI Documentation Enrichment | Permit Evidence-bounded narrative and scoped patch proposals without canonical authority |
+| RFC-0071 | Diagram IR and Mermaid Rendering | Introduce deterministic Diagram IR with Mermaid as its first renderer |
+| RFC-0072 | Documentation Claims and Traceability | Trace Source, Evidence, Specification, Claim, Document Section, and Review Decision |
+| RFC-0073 | Official Reconciliation CLI Workflow | Expose preview, decision, apply, Receipt, JSON, and exit-code behavior through the product CLI |
+| RFC-0074 | Official Evolution CLI Workflow | Expose change, impact, causal graph, coverage, persistence, and offline verification through the product CLI |
+| RFC-0075 | Documentation Quality Gate | Define and enforce the official deterministic documentation quality contract |
+| RFC-0076 | Product Validation Re-entry | Re-run the public-project product flow and independently reassess PV-009 and public approval |
 
 The default dependency order is:
 
@@ -56,8 +58,8 @@ It does not rescan source or invent Feature and Scenario entities. RFC-0065 thro
 extract, and render Evidence-backed Contracts. Ambiguous or unprovable identity remains explicit as
 unresolved; first-candidate selection and business-meaning inference from names are prohibited.
 
-RFC-0068 separates `ProjectSpecification`, `DiagramSpecification`, Diagram IR, and renderer syntax.
-Nodes and edges use Stable IDs, and renderers do not infer relationships. RFC-0069 adds stable Claim,
+RFC-0071 separates `ProjectSpecification`, `DiagramSpecification`, Diagram IR, and renderer syntax.
+Nodes and edges use Stable IDs, and renderers do not infer relationships. RFC-0072 adds stable Claim,
 Evidence, entity, section, and review bindings, including orphan, stale, and broken traceability
 detection.
 

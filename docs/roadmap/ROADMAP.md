@@ -81,13 +81,15 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 8. RFC-0064 — Profile-aware Feature Documentation Rendering — implemented.
 9. RFC-0065 — Contract Specification Foundation — implemented.
 10. RFC-0066 — Deterministic Contract Extraction — implemented with real-project validation limitations.
-11. RFC-0067 — Contract Documentation Rendering — next; detailed design and Acceptance Criteria require start approval.
-12. RFC-0068 — Diagram IR and Mermaid Rendering.
-13. RFC-0069 — Documentation Claims and Traceability.
-14. RFC-0070 / RFC-0071 — official Reconciliation and Evolution CLI workflows after shared Core contracts stabilize.
-15. RFC-0072 — Structured AI Documentation Enrichment.
-16. RFC-0073 — Documentation Quality Gate.
-17. RFC-0074 — Product Validation Re-entry and independent PV-009 reassessment.
+11. RFC-0067 — Contract Documentation Rendering — implemented.
+12. RFC-0068 — Official Documentation Generation CLI — implemented.
+13. RFC-0069 — Documentation Bundle and Manifest.
+14. RFC-0070 — Structured AI Documentation Enrichment.
+15. RFC-0071 — Diagram IR and Mermaid Rendering.
+16. RFC-0072 — Documentation Claims and Traceability.
+17. RFC-0073 / RFC-0074 — official Reconciliation and Evolution CLI workflows.
+18. RFC-0075 — Documentation Quality Gate.
+19. RFC-0076 — Product Validation Re-entry and independent PV-009 reassessment.
 
 The Product Owner fixed this numbering, order, and scope boundary in
 `docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,

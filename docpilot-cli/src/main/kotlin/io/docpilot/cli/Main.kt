@@ -34,6 +34,7 @@ private fun printUsage() {
         Usage:
           docpilot generate architecture --project <path> --provider <id> --model <model> [--title <title>] [--output <file>]
           docpilot generate specification --project <path> [--output <directory>]
+          docpilot generate docs --project <path> --output <directory> [--dry-run|--confirm] [--full]
           docpilot generate adr --project <path> --provider <id> --model <model> --title <title> --context <text> --decision <text> --consequences <text> [--alternatives <text>] [--status <status>] [--output <file>]
           docpilot review prepare --project <path> --documentation <file> --provider <id> --model <model> [--bundle <file>] [--json]
           docpilot review inspect|status --project <path> (--proposal <id> | --bundle <file>) [--documentation <file>] [--json]

@@ -12,17 +12,19 @@ import io.docpilot.core.generator.architecture.ArchitectureGenerationRequest
 import io.docpilot.core.model.ai.AiModelId
 import java.nio.file.Path
 
-class GenerateCommand(
+class GenerateCommand internal constructor(
     private val bootstrap: CliBootstrap = CliBootstrap(),
     private val knowledgeLoader: ProjectKnowledgeLoader = ProjectKnowledgeLoader(),
     private val renderer: DocumentRenderer = DocumentRenderer(),
     private val writer: OutputWriter = OutputWriter(),
     private val printer: ConsolePrinter = ConsolePrinter(),
     private val specificationWorkflow: SpecificationGenerateWorkflow = DefaultSpecificationGenerateWorkflow(),
+    private val documentationWorkflow: DocumentationGenerationWorkflow = DefaultDocumentationGenerationWorkflow(),
 ) {
     fun execute(args: List<String>): Int =
         try {
             require(args.isNotEmpty()) { "Missing generation type." }
+            if (args.first() == "docs") return documentation(args.drop(1))
             when (args.first()) {
                 "architecture" -> architecture(CliArguments.parse(args.drop(1)))
                 "adr" -> adr(CliArguments.parse(args.drop(1)))
@@ -37,6 +39,65 @@ class GenerateCommand(
             printer.error(exception.message ?: "Generation failed.")
             1
         }
+
+    private fun documentation(tokens: List<String>): Int {
+        val options = GenerateDocsOptionsParser.parse(tokens)
+        val result = documentationWorkflow.execute(options)
+        if (options.json) printer.content(renderJson(result)) else renderText(result)
+        return result.exitCode
+    }
+
+    private fun renderText(result: DocumentationGenerationResult) {
+        printer.content("Command: generate docs")
+        printer.content("Mode: ${result.mode}")
+        printer.content("Status: ${result.status}")
+        printer.content("Project: ${result.projectId ?: "UNKNOWN"}")
+        printer.content("Output: ${result.outputRoot}")
+        printer.content("Profile: ${result.profile}")
+        printer.content("Snapshot Status: ${result.snapshotStatus}")
+        printer.content("Artifact Plan: ${result.artifacts.size}")
+        printer.content("Created: ${result.artifacts.count { it.operation.name == "CREATE" }}")
+        printer.content("Updated: ${result.artifacts.count { it.operation.name == "UPDATE" }}")
+        printer.content("Retained: ${result.artifacts.count { it.operation.name == "KEEP" }}")
+        printer.content("Plan SHA-256: ${result.planSha256 ?: "NONE"}")
+        result.artifacts.forEach { printer.content("${it.operation} ${it.artifactId.value} ${it.relativePath}") }
+        result.diagnostics.forEach { printer.content("Diagnostic: $it") }
+        printer.content("Result: ${result.status}")
+    }
+
+    private fun renderJson(result: DocumentationGenerationResult): String = buildString {
+        append('{')
+        append("\"schemaVersion\":1,")
+        append("\"status\":\"").append(result.status).append("\",")
+        append("\"mode\":\"").append(result.mode).append("\",")
+        append("\"projectId\":").append(result.projectId?.let { "\"${json(it)}\"" } ?: "null").append(',')
+        append("\"outputRoot\":\"").append(json(result.outputRoot)).append("\",")
+        append("\"profile\":\"").append(json(result.profile)).append("\",")
+        append("\"snapshotStatus\":\"").append(json(result.snapshotStatus)).append("\",")
+        append("\"planSha256\":").append(result.planSha256?.let { "\"$it\"" } ?: "null").append(',')
+        append("\"snapshotWritten\":").append(result.snapshotWritten).append(',')
+        append("\"artifacts\":[")
+        result.artifacts.forEachIndexed { index, artifact ->
+            if (index > 0) append(',')
+            append("{\"artifactId\":\"").append(json(artifact.artifactId.value))
+            append("\",\"documentType\":\"").append(artifact.documentType)
+            append("\",\"relativePath\":\"").append(json(artifact.relativePath))
+            append("\",\"action\":\"").append(artifact.operation)
+            append("\",\"contentSha256\":\"").append(artifact.contentSha256).append("\"}")
+        }
+        append("],\"diagnostics\":[")
+        result.diagnostics.forEachIndexed { index, diagnostic ->
+            if (index > 0) append(','); append('"').append(json(diagnostic)).append('"')
+        }
+        append("]}")
+    }
+
+    private fun json(value: String): String = buildString {
+        value.forEach { character -> when (character) {
+            '\\' -> append("\\\\"); '"' -> append("\\\""); '\n' -> append("\\n"); '\r' -> append("\\r"); '\t' -> append("\\t")
+            else -> if (character.code < 0x20) append("\\u%04x".format(character.code)) else append(character)
+        } }
+    }
 
     private fun architecture(args: CliArguments) {
         val project = Path.of(args.required("project"))
