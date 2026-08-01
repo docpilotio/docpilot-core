@@ -12,6 +12,7 @@ public data class ProjectSpecification(
     public val features: List<FeatureSpecification> = emptyList(),
     public val entryPoints: List<EntryPointSpecification> = emptyList(),
     public val scenarios: List<ScenarioSpecification> = emptyList(),
+    public val contracts: List<ContractSpecification> = emptyList(),
 )
 
 public data class ProjectDescriptor(

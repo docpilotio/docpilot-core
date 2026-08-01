@@ -10,6 +10,7 @@ import io.docpilot.core.model.EntryPointSpecification
 import io.docpilot.core.model.ScenarioSpecification
 import io.docpilot.core.model.ScenarioStepSpecification
 import io.docpilot.core.model.Evidence
+import io.docpilot.core.model.ContractSpecification
 
 /** A deterministic change entry identified by the entity's stable DIR id. */
 public data class SpecificationChange<T>(
@@ -47,6 +48,7 @@ public data class SpecificationDiff(
     public val scenarioChanges: List<SpecificationChange<ScenarioSpecification>> = emptyList(),
     public val scenarioStepChanges: List<SpecificationChange<ScenarioStepSpecification>> = emptyList(),
     public val evidenceChanges: List<SpecificationChange<Evidence>> = emptyList(),
+    public val contractChanges: List<SpecificationChange<ContractSpecification>> = emptyList(),
 ) {
     public val hasChanges: Boolean
         get() = packageChanges.isNotEmpty() ||
@@ -58,7 +60,8 @@ public data class SpecificationDiff(
             entryPointChanges.isNotEmpty() ||
             scenarioChanges.isNotEmpty() ||
             scenarioStepChanges.isNotEmpty() ||
-            evidenceChanges.isNotEmpty()
+            evidenceChanges.isNotEmpty() ||
+            contractChanges.isNotEmpty()
 
     public companion object {
         public val EMPTY: SpecificationDiff = SpecificationDiff()

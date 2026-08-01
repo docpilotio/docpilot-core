@@ -102,10 +102,10 @@ AI Provider implementations remain adapters behind the Provider SPI. AI output i
 | PV-009 | `PENDING` |
 | Technical v1 baseline | Documentation reports immutable `v1.0.0`; Git identity is not verifiable from source ZIPs without `.git` |
 | Gradle artifact version | `0.1.0-SNAPSHOT` |
-| Next RFC | RFC-0064 Profile-aware Feature Documentation Rendering; detailed start approval required |
+| Next RFC | RFC-0066 Deterministic Contract Extraction; detailed start approval required |
 | Primary validation target | `C:\WorkSpace\architecture-samples` |
 
-RFC-0059 introduced additive DIR 0.4 Feature, Entry Point, Scenario, and ordered Scenario Step contracts. RFC-0060 added AI-independent Evidence-bounded Feature Discovery, RFC-0061 added verified Compose route/registration/destination Evidence, and RFC-0062 added function-reference resolution, bounded external lambdas, nested graph ownership, and navigation argument Evidence. RFC-0062 targeted and full Gradle verification passed; isolated real-project generation produced `FULL_REGENERATION` followed by `NO_CHANGES` with a valid Snapshot. The sample still contains no RFC-0062-specific syntax. The public v1.0 Product Validation decision and PV-009 state are unchanged.
+RFC-0065 adds the Evidence-backed canonical Contract foundation in DIR 0.5 and Snapshot format 3 while retaining DIR 0.3/0.4 readers. Deterministic source extraction and Contract rendering remain RFC-0066 and RFC-0067. The public v1.0 Product Validation decision and PV-009 state are unchanged.
 
 ### Current technical formats
 
@@ -114,15 +114,15 @@ RFC-0059 introduced additive DIR 0.4 Feature, Entry Point, Scenario, and ordered
 | Base builder DIR schema | `0.3` |
 | Discovery pipeline output | `0.4` |
 | Legacy manual `ProjectSpecification` default | `0.2` |
-| Specification Snapshot | format `1` for DIR `0.3`; format `2` for DIR `0.4` |
-| Snapshot-supported DIR | `0.3` and `0.4` through their versioned formats |
+| Specification Snapshot | format `1` for DIR `0.3`; format `2` for DIR `0.4`; format `3` for DIR `0.5` |
+| Snapshot-supported DIR | `0.3`, `0.4`, and `0.5` through their versioned formats |
 | Review Bundle | `1` |
 | Evolution Report | `1` |
 | Relationship Projection Report | `1` |
 | Release Evidence Manifest | `2` (Core-only candidate identity) |
 | Documentation Profile | `kotlin-android@1` runtime-only |
 
-Snapshot format and DIR schema are independent version lines. Format 1/DIR 0.3 remains readable; format 2 stores DIR 0.4. Documentation Profiles remain runtime-only, and Review, Reconciliation, Projection, and Evolution formats remain unchanged.
+Snapshot format and DIR schema are independent version lines. Formats 1/DIR 0.3 and 2/DIR 0.4 remain readable; format 3 stores DIR 0.5 Contracts. Documentation Profiles remain runtime-only, and Review, Reconciliation, Projection, and Evolution formats remain version 1.
 
 The Product Owner has fixed RFC-0064 through RFC-0074 as the first post-RFC-0063 product-development
 sequence. The fixed baseline is recorded in

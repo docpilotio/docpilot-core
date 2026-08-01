@@ -31,6 +31,7 @@ public enum class EvolutionChangeKind {
     OWNERSHIP_CHANGED,
     RECONCILIATION_CONFLICTED,
     USER_DECISION_APPLIED,
+    CONTRACT_CHANGED,
 }
 
 public enum class EvolutionSubjectKind {
@@ -45,6 +46,7 @@ public enum class EvolutionSubjectKind {
     OWNERSHIP,
     RECONCILIATION_OPERATION,
     USER_DECISION,
+    CONTRACT,
 }
 
 public enum class EvolutionConfidenceClass {
@@ -115,6 +117,7 @@ public enum class EvolutionGraphNodeKind {
     RECONCILIATION_OPERATION,
     APPLIED_RESULT,
     DOCUMENT_STATE,
+    CONTRACT,
 }
 
 public enum class EvolutionGraphEdgeKind {

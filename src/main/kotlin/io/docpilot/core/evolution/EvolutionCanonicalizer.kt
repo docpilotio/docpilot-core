@@ -8,6 +8,8 @@ import io.docpilot.core.model.PackageSpecification
 import io.docpilot.core.model.ProjectDescriptor
 import io.docpilot.core.model.PropertySpecification
 import io.docpilot.core.model.RelationshipSpecification
+import io.docpilot.core.model.ContractSpecification
+import io.docpilot.core.specification.ContractCanonicalizer
 import java.security.MessageDigest
 
 public object EvolutionCanonicalizer {
@@ -144,6 +146,8 @@ public object EvolutionCanonicalizer {
         value.id, value.type, value.sourceId, value.targetId, value.description.orEmpty(),
         value.evidenceRefs.sorted().joinToString(","),
     )
+
+    public fun contract(value: ContractSpecification): String = ContractCanonicalizer.canonical(value)
 
     public fun evidence(value: Evidence): String = record(
         value.id, value.type, value.file.orEmpty(), value.symbol.orEmpty(), value.lineStart?.toString().orEmpty(),

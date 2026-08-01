@@ -10,6 +10,7 @@ import io.docpilot.core.model.FeatureSpecification
 import io.docpilot.core.model.EntryPointSpecification
 import io.docpilot.core.model.ScenarioSpecification
 import io.docpilot.core.model.Evidence
+import io.docpilot.core.model.ContractSpecification
 
 /** Stable-id based, deterministic ProjectSpecification differ. */
 public class DefaultSpecificationDiffer : SpecificationDiffer {
@@ -71,6 +72,11 @@ public class DefaultSpecificationDiffer : SpecificationDiffer {
             evidenceChanges = compare(
                 indexByStableId(previous.evidence, Evidence::id, "previous evidence"),
                 indexByStableId(current.evidence, Evidence::id, "current evidence"),
+            ),
+            contractChanges = compare(
+                indexByStableId(previous.contracts, ContractSpecification::id, "previous contracts"),
+                indexByStableId(current.contracts, ContractSpecification::id, "current contracts"),
+                parentId = { it.owner.stableId },
             ),
         )
     }
