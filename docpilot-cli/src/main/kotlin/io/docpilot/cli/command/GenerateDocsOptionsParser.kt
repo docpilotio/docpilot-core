@@ -6,9 +6,9 @@ internal object GenerateDocsOptionsParser {
     fun parse(tokens: List<String>): DocumentationGenerationOptions {
         val values = linkedMapOf<String, MutableList<String>>()
         val flags = linkedSetOf<String>()
-        val repeatable = setOf("artifact", "document-type")
-        val flagNames = setOf("dry-run", "confirm", "full", "json")
-        val valueNames = setOf("project", "output", "profile", "plan-sha256") + repeatable
+        val repeatable = setOf("artifact", "document-type", "enrichment-target")
+        val flagNames = setOf("dry-run", "confirm", "full", "json", "enrich")
+        val valueNames = setOf("project", "output", "profile", "plan-sha256", "provider", "model") + repeatable
         var index = 0
         while (index < tokens.size) {
             val token = tokens[index]
@@ -37,6 +37,14 @@ internal object GenerateDocsOptionsParser {
         val planSha = values["plan-sha256"]?.single()
         require(mode == DocumentationGenerationMode.APPLY || planSha == null) { "--plan-sha256 requires --confirm." }
         planSha?.let { require(it.matches(Regex("[0-9a-f]{64}"))) { "Invalid --plan-sha256 value." } }
+        val enrich = "enrich" in flags
+        require(enrich || ("provider" !in values && "model" !in values && "enrichment-target" !in values)) {
+            "--provider, --model, and --enrichment-target require --enrich."
+        }
+        require(!enrich || ("provider" in values && "model" in values)) { "--enrich requires --provider and --model." }
+        require(!(enrich && mode == DocumentationGenerationMode.PREVIEW)) {
+            "Dry-run enrichment does not invoke providers; use --confirm to apply enrichment."
+        }
         return DocumentationGenerationOptions(
             projectRoot = Path.of(values.getValue("project").single()),
             outputRoot = Path.of(values.getValue("output").single()),
@@ -47,6 +55,10 @@ internal object GenerateDocsOptionsParser {
             documentTypes = values["document-type"].orEmpty().map { it.uppercase().replace('-', '_') }.toSet(),
             expectedPlanSha256 = planSha,
             json = "json" in flags,
+            enrich = enrich,
+            provider = values["provider"]?.single(),
+            model = values["model"]?.single(),
+            enrichmentTargets = values["enrichment-target"].orEmpty().toSet(),
         )
     }
 }

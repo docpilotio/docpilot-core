@@ -19,7 +19,9 @@ class GenerateCommand internal constructor(
     private val writer: OutputWriter = OutputWriter(),
     private val printer: ConsolePrinter = ConsolePrinter(),
     private val specificationWorkflow: SpecificationGenerateWorkflow = DefaultSpecificationGenerateWorkflow(),
-    private val documentationWorkflow: DocumentationGenerationWorkflow = DefaultDocumentationGenerationWorkflow(),
+    private val documentationWorkflow: DocumentationGenerationWorkflow = DefaultDocumentationGenerationWorkflow(
+        providerResolver = { bootstrap.createProvider(it) },
+    ),
 ) {
     fun execute(args: List<String>): Int =
         try {
@@ -60,6 +62,16 @@ class GenerateCommand internal constructor(
         printer.content("Updated: ${result.artifacts.count { it.operation.name == "UPDATE" }}")
         printer.content("Retained: ${result.artifacts.count { it.operation.name == "KEEP" }}")
         printer.content("Plan SHA-256: ${result.planSha256 ?: "NONE"}")
+        printer.content("Bundle Status: ${result.verification ?: "NOT_PERSISTED"}")
+        printer.content("Bundle ID: ${result.bundle?.bundleId ?: "NONE"}")
+        printer.content("Manifest Path: ${result.bundle?.let { "${result.outputRoot}/${DocumentationBundleFormat.MANIFEST_PATH}" } ?: "NONE"}")
+        printer.content("Manifest SHA-256: ${result.bundle?.manifestSha256 ?: "NONE"}")
+        printer.content("Snapshot SHA-256: ${result.bundle?.snapshotSha256 ?: "NONE"}")
+        printer.content("Profile SHA-256: ${result.bundle?.profileSha256 ?: "NONE"}")
+        printer.content("Artifact Aggregate SHA-256: ${result.bundle?.artifactAggregateSha256 ?: "NONE"}")
+        printer.content("Receipt ID: ${result.bundle?.receiptId ?: "NONE"}")
+        printer.content("Receipt SHA-256: ${result.bundle?.receiptSha256 ?: "NONE"}")
+        printer.content("Link Status: ${result.bundle?.linkStatus ?: "UNKNOWN"}")
         result.artifacts.forEach { printer.content("${it.operation} ${it.artifactId.value} ${it.relativePath}") }
         result.diagnostics.forEach { printer.content("Diagnostic: $it") }
         printer.content("Result: ${result.status}")
@@ -76,6 +88,26 @@ class GenerateCommand internal constructor(
         append("\"snapshotStatus\":\"").append(json(result.snapshotStatus)).append("\",")
         append("\"planSha256\":").append(result.planSha256?.let { "\"$it\"" } ?: "null").append(',')
         append("\"snapshotWritten\":").append(result.snapshotWritten).append(',')
+        append("\"bundleId\":").append(result.bundle?.let { "\"${json(it.bundleId)}\"" } ?: "null").append(',')
+        append("\"manifestSha256\":").append(result.bundle?.let { "\"${it.manifestSha256}\"" } ?: "null").append(',')
+        append("\"artifactAggregateSha256\":").append(result.bundle?.let { "\"${it.artifactAggregateSha256}\"" } ?: "null").append(',')
+        append("\"receiptId\":").append(result.bundle?.let { "\"${json(it.receiptId)}\"" } ?: "null").append(',')
+        append("\"receiptSha256\":").append(result.bundle?.let { "\"${it.receiptSha256}\"" } ?: "null").append(',')
+        append("\"linkStatus\":").append(result.bundle?.let { "\"${it.linkStatus}\"" } ?: "null").append(',')
+        append("\"verification\":").append(result.verification?.let { "\"$it\"" } ?: "null").append(',')
+        append("\"enrichments\":[")
+        result.enrichments.forEachIndexed { index, record ->
+            if (index > 0) append(',')
+            append("{\"artifactId\":\"").append(json(record.targetArtifactId)).append("\",\"sectionId\":\"")
+                .append(json(record.targetSectionId)).append("\",\"provider\":")
+                .append(record.providerId?.let { "\"${json(it)}\"" } ?: "null").append(",\"model\":")
+                .append(record.model?.let { "\"${json(it)}\"" } ?: "null").append(",\"status\":\"")
+                .append(record.status).append("\",\"canonicalInputIdentity\":\"").append(record.canonicalInputIdentity)
+                .append("\",\"promptTemplateIdentity\":\"").append(record.promptTemplateIdentity)
+                .append("\",\"narrativeSha256\":").append(record.narrativeSha256?.let { "\"$it\"" } ?: "null")
+                .append(",\"providerInvoked\":").append(record.providerInvoked).append(",\"cached\":").append(record.cached).append('}')
+        }
+        append("],")
         append("\"artifacts\":[")
         result.artifacts.forEachIndexed { index, artifact ->
             if (index > 0) append(',')
