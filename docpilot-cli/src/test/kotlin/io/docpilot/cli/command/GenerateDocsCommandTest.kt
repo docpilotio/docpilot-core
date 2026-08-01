@@ -31,6 +31,17 @@ class GenerateDocsCommandTest {
         }
     }
 
+    @Test fun `enrichment requires explicit provider model and confirm`() {
+        assertFailsWith<IllegalArgumentException> { GenerateDocsOptionsParser.parse(
+            listOf("--project", ".", "--output", "out", "--enrich", "--confirm")) }
+        assertFailsWith<IllegalArgumentException> { GenerateDocsOptionsParser.parse(
+            listOf("--project", ".", "--output", "out", "--enrich", "--provider", "fixture", "--model", "m")) }
+        val options = GenerateDocsOptionsParser.parse(listOf("--project", ".", "--output", "out", "--enrich",
+            "--provider", "fixture", "--model", "m", "--enrichment-target", "architecture-description", "--confirm"))
+        assertTrue(options.enrich)
+        assertEquals("fixture", options.provider)
+    }
+
     @Test
     fun `json mode writes only one machine readable result to stdout`() {
         val out = ByteArrayOutputStream(); val err = ByteArrayOutputStream()

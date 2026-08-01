@@ -19,7 +19,9 @@ class GenerateCommand internal constructor(
     private val writer: OutputWriter = OutputWriter(),
     private val printer: ConsolePrinter = ConsolePrinter(),
     private val specificationWorkflow: SpecificationGenerateWorkflow = DefaultSpecificationGenerateWorkflow(),
-    private val documentationWorkflow: DocumentationGenerationWorkflow = DefaultDocumentationGenerationWorkflow(),
+    private val documentationWorkflow: DocumentationGenerationWorkflow = DefaultDocumentationGenerationWorkflow(
+        providerResolver = { bootstrap.createProvider(it) },
+    ),
 ) {
     fun execute(args: List<String>): Int =
         try {
@@ -93,6 +95,19 @@ class GenerateCommand internal constructor(
         append("\"receiptSha256\":").append(result.bundle?.let { "\"${it.receiptSha256}\"" } ?: "null").append(',')
         append("\"linkStatus\":").append(result.bundle?.let { "\"${it.linkStatus}\"" } ?: "null").append(',')
         append("\"verification\":").append(result.verification?.let { "\"$it\"" } ?: "null").append(',')
+        append("\"enrichments\":[")
+        result.enrichments.forEachIndexed { index, record ->
+            if (index > 0) append(',')
+            append("{\"artifactId\":\"").append(json(record.targetArtifactId)).append("\",\"sectionId\":\"")
+                .append(json(record.targetSectionId)).append("\",\"provider\":")
+                .append(record.providerId?.let { "\"${json(it)}\"" } ?: "null").append(",\"model\":")
+                .append(record.model?.let { "\"${json(it)}\"" } ?: "null").append(",\"status\":\"")
+                .append(record.status).append("\",\"canonicalInputIdentity\":\"").append(record.canonicalInputIdentity)
+                .append("\",\"promptTemplateIdentity\":\"").append(record.promptTemplateIdentity)
+                .append("\",\"narrativeSha256\":").append(record.narrativeSha256?.let { "\"$it\"" } ?: "null")
+                .append(",\"providerInvoked\":").append(record.providerInvoked).append(",\"cached\":").append(record.cached).append('}')
+        }
+        append("],")
         append("\"artifacts\":[")
         result.artifacts.forEachIndexed { index, artifact ->
             if (index > 0) append(',')

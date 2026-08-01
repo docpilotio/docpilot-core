@@ -16,6 +16,10 @@ internal data class DocumentationGenerationOptions(
     val documentTypes: Set<String>,
     val expectedPlanSha256: String?,
     val json: Boolean,
+    val enrich: Boolean = false,
+    val provider: String? = null,
+    val model: String? = null,
+    val enrichmentTargets: Set<String> = emptySet(),
 )
 
 internal data class DocumentationArtifactResult(
@@ -40,6 +44,7 @@ internal data class DocumentationGenerationResult(
     val snapshotWritten: Boolean = false,
     val bundle: BundleData? = null,
     val verification: BundleVerificationStatus? = null,
+    val enrichments: List<io.docpilot.core.documentation.enrichment.DocumentationEnrichmentRecord> = emptyList(),
 ) {
     val exitCode: Int get() = when (status) {
         DocumentationGenerationStatus.PREVIEW_READY,

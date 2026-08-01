@@ -10,6 +10,10 @@ import io.docpilot.core.documentation.profile.DocumentationProfileResolutionRequ
 import io.docpilot.core.documentation.profile.DocumentationProfileVersion
 import io.docpilot.core.documentation.profile.DocumentationRendererCapabilityProvider
 import io.docpilot.core.documentation.profile.DocumentPlanningStatus
+import io.docpilot.core.documentation.profile.BuiltInDocumentationProfiles
+import io.docpilot.core.documentation.profile.DocumentationProfileIntegrity
+import io.docpilot.core.documentation.enrichment.*
+import io.docpilot.core.api.AiProvider
 import io.docpilot.core.incremental.execution.DocumentationArtifactOperation
 import io.docpilot.core.incremental.specification.snapshot.FileSpecificationSnapshotRepository
 import io.docpilot.core.incremental.specification.snapshot.SpecificationSnapshotLoadResult
@@ -30,6 +34,7 @@ internal fun interface DocumentationGenerationWorkflow {
 
 internal class DefaultDocumentationGenerationWorkflow(
     private val knowledgeLoader: ProjectKnowledgeLoader = ProjectKnowledgeLoader(),
+    private val providerResolver: (String) -> AiProvider = { throw IllegalArgumentException("AI provider '$it' was not found.") },
 ) : DocumentationGenerationWorkflow {
     override fun execute(options: DocumentationGenerationOptions): DocumentationGenerationResult = try {
         prepareAndExecute(options)
@@ -66,6 +71,11 @@ internal class DefaultDocumentationGenerationWorkflow(
                 catalog, (renderer as DocumentationRendererCapabilityProvider).capabilities(),
             ),
         )
+        val registeredProfile = BuiltInDocumentationProfiles.resolve(DocumentationProfileId(profileId), DocumentationProfileVersion(profileVersion))
+        require(DocumentationProfileIntegrity.verifyProfile(registeredProfile, resolution.profileSemanticSha256)) {
+            "Resolved Profile binding does not match the registered Profile identity."
+        }
+        require(DocumentationProfileIntegrity.verifyResolution(resolution)) { "Resolved Profile binding integrity is invalid." }
         val selected = select(catalog, options)
         require(selected.isNotEmpty()) { "Selection did not match any documentation artifact." }
         val blockedTypes = resolution.documents.filter {
@@ -74,41 +84,88 @@ internal class DefaultDocumentationGenerationWorkflow(
         require(selected.none { documentType(it.kind) in blockedTypes }) {
             "Selected documentation contains BLOCKED or UNSUPPORTED Profile artifacts."
         }
-        val rendered = renderer.render(specification, selected.mapTo(linkedSetOf()) { it.artifactId })
+        var rendered = renderer.render(specification, selected.mapTo(linkedSetOf()) { it.artifactId })
+        val enrichmentRecords = mutableListOf<DocumentationEnrichmentRecord>()
+        if (options.enrich) {
+            val providerId = requireNotNull(options.provider)
+            val model = requireNotNull(options.model)
+            val engine = DocumentationEnrichmentEngine(providerResolver(providerId))
+            rendered = rendered.map { artifact ->
+                val descriptor = selected.first { safeRelativePath(it.relativePath) == safeRelativePath(artifact.relativePath) }
+                val type = documentType(descriptor.kind)
+                val section = enrichmentSection(type)
+                if (section == null || (options.enrichmentTargets.isNotEmpty() &&
+                        descriptor.artifactId.value !in options.enrichmentTargets && section !in options.enrichmentTargets &&
+                        "${descriptor.artifactId.value}#$section" !in options.enrichmentTargets)) return@map artifact
+                val title = Regex("(?m)^#\\s+(.+)$").find(artifact.content)?.groupValues?.get(1) ?: descriptor.artifactId.value
+                val request = DocumentationEnrichmentRequest(
+                    DocumentationEnrichmentTarget(descriptor.artifactId.value, section, title, type,
+                        sourceModelStableIds = listOf(descriptor.artifactId.value),
+                        evidenceRefs = markdownItems(artifact.content, "Evidence"),
+                        unresolvedRefs = markdownItems(artifact.content, "Unresolved")),
+                    canonicalNarrative = canonicalNarrative(artifact.content), providerId = providerId, model = model,
+                )
+                val enriched = loadCachedEnrichment(output, descriptor.relativePath, request) ?: engine.enrich(request)
+                enrichmentRecords += enriched.record
+                val narrative = enriched.narrative
+                if (narrative == null) artifact else artifact.copy(
+                    content = DocumentationEnrichmentSections.apply(artifact.content, narrative),
+                )
+            }
+        } else {
+            selected.forEach { descriptor -> enrichmentSection(documentType(descriptor.kind))?.let { section ->
+                enrichmentRecords += DocumentationEnrichmentRecord(1,
+                    "documentation-enrichment:${sha256("not-applied|${descriptor.artifactId.value}|$section")}", null, null,
+                    sha256("${descriptor.artifactId.value}|$section"), DocumentationEnrichmentPrompt.identity,
+                    DocumentationEnrichmentPrompt.TEMPLATE_VERSION, descriptor.artifactId.value, section,
+                    listOf(descriptor.artifactId.value), emptyList(), emptyList(), null,
+                    DocumentationEnrichmentStatus.NOT_APPLIED, false, false)
+            } }
+        }
         val manifest = loadManifest(output)
         val results = plan(selected, rendered, output, manifest)
         val snapshotText = JsonSpecificationSnapshotCodec().encode(specification)
         val snapshotSha = Regex("\"payloadSha256\":\\s*\"([0-9a-f]{64})\"").find(snapshotText)!!.groupValues[1]
         val planSha = planSha(specification.project.id, options.profile, results, snapshotSha)
-        val bundleArtifacts = results.map { item ->
+        val generatedBundleArtifacts = results.map { item ->
             val descriptor = selected.first { it.artifactId == item.artifactId }
             val generated = rendered.first { safeRelativePath(it.relativePath) == item.relativePath }
             BundleArtifact(item.artifactId.value, item.documentType, item.relativePath, item.contentSha256,
                 generated.content.toByteArray(StandardCharsets.UTF_8).size.toLong(), "RENDER",
                 descriptor.dependencyArtifactIds.map { it.value }.sorted())
         }
+        val previousBundleArtifacts = if (!options.full) {
+            val persisted = output.resolve(DocumentationBundleFormat.MANIFEST_PATH)
+            if (Files.isRegularFile(persisted)) DocumentationBundleCodec.artifacts(Files.readString(persisted, StandardCharsets.UTF_8))
+                .filter { old -> generatedBundleArtifacts.none { it.id == old.id } } else emptyList()
+        } else emptyList()
+        val bundleArtifacts = previousBundleArtifacts + generatedBundleArtifacts
         val bundle = DocumentationBundleCodec.create(specification.project.id,
             "project-specification:${sha256(snapshotText)}", 3, specification.schemaVersion, snapshotSha,
-            options.profile, resolution.profileSemanticSha256, planSha, options.mode.name, bundleArtifacts, "VALID")
+            options.profile, resolution.profileSemanticSha256, planSha, options.mode.name, bundleArtifacts, "VALID", enrichmentRecords)
         val changed = results.filter { it.operation != DocumentationArtifactOperation.KEEP }
         if (options.mode == DocumentationGenerationMode.PREVIEW) {
             return result(options, specification.project.id, snapshotLoad, planSha, results,
                 if (changed.isEmpty()) DocumentationGenerationStatus.NO_CHANGES else DocumentationGenerationStatus.PREVIEW_READY,
-                bundle = bundle, verification = BundleVerificationStatus.VALID)
+                bundle = bundle, verification = BundleVerificationStatus.VALID, enrichments = enrichmentRecords)
         }
         options.expectedPlanSha256?.let {
             require(it == planSha) { "Stale documentation Plan: expected $it but calculated $planSha." }
         }
-        if (changed.isEmpty()) {
+        val persistedBundlePath = output.resolve(DocumentationBundleFormat.MANIFEST_PATH)
+        val persistedEnrichmentHash = if (Files.isRegularFile(persistedBundlePath))
+            Regex("\"enrichmentReceiptSha256\":\"([0-9a-f]{64})\"").find(Files.readString(persistedBundlePath))?.groupValues?.get(1) else null
+        val enrichmentChanged = options.enrich && persistedEnrichmentHash != bundle.enrichmentReceiptSha256
+        if (changed.isEmpty() && !enrichmentChanged) {
             val persisted = output.resolve(DocumentationBundleFormat.MANIFEST_PATH)
             val existing = if (Files.isRegularFile(persisted)) DocumentationBundleVerifier.verify(persisted) else null
             return result(options, specification.project.id, snapshotLoad, planSha, results, DocumentationGenerationStatus.NO_CHANGES,
-                bundle = bundle, verification = existing?.status)
+                bundle = bundle, verification = existing?.status, enrichments = enrichmentRecords)
         }
         applyTransaction(output, rendered, results, manifest, bundle) { snapshotRepository.save(specification) }
         return result(options, specification.project.id, snapshotLoad, planSha, results,
             DocumentationGenerationStatus.APPLIED, snapshotWritten = true, bundle = bundle,
-            verification = DocumentationBundleVerifier.verify(output).status)
+            verification = DocumentationBundleVerifier.verify(output).status, enrichments = enrichmentRecords)
     }
 
     private fun select(catalog: List<DocumentationArtifactDescriptor>, options: DocumentationGenerationOptions): List<DocumentationArtifactDescriptor> {
@@ -193,9 +250,12 @@ internal class DefaultDocumentationGenerationWorkflow(
             saveManifest(output, manifest, results)
             saveSnapshot()
             Files.createDirectories(bundlePath.parent)
-            Files.writeString(receiptPath, receiptJson(bundle), StandardCharsets.UTF_8)
+            Files.writeString(receiptPath, DocumentationBundleCodec.encodeReceipt(bundle), StandardCharsets.UTF_8)
             Files.writeString(bundlePath, DocumentationBundleCodec.encode(bundle), StandardCharsets.UTF_8)
-            check(DocumentationBundleVerifier.verify(bundlePath).status == BundleVerificationStatus.VALID) { "Final Bundle verification failed." }
+            val finalVerification = DocumentationBundleVerifier.verify(bundlePath)
+            check(finalVerification.status == BundleVerificationStatus.VALID) {
+                "Final Bundle verification failed: ${finalVerification.status}: ${finalVerification.diagnostics.take(10).joinToString()}"
+            }
         } catch (failure: Exception) {
             val rollbackFailures = mutableListOf<String>()
             changedPaths.forEach { (path, previous) ->
@@ -268,9 +328,10 @@ internal class DefaultDocumentationGenerationWorkflow(
     private fun result(options: DocumentationGenerationOptions, projectId: String, snapshot: SpecificationSnapshotLoadResult,
         planSha: String, artifacts: List<DocumentationArtifactResult>, status: DocumentationGenerationStatus,
         snapshotWritten: Boolean = false, bundle: BundleData? = null,
-        verification: BundleVerificationStatus? = null) = DocumentationGenerationResult(status, options.mode, projectId,
+        verification: BundleVerificationStatus? = null,
+        enrichments: List<DocumentationEnrichmentRecord> = emptyList()) = DocumentationGenerationResult(status, options.mode, projectId,
         options.outputRoot.toAbsolutePath().normalize().toString(), options.profile, snapshotStatus(snapshot), planSha,
-        artifacts, snapshotWritten = snapshotWritten, bundle = bundle, verification = verification)
+        artifacts, snapshotWritten = snapshotWritten, bundle = bundle, verification = verification, enrichments = enrichments)
 
     private fun failure(options: DocumentationGenerationOptions, status: DocumentationGenerationStatus, message: String) =
         DocumentationGenerationResult(status, options.mode, null, options.outputRoot.toAbsolutePath().normalize().toString(),
@@ -290,12 +351,60 @@ internal class DefaultDocumentationGenerationWorkflow(
     private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(value.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
-    private fun receiptJson(bundle: BundleData): String =
-        "{\"formatVersion\":1,\"receiptId\":\"${bundle.receiptId}\",\"bundleId\":\"${bundle.bundleId}\",\"projectId\":\"${bundle.projectId}\",\"profileId\":\"${bundle.profileId}\",\"profileVersion\":${bundle.profileVersion},\"artifactPlanSha256\":\"${bundle.planSha256}\",\"generationMode\":\"${bundle.generationMode}\",\"manifestSha256\":\"${bundle.manifestSha256}\",\"artifactAggregateSha256\":\"${bundle.artifactAggregateSha256}\",\"linkStatus\":\"${bundle.linkStatus}\",\"receiptSha256\":\"${bundle.receiptSha256}\"}\n"
-
     private fun restore(path: Path, previous: String?, failures: MutableList<String>, label: String) {
         runCatching { if (previous == null) Files.deleteIfExists(path) else Files.writeString(path, previous, StandardCharsets.UTF_8) }
             .onFailure { failures += "$label: ${it.message}" }
+    }
+
+    private fun enrichmentSection(type: String): String? = when (type) {
+        "PROJECT_OVERVIEW" -> "architecture-description"
+        "FEATURE_CATALOG" -> "feature-summary"
+        "FEATURE_SPECIFICATION" -> "feature-description"
+        "SCENARIO_DETAIL" -> "scenario-flow"
+        "CONTRACT_DETAIL" -> "contract-description"
+        else -> null
+    }
+
+    private fun markdownItems(content: String, heading: String): List<String> {
+        val match = Regex("(?ms)^## ${Regex.escape(heading)}\\s*\\n(.*?)(?=^## |\\z)").find(content) ?: return emptyList()
+        return Regex("(?m)^-\\s+(.+)$").findAll(match.groupValues[1]).map { it.groupValues[1].trim() }
+            .filter { it != "None" }.take(50).toList()
+    }
+
+    private fun canonicalNarrative(content: String): String = content.lineSequence()
+        .filterNot { it.startsWith("## Evidence") || it.startsWith("## Unresolved") }
+        .take(80).joinToString("\n").take(4_000)
+
+    private fun loadCachedEnrichment(output: Path, relativePath: String,
+        request: DocumentationEnrichmentRequest): DocumentationEnrichmentResult? {
+        val bundlePath = output.resolve(DocumentationBundleFormat.MANIFEST_PATH)
+        val artifactPath = output.resolve(safeRelativePath(relativePath))
+        if (!Files.isRegularFile(bundlePath) || !Files.isRegularFile(artifactPath)) return null
+        val bundleText = Files.readString(bundlePath, StandardCharsets.UTF_8)
+        val marker = "\"targetArtifactId\":\"${request.target.artifactId}\",\"targetSectionId\":\"${request.target.sectionId}\""
+        val markerIndex = bundleText.indexOf(marker)
+        if (markerIndex < 0) return null
+        val start = bundleText.lastIndexOf('{', markerIndex)
+        val diagnosticIndex = bundleText.indexOf(",\"diagnostic\":", markerIndex)
+        val end = if (diagnosticIndex >= 0) bundleText.indexOf('}', diagnosticIndex) else -1
+        if (start < 0 || end < 0) return null
+        val json = bundleText.substring(start, end + 1)
+        fun field(name: String) = Regex("\\\"$name\\\":\\\"([^\\\"]*)\\\"").find(json)?.groupValues?.get(1)
+        val canonicalIdentity = DocumentationBundleCodec.sha256(DocumentationEnrichmentPrompt.canonicalInput(request))
+        if (field("providerId") != request.providerId || field("model") != request.model ||
+            field("canonicalInputIdentity") != canonicalIdentity || field("promptTemplateIdentity") != DocumentationEnrichmentPrompt.identity ||
+            field("status") != DocumentationEnrichmentStatus.APPLIED.name) return null
+        val persisted = Files.readString(artifactPath, StandardCharsets.UTF_8)
+        val narrative = Regex("(?s)${Regex.escape(DocumentationEnrichmentSections.START)}\\s*## AI Enrichment\\s*(.*?)\\s*${Regex.escape(DocumentationEnrichmentSections.END)}")
+            .find(persisted)?.groupValues?.get(1)?.trim() ?: return null
+        val narrativeHash = DocumentationBundleCodec.sha256(narrative)
+        if (field("narrativeSha256") != narrativeHash) return null
+        val stableId = field("enrichmentStableId") ?: return null
+        return DocumentationEnrichmentResult(narrative, DocumentationEnrichmentRecord(1, stableId, request.providerId,
+            request.model, canonicalIdentity, DocumentationEnrichmentPrompt.identity, DocumentationEnrichmentPrompt.TEMPLATE_VERSION,
+            request.target.artifactId, request.target.sectionId, request.target.sourceModelStableIds.sorted(),
+            request.target.evidenceRefs.sorted(), request.target.unresolvedRefs.sorted(), narrativeHash,
+            DocumentationEnrichmentStatus.APPLIED, providerInvoked = false, cached = true))
     }
 
     private companion object { const val MANIFEST_PATH = ".docpilot/documentation-ownership.manifest" }
