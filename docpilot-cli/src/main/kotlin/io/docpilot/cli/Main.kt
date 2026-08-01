@@ -1,6 +1,7 @@
 package io.docpilot.cli
 
 import io.docpilot.cli.command.GenerateCommand
+import io.docpilot.cli.command.BundleCommand
 import io.docpilot.cli.command.ReconcileCommand
 import io.docpilot.cli.command.review.ReviewCommand
 import io.docpilot.cli.io.ConsolePrinter
@@ -21,6 +22,7 @@ fun runCli(args: List<String>): Int {
     if (args.isNotEmpty() && args.first() == "reconcile") {
         return ReconcileCommand().execute(args.drop(1))
     }
+    if (args.isNotEmpty() && args.first() == "bundle") return BundleCommand().execute(args.drop(1))
 
     printUsage()
     return if (args.isEmpty() || args == listOf("help") || args == listOf("--help")) 0 else 2
@@ -35,6 +37,7 @@ private fun printUsage() {
           docpilot generate architecture --project <path> --provider <id> --model <model> [--title <title>] [--output <file>]
           docpilot generate specification --project <path> [--output <directory>]
           docpilot generate docs --project <path> --output <directory> [--dry-run|--confirm] [--full]
+          docpilot bundle verify --bundle <bundle-root-or-manifest> [--strict] [--json]
           docpilot generate adr --project <path> --provider <id> --model <model> --title <title> --context <text> --decision <text> --consequences <text> [--alternatives <text>] [--status <status>] [--output <file>]
           docpilot review prepare --project <path> --documentation <file> --provider <id> --model <model> [--bundle <file>] [--json]
           docpilot review inspect|status --project <path> (--proposal <id> | --bundle <file>) [--documentation <file>] [--json]

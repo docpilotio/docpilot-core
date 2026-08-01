@@ -13,6 +13,7 @@ import io.docpilot.core.documentation.profile.DocumentPlanningStatus
 import io.docpilot.core.incremental.execution.DocumentationArtifactOperation
 import io.docpilot.core.incremental.specification.snapshot.FileSpecificationSnapshotRepository
 import io.docpilot.core.incremental.specification.snapshot.SpecificationSnapshotLoadResult
+import io.docpilot.core.incremental.specification.snapshot.JsonSpecificationSnapshotCodec
 import io.docpilot.core.model.RenderedArtifact
 import io.docpilot.core.render.ProjectSpecificationMarkdownRenderer
 import io.docpilot.core.specification.DefaultSpecificationBuilder
@@ -76,21 +77,38 @@ internal class DefaultDocumentationGenerationWorkflow(
         val rendered = renderer.render(specification, selected.mapTo(linkedSetOf()) { it.artifactId })
         val manifest = loadManifest(output)
         val results = plan(selected, rendered, output, manifest)
-        val planSha = planSha(specification.project.id, options.profile, output, results, snapshotLoad)
+        val snapshotText = JsonSpecificationSnapshotCodec().encode(specification)
+        val snapshotSha = Regex("\"payloadSha256\":\\s*\"([0-9a-f]{64})\"").find(snapshotText)!!.groupValues[1]
+        val planSha = planSha(specification.project.id, options.profile, results, snapshotSha)
+        val bundleArtifacts = results.map { item ->
+            val descriptor = selected.first { it.artifactId == item.artifactId }
+            val generated = rendered.first { safeRelativePath(it.relativePath) == item.relativePath }
+            BundleArtifact(item.artifactId.value, item.documentType, item.relativePath, item.contentSha256,
+                generated.content.toByteArray(StandardCharsets.UTF_8).size.toLong(), "RENDER",
+                descriptor.dependencyArtifactIds.map { it.value }.sorted())
+        }
+        val bundle = DocumentationBundleCodec.create(specification.project.id,
+            "project-specification:${sha256(snapshotText)}", 3, specification.schemaVersion, snapshotSha,
+            options.profile, resolution.profileSemanticSha256, planSha, options.mode.name, bundleArtifacts, "VALID")
         val changed = results.filter { it.operation != DocumentationArtifactOperation.KEEP }
         if (options.mode == DocumentationGenerationMode.PREVIEW) {
             return result(options, specification.project.id, snapshotLoad, planSha, results,
-                if (changed.isEmpty()) DocumentationGenerationStatus.NO_CHANGES else DocumentationGenerationStatus.PREVIEW_READY)
+                if (changed.isEmpty()) DocumentationGenerationStatus.NO_CHANGES else DocumentationGenerationStatus.PREVIEW_READY,
+                bundle = bundle, verification = BundleVerificationStatus.VALID)
         }
         options.expectedPlanSha256?.let {
             require(it == planSha) { "Stale documentation Plan: expected $it but calculated $planSha." }
         }
         if (changed.isEmpty()) {
-            return result(options, specification.project.id, snapshotLoad, planSha, results, DocumentationGenerationStatus.NO_CHANGES)
+            val persisted = output.resolve(DocumentationBundleFormat.MANIFEST_PATH)
+            val existing = if (Files.isRegularFile(persisted)) DocumentationBundleVerifier.verify(persisted) else null
+            return result(options, specification.project.id, snapshotLoad, planSha, results, DocumentationGenerationStatus.NO_CHANGES,
+                bundle = bundle, verification = existing?.status)
         }
-        applyTransaction(output, rendered, results, manifest) { snapshotRepository.save(specification) }
+        applyTransaction(output, rendered, results, manifest, bundle) { snapshotRepository.save(specification) }
         return result(options, specification.project.id, snapshotLoad, planSha, results,
-            DocumentationGenerationStatus.APPLIED, snapshotWritten = true)
+            DocumentationGenerationStatus.APPLIED, snapshotWritten = true, bundle = bundle,
+            verification = DocumentationBundleVerifier.verify(output).status)
     }
 
     private fun select(catalog: List<DocumentationArtifactDescriptor>, options: DocumentationGenerationOptions): List<DocumentationArtifactDescriptor> {
@@ -156,6 +174,7 @@ internal class DefaultDocumentationGenerationWorkflow(
         rendered: List<RenderedArtifact>,
         results: List<DocumentationArtifactResult>,
         manifest: Map<String, String>,
+        bundle: BundleData,
         saveSnapshot: () -> Unit,
     ) {
         val changedPaths = results.filter { it.operation != DocumentationArtifactOperation.KEEP }
@@ -165,10 +184,18 @@ internal class DefaultDocumentationGenerationWorkflow(
             }
         val manifestPath = output.resolve(MANIFEST_PATH)
         val previousManifest = if (Files.isRegularFile(manifestPath)) Files.readString(manifestPath, StandardCharsets.UTF_8) else null
+        val bundlePath = output.resolve(DocumentationBundleFormat.MANIFEST_PATH)
+        val receiptPath = output.resolve(DocumentationBundleFormat.RECEIPT_PATH)
+        val previousBundle = if (Files.isRegularFile(bundlePath)) Files.readString(bundlePath, StandardCharsets.UTF_8) else null
+        val previousReceipt = if (Files.isRegularFile(receiptPath)) Files.readString(receiptPath, StandardCharsets.UTF_8) else null
         try {
             apply(output, rendered, results)
             saveManifest(output, manifest, results)
             saveSnapshot()
+            Files.createDirectories(bundlePath.parent)
+            Files.writeString(receiptPath, receiptJson(bundle), StandardCharsets.UTF_8)
+            Files.writeString(bundlePath, DocumentationBundleCodec.encode(bundle), StandardCharsets.UTF_8)
+            check(DocumentationBundleVerifier.verify(bundlePath).status == BundleVerificationStatus.VALID) { "Final Bundle verification failed." }
         } catch (failure: Exception) {
             val rollbackFailures = mutableListOf<String>()
             changedPaths.forEach { (path, previous) ->
@@ -181,6 +208,8 @@ internal class DefaultDocumentationGenerationWorkflow(
                 if (previousManifest == null) Files.deleteIfExists(manifestPath)
                 else Files.writeString(manifestPath, previousManifest, StandardCharsets.UTF_8)
             }.onFailure { rollbackFailures += "manifest: ${it.message}" }
+            restore(bundlePath, previousBundle, rollbackFailures, "bundle")
+            restore(receiptPath, previousReceipt, rollbackFailures, "receipt")
             if (rollbackFailures.isNotEmpty()) {
                 throw IllegalStateException(
                     "Documentation apply failed and recovery is required: ${rollbackFailures.joinToString()}", failure,
@@ -229,19 +258,19 @@ internal class DefaultDocumentationGenerationWorkflow(
         Files.writeString(path, content, StandardCharsets.UTF_8)
     }
 
-    private fun planSha(projectId: String, profile: String, output: Path, artifacts: List<DocumentationArtifactResult>, snapshot: SpecificationSnapshotLoadResult): String =
+    private fun planSha(projectId: String, profile: String, artifacts: List<DocumentationArtifactResult>, snapshotSha: String): String =
         sha256(buildString {
             appendLine("documentation-plan|1"); appendLine("project|$projectId"); appendLine("profile|$profile")
-            appendLine("output|${output.toString().replace('\\', '/')}")
-            appendLine("snapshot|${snapshotStatus(snapshot)}")
-            artifacts.forEach { appendLine("artifact|${it.artifactId.value}|${it.documentType}|${it.relativePath}|${it.operation}|${it.contentSha256}") }
+            appendLine("snapshot|$snapshotSha")
+            artifacts.forEach { appendLine("artifact|${it.artifactId.value}|${it.documentType}|${it.relativePath}|${it.contentSha256}") }
         })
 
     private fun result(options: DocumentationGenerationOptions, projectId: String, snapshot: SpecificationSnapshotLoadResult,
         planSha: String, artifacts: List<DocumentationArtifactResult>, status: DocumentationGenerationStatus,
-        snapshotWritten: Boolean = false) = DocumentationGenerationResult(status, options.mode, projectId,
+        snapshotWritten: Boolean = false, bundle: BundleData? = null,
+        verification: BundleVerificationStatus? = null) = DocumentationGenerationResult(status, options.mode, projectId,
         options.outputRoot.toAbsolutePath().normalize().toString(), options.profile, snapshotStatus(snapshot), planSha,
-        artifacts, snapshotWritten = snapshotWritten)
+        artifacts, snapshotWritten = snapshotWritten, bundle = bundle, verification = verification)
 
     private fun failure(options: DocumentationGenerationOptions, status: DocumentationGenerationStatus, message: String) =
         DocumentationGenerationResult(status, options.mode, null, options.outputRoot.toAbsolutePath().normalize().toString(),
@@ -260,6 +289,14 @@ internal class DefaultDocumentationGenerationWorkflow(
 
     private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(value.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
+    private fun receiptJson(bundle: BundleData): String =
+        "{\"formatVersion\":1,\"receiptId\":\"${bundle.receiptId}\",\"bundleId\":\"${bundle.bundleId}\",\"projectId\":\"${bundle.projectId}\",\"profileId\":\"${bundle.profileId}\",\"profileVersion\":${bundle.profileVersion},\"artifactPlanSha256\":\"${bundle.planSha256}\",\"generationMode\":\"${bundle.generationMode}\",\"manifestSha256\":\"${bundle.manifestSha256}\",\"artifactAggregateSha256\":\"${bundle.artifactAggregateSha256}\",\"linkStatus\":\"${bundle.linkStatus}\",\"receiptSha256\":\"${bundle.receiptSha256}\"}\n"
+
+    private fun restore(path: Path, previous: String?, failures: MutableList<String>, label: String) {
+        runCatching { if (previous == null) Files.deleteIfExists(path) else Files.writeString(path, previous, StandardCharsets.UTF_8) }
+            .onFailure { failures += "$label: ${it.message}" }
+    }
 
     private companion object { const val MANIFEST_PATH = ".docpilot/documentation-ownership.manifest" }
 }

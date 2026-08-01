@@ -38,6 +38,8 @@ internal data class DocumentationGenerationResult(
     val artifacts: List<DocumentationArtifactResult> = emptyList(),
     val diagnostics: List<String> = emptyList(),
     val snapshotWritten: Boolean = false,
+    val bundle: BundleData? = null,
+    val verification: BundleVerificationStatus? = null,
 ) {
     val exitCode: Int get() = when (status) {
         DocumentationGenerationStatus.PREVIEW_READY,
