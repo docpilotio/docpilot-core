@@ -1,4 +1,12 @@
 # CDD-0001 — Core Domain Definition
+Status: Active domain baseline through RFC-0062
+
+## DIR 0.4 Feature and Navigation Domain
+
+The canonical Feature workflow additively extends the base specification with Feature, Entry Point, Scenario, ordered Scenario Step, and deterministic UnresolvedItem entities. Compose route, registration, destination, function-reference, graph, argument, and argument-link observations remain source Evidence rather than inferred business semantics.
+
+The base Builder remains DIR 0.3. AI-independent discovery emits DIR 0.4, Snapshot format 2 stores DIR 0.4, and Snapshot format 1/DIR 0.3 compatibility remains available. Names are not business semantics, and AI output never creates canonical Feature or navigation identity.
+
 
 Status: Baseline  
 Version: 0.1

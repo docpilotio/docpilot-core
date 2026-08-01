@@ -1,9 +1,9 @@
 # DSD-0001 — DocPilot Specification Language
 
-Status: Active baseline
-Version: 0.2 authoring baseline with DIR 0.3 runtime extension
+Status: Active baseline through RFC-0062
+Version: 0.2 authoring baseline with DIR 0.3 and DIR 0.4 runtime extensions
 
-> Version policy: DIR 0.2 remains the legacy, source-compatible baseline for manual `ProjectSpecification` construction. `DefaultSpecificationBuilder` emits DIR 0.3, which extends the runtime model with package, API, property, relationship, and deterministic rendering data. Specification Snapshot format 1 accepts DIR 0.3 only. Snapshot format and DIR schema remain independent version lines.
+> Version policy: DIR 0.2 remains the legacy manual-construction baseline. `DefaultSpecificationBuilder` creates base DIR 0.3; AI-independent discovery emits DIR 0.4. Snapshot format 1 reads DIR 0.3 and format 2 stores DIR 0.4. Snapshot format and DIR schema remain independent version lines.
 
 ## Purpose
 
@@ -545,3 +545,10 @@ The default Builder emits DIR 0.4 after an AI-independent discovery stage. Exact
 ## RFC-0061 Compose Navigation Evidence
 
 DIR 0.4 Compose destination production entities require a resolved route declaration, a known navigation registration, and one actual destination API. Route, registration, destination-link, and unresolved identities are canonical and order-independent. Plain composables, dynamic routes, and ambiguous targets are not promoted; ambiguity remains an UnresolvedItem. Snapshot format 2 stores the resulting Entry Point, Feature, Scenario, and Evidence references while format 1 remains unchanged.
+
+## RFC-0062 Compose Function References, Nested Graphs, and Arguments
+
+RFC-0062 additively records destination function references, bounded external lambdas, lexical nested-graph ownership, typed-route and placeholder arguments,
+avArgument declarations, and signature-backed argument links. These observations extend RFC-0061 Evidence and project into existing DIR 0.4 Entry Point and Scenario entities; no persisted schema version changes.
+
+Identities exclude timestamps, locale, absolute paths, filesystem order, and AI output. Ambiguous references, ownership, or parameter links produce deterministic unresolved records rather than first-candidate selection. Snapshot format 1/2, Profile identities, RFC-0052 Artifact identities, Review Bundle format 1, and Evolution Report format 1 remain compatible.

@@ -67,14 +67,14 @@ Specialized profiles may later cover Wear OS, Bluetooth, Wi-Fi, background servi
 
 ## Documentation Expansion Direction
 
-The DIR 0.3 and Snapshot format 1 baseline is fixed. RFC-0058 now implements Documentation Profile and Document Contract policy; the remaining planned production concepts include:
+The DIR 0.3/Snapshot format 1 compatibility baseline remains fixed. RFC-0058 implements Documentation Profile policy, and RFC-0059 through RFC-0062 add the current DIR 0.4 Feature and Compose Navigation production capabilities:
 
 - Documentation Profile — implemented as runtime-only `kotlin-android@1` policy
 - Document Contract — implemented with deterministic Profile Resolution
-- Feature Specification
-- Entry Point Specification
-- Scenario Specification
-- Interaction Step
+- Feature Specification — implemented in DIR 0.4
+- Entry Point Specification — implemented in DIR 0.4
+- Scenario Specification — implemented in DIR 0.4
+- Scenario Step — implemented in DIR 0.4
 - Contract Specification
 - Documentation Claim
 - Diagram Specification / Diagram IR
@@ -107,7 +107,9 @@ The current public v1.0 decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROV
 ## Status
 
 - Status: Active product direction
-- Version: 0.3
-- Canonical baseline: RFC-0058
+- Version: 0.4
+- Canonical baseline: RFC-0062
 - Current development track: v1.1 Product Capability
+- RFC-0062 validation: full Gradle PASS; real-project repeat validation pending
+- RFC-0063 scope: not approved
 - Authority: Product Owner
