@@ -85,7 +85,8 @@ class GenerateCommand(
         val project = Path.of(args.required("project"))
         val log = ProjectLogSession.create(project)
         log.info("Specification analysis and generation started for ${project.toAbsolutePath().normalize()}.")
-        val outputRoot = Path.of(args.optional("output") ?: project.toString())
+        val outputRoot = args.optional("output")?.let { Path.of(it) }
+            ?: project.resolve(DEFAULT_OUTPUT_ROOT)
         val result = specificationWorkflow.execute(project, outputRoot)
 
         printer.content("Execution Mode: ${result.execution.mode}")
@@ -134,6 +135,10 @@ class GenerateCommand(
             val path = writer.write(Path.of(output), content)
             printer.success("Generated $path")
         }
+    }
+
+    private companion object {
+        const val DEFAULT_OUTPUT_ROOT = "docpilot"
     }
 }
 

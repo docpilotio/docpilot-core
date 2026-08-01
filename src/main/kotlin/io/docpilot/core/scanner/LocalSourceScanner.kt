@@ -49,6 +49,7 @@ class LocalSourceScanner(
 
     private fun isManagedOutput(relativePath: String): Boolean =
         relativePath == ".docpilot" || relativePath.startsWith(".docpilot/") ||
+            relativePath == "docpilot" || relativePath.startsWith("docpilot/") ||
             relativePath == "prompt-package" || relativePath.startsWith("prompt-package/") ||
             relativePath == "docs/project-summary.md" ||
             relativePath == "docs/source-index.md" ||

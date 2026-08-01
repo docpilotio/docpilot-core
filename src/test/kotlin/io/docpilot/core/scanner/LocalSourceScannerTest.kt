@@ -127,6 +127,8 @@ class LocalSourceScannerTest {
         root.resolve("docs/project-summary.md").writeText("# Generated")
         root.resolve("prompt-package").createDirectories().resolve("overview.md").writeText("# Generated")
         root.resolve(".docpilot/snapshots").createDirectories().resolve("specification.json").writeText("{}")
+        root.resolve("docpilot/docs/specification").createDirectories()
+            .resolve("project.md").writeText("# Generated")
 
         val inventory = scanner.scan(loader.load(root))
 
@@ -135,6 +137,7 @@ class LocalSourceScannerTest {
         assertFalse(inventory.files.any { it.relativePath.startsWith("docs/specification/") })
         assertFalse(inventory.files.any { it.relativePath.startsWith("prompt-package/") })
         assertFalse(inventory.files.any { it.relativePath.startsWith(".docpilot/") })
+        assertFalse(inventory.files.any { it.relativePath.startsWith("docpilot/") })
         assertFalse("docs" in inventory.directories)
     }
 }

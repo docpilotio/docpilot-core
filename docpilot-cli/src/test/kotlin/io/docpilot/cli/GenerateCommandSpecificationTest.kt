@@ -15,6 +15,7 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.io.path.createTempDirectory
 
 class GenerateCommandSpecificationTest {
     @Test
@@ -40,6 +41,39 @@ class GenerateCommandSpecificationTest {
         assertTrue(output.toString().contains("Snapshot Validation: NOT_FOUND"))
         assertTrue(output.toString().contains("snapshot saved"))
         assertEquals("", error.toString())
+    }
+
+    @Test
+    fun `writes generated documentation below project docpilot directory by default`() {
+        val projectRoot = createTempDirectory("docpilot-output-root")
+        var capturedProject: Path? = null
+        var capturedOutput: Path? = null
+        val command = command(
+            result = SpecificationSnapshotExecutionResult(
+                execution = IncrementalDocumentationExecutionResult(
+                    mode = IncrementalExecutionMode.NO_CHANGES,
+                ),
+                snapshotLoadResult = SpecificationSnapshotLoadResult.NotFound,
+                snapshotSaved = false,
+            ),
+            workflow = SpecificationGenerateWorkflow { project, output ->
+                capturedProject = project
+                capturedOutput = output
+                SpecificationSnapshotExecutionResult(
+                    execution = IncrementalDocumentationExecutionResult(
+                        mode = IncrementalExecutionMode.NO_CHANGES,
+                    ),
+                    snapshotLoadResult = SpecificationSnapshotLoadResult.NotFound,
+                    snapshotSaved = false,
+                )
+            },
+        )
+
+        val exitCode = command.execute(listOf("specification", "--project", projectRoot.toString()))
+
+        assertEquals(0, exitCode)
+        assertEquals(projectRoot, capturedProject)
+        assertEquals(projectRoot.resolve("docpilot"), capturedOutput)
     }
 
     @Test
@@ -95,9 +129,10 @@ class GenerateCommandSpecificationTest {
         result: SpecificationSnapshotExecutionResult,
         output: ByteArrayOutputStream = ByteArrayOutputStream(),
         error: ByteArrayOutputStream = ByteArrayOutputStream(),
+        workflow: SpecificationGenerateWorkflow = SpecificationGenerateWorkflow { _: Path, _: Path -> result },
     ): GenerateCommand = GenerateCommand(
         printer = ConsolePrinter(PrintStream(output), PrintStream(error)),
-        specificationWorkflow = SpecificationGenerateWorkflow { _: Path, _: Path -> result },
+        specificationWorkflow = workflow,
     )
 
     private fun validLoadResultPlaceholder(): SpecificationSnapshotLoadResult =
