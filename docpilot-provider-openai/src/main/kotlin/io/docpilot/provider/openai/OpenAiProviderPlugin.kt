@@ -52,6 +52,8 @@ class OpenAiProviderPlugin(
                 )
                 is AiGenerationResult.Failure -> failed(result.error.message)
             }
+        } catch (exception: IllegalArgumentException) {
+            failed(exception.message ?: "OpenAI configuration is invalid.")
         } catch (exception: IllegalStateException) {
             failed(exception.message ?: "OpenAI configuration is unavailable.")
         }
