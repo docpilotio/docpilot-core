@@ -1,31 +1,21 @@
 package io.docpilot.release
 
 public object ReleaseEvidenceFormat {
-    public const val CURRENT_VERSION: Int = 1
+    public const val CURRENT_VERSION: Int = 2
     public const val POLICY_ID: String = "DOCPILOT_V0_5"
     public const val POLICY_VERSION: Int = 1
 }
 
 public enum class EvidenceResult { PASS, FAIL }
 
-public enum class McpMode { EMBEDDED }
-
 public data class ReleaseCandidate(
     val coreCommit: String,
     val branch: String,
     val repositoryClean: Boolean,
-    val mcpMode: McpMode,
-    val mcpCommit: String,
-    val mcpVersion: String,
 ) {
     init {
         require(coreCommit.isCommit()) { "Core commit must be 40 lowercase hexadecimal characters." }
         require(branch.isNotBlank()) { "Candidate branch must not be blank." }
-        require(mcpCommit.isCommit()) { "MCP commit must be 40 lowercase hexadecimal characters." }
-        require(mcpVersion.matches(SEMVER)) { "MCP version must use semantic version format." }
-        require(mcpMode != McpMode.EMBEDDED || mcpCommit == coreCommit) {
-            "Embedded MCP commit must equal Core commit."
-        }
     }
 }
 
@@ -163,7 +153,6 @@ public enum class GateFailure {
     INTEGRITY_MISMATCH,
     CANDIDATE_MISMATCH,
     DIRTY_REPOSITORY,
-    MCP_IDENTITY_MISMATCH,
     MISSING_EXECUTION,
     EXECUTION_FAILED,
     CACHED_TEST_EVIDENCE,
@@ -239,9 +228,7 @@ internal val REQUIRED_EXECUTIONS = listOf(
 internal val REQUIRED_COMPATIBILITY_CHECKS = listOf(
     "CLI_EXIT_CODE_CONTRACT_1",
     "CLI_JSON_OUTPUT_FORMAT_1",
-    "CORE_HAS_NO_MCP_RUNTIME_DEPENDENCY",
     "DIR_SCHEMA_0_3",
-    "MCP_EMBEDDED_IDENTITY",
     "REVIEW_BUNDLE_FORMAT_1",
     "RFC_0046_REMOVE_SEMANTICS",
     "RFC_0047_INTEGRITY_AND_STALE_APPLY",
@@ -263,8 +250,6 @@ private val SHA256 = Regex("[0-9a-f]{64}")
 private val COMMIT = Regex("[0-9a-f]{40}")
 private val STABLE_ID = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
 private val RELEASE_ID = Regex("v\\d+\\.\\d+\\.\\d+-rc\\.[1-9]\\d*")
-private val SEMVER = Regex("\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?")
-
 internal fun String.isSha256(): Boolean = matches(SHA256)
 internal fun String.isCommit(): Boolean = matches(COMMIT)
 internal fun String.isStableId(): Boolean = matches(STABLE_ID)

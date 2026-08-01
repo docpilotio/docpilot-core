@@ -56,10 +56,9 @@ public class ReleaseEvidenceCodec(
             "Unsupported Release Evidence Manifest format: $version"
         }
         val candidate = root.obj("candidate").let {
-            it.requireKeys("coreCommit", "branch", "repositoryClean", "mcpMode", "mcpCommit", "mcpVersion")
+            it.requireKeys("coreCommit", "branch", "repositoryClean")
             ReleaseCandidate(
                 it.string("coreCommit"), it.string("branch"), it.bool("repositoryClean"),
-                McpMode.valueOf(it.string("mcpMode")), it.string("mcpCommit"), it.string("mcpVersion"),
             )
         }
         val contracts = root.obj("contracts").let {
@@ -165,9 +164,6 @@ public class ReleaseEvidenceCodec(
                 "coreCommit" to json(m.candidate.coreCommit),
                 "branch" to json(m.candidate.branch),
                 "repositoryClean" to m.candidate.repositoryClean.toString(),
-                "mcpMode" to json(m.candidate.mcpMode.name),
-                "mcpCommit" to json(m.candidate.mcpCommit),
-                "mcpVersion" to json(m.candidate.mcpVersion),
             ), 1,
         )
         append(",\n  \"contracts\": ")

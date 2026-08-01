@@ -182,7 +182,7 @@ Optional Relationship / Ownership / Reconciliation Evidence
 → offline verification
 ```
 
-The current source baseline exposes Core APIs and strict codecs but no official Evolution CLI or MCP adapter. AI may render narrative only after Report verification.
+The current source baseline exposes Core APIs and strict codecs but no official Evolution CLI adapter. AI may render narrative only after Report verification.
 
 ## 10. Release and Product Validation
 

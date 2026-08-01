@@ -33,9 +33,7 @@ internal fun passingInput(
     }
     return ReleaseEvidenceInput(
         releaseId = "v0.5.0-rc.1",
-        candidate = ReleaseCandidate(
-            "1".repeat(40), "main", true, McpMode.EMBEDDED, "1".repeat(40), "0.12.3",
-        ),
+        candidate = ReleaseCandidate("1".repeat(40), "main", true),
         contracts = ReleaseContracts("0.3", 1, 1, 1, 1),
         executions = executions,
         testAggregate = TestAggregate(89, 273, 0, 0, 0, fresh = true, cached = false),

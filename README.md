@@ -88,8 +88,6 @@ AI Provider implementations remain adapters behind the Provider SPI. AI output i
 | `docpilot-provider-ollama` | Ollama provider adapter |
 | `docpilot-provider-openai` | OpenAI provider adapter |
 | `docpilot-release` | Release Evidence and deterministic release-gate capability |
-| `tools/docpilot-mcp` | Temporary development orchestration tool; not a Gradle production module |
-
 ---
 
 ## Current Status
@@ -97,17 +95,17 @@ AI Provider implementations remain adapters behind the Provider SPI. AI output i
 | Item | Canonical state |
 |---|---|
 | Active development track | v1.1 Product Capability |
-| Current RFC state | RFC-0062 implemented with real-project repeat-validation limitation |
+| Current RFC state | RFC-0062 implemented with real-project syntax-coverage limitation |
 | Implemented RFC sequence | RFC-0001 through RFC-0053, RFC-0055 through RFC-0062 |
 | RFC-0054 | Proposed but not approved or completed |
 | Public v1.0 Product Validation | `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED` |
 | PV-009 | `PENDING` |
 | Technical v1 baseline | Documentation reports immutable `v1.0.0`; Git identity is not verifiable from source ZIPs without `.git` |
 | Gradle artifact version | `0.1.0-SNAPSHOT` |
-| Next RFC | RFC-0063 scope not yet approved; finish RFC-0062 real-project repeat validation first |
+| Next RFC | RFC-0063 scope not yet approved; Main Planning/Roadmap approval required |
 | Primary validation target | `C:\WorkSpace\architecture-samples` |
 
-RFC-0059 introduced additive DIR 0.4 Feature, Entry Point, Scenario, and ordered Scenario Step contracts. RFC-0060 added AI-independent Evidence-bounded Feature Discovery, RFC-0061 added verified Compose route/registration/destination Evidence, and RFC-0062 added function-reference resolution, bounded external lambdas, nested graph ownership, and navigation argument Evidence. RFC-0062 targeted and full Gradle verification passed; real-project first/repeat generation remains pending. The public v1.0 Product Validation decision and PV-009 state are unchanged.
+RFC-0059 introduced additive DIR 0.4 Feature, Entry Point, Scenario, and ordered Scenario Step contracts. RFC-0060 added AI-independent Evidence-bounded Feature Discovery, RFC-0061 added verified Compose route/registration/destination Evidence, and RFC-0062 added function-reference resolution, bounded external lambdas, nested graph ownership, and navigation argument Evidence. RFC-0062 targeted and full Gradle verification passed; isolated real-project generation produced `FULL_REGENERATION` followed by `NO_CHANGES` with a valid Snapshot. The sample still contains no RFC-0062-specific syntax. The public v1.0 Product Validation decision and PV-009 state are unchanged.
 
 ### Current technical formats
 
@@ -145,7 +143,7 @@ Snapshot format and DIR schema are independent version lines. Format 1/DIR 0.3 r
 - deterministic Evolution Report, causal graph, coverage, strict codec, offline verification, and narrative-only AI boundary
 - immutable Documentation Profiles, Document and Section contracts, section-level Evidence policy, Renderer capability requirements, completeness states, ownership conflict handling, and deterministic Profile Resolution
 
-There is no official CLI or MCP command for RFC-0055 Reconciliation, RFC-0056 Evolution generation, or RFC-0058 Profile Resolution in this baseline.
+There is no official CLI command for RFC-0055 Reconciliation, RFC-0056 Evolution generation, or RFC-0058 Profile Resolution in this baseline.
 
 ---
 

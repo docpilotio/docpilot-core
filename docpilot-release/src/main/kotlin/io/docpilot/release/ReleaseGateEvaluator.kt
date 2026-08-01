@@ -7,12 +7,6 @@ public class ReleaseGateEvaluator {
         if (!input.candidate.repositoryClean || !input.scopeChecks.repositoryClean) {
             failures += GateFailure.DIRTY_REPOSITORY
         }
-        if (input.candidate.mcpMode != McpMode.EMBEDDED ||
-            input.candidate.mcpCommit != input.candidate.coreCommit
-        ) {
-            failures += GateFailure.MCP_IDENTITY_MISMATCH
-        }
-
         val executions = input.executions.associateBy { it.id }
         if (REQUIRED_EXECUTIONS.any { executions[it]?.required != true }) {
             failures += GateFailure.MISSING_EXECUTION

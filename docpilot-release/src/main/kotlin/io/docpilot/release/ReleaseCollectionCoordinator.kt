@@ -26,7 +26,6 @@ public data class ReleaseCollectionRequest(
     val outputDirectory: Path,
     val releaseId: String,
     val expectedCommit: String,
-    val mcpVersion: String,
     val contracts: ReleaseContracts,
     val executions: List<ExecutionPlan>,
     val junitRoots: List<String>,
@@ -155,9 +154,7 @@ public class ReleaseCollectionCoordinator(
         )
         val input = ReleaseEvidenceInput(
             releaseId = request.releaseId,
-            candidate = ReleaseCandidate(
-                before.commit, before.branch, true, McpMode.EMBEDDED, before.commit, request.mcpVersion,
-            ),
+            candidate = ReleaseCandidate(before.commit, before.branch, true),
             contracts = request.contracts,
             executions = executions,
             testAggregate = testAggregate,

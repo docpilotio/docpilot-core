@@ -43,7 +43,7 @@ class ReleaseCollectionCoordinatorTest {
         val output = root.resolve("build/release-evidence/v0.5.0-rc.1")
         val result = ReleaseCollectionCoordinator().collect(
             ReleaseCollectionRequest(
-                root, output, "v0.5.0-rc.1", commit, "0.12.3",
+                root, output, "v0.5.0-rc.1", commit,
                 ReleaseContracts("0.3", 1, 1, 1, 1),
                 commands, listOf("test-results"), artifactPlans, checks, true,
             ),
@@ -62,7 +62,7 @@ class ReleaseCollectionCoordinatorTest {
 
         val result = ReleaseCollectionCoordinator().collect(
             ReleaseCollectionRequest(
-                root, root.resolve("build/out"), "v0.5.0-rc.1", commit, "0.12.3",
+                root, root.resolve("build/out"), "v0.5.0-rc.1", commit,
                 ReleaseContracts("0.3", 1, 1, 1, 1), emptyList(), emptyList(),
                 emptyList(), emptyList(), false,
             ),
