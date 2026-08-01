@@ -119,8 +119,22 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
             val kind = NAVIGATION_APIS.getValue(callee)
             val semanticRoute = routeExpression.replace(" ", "")
             val ownerId = "symbol:${owner.id}"
+            val registrationId = "compose-registration:$ownerId:$semanticRoute:${kind.name.lowercase()}"
+            val functionReferences = functionReferences(
+                path, tokens, cursor + 1, close, registrationId,
+            )
+            val externalLambdaReference = namedIdentifierArgument(tokens, cursor + 1, close, "content")
+            val placeholderExpression = if ('{' in routeExpression) routeExpression else {
+                routes.filter { it.qualifiedName.substringAfterLast('.') == routeExpression.substringAfterLast('.') }
+                    .map { it.expression }.distinct().singleOrNull() ?: routeExpression
+            }
+            val argumentObservations = (routePlaceholders(
+                path, placeholderExpression, registrationId, token.line, token.column,
+            ) + navigationArgumentDeclarations(path, tokens, cursor + 1, close, registrationId))
+                .distinctBy { it.id }.sortedBy { it.id }
+            val lambdaClose = lambdaOpen?.let { matching(tokens, it, "{", "}") }
             registrations += ComposeNavigationRegistrationObservation(
-                id = "compose-registration:$ownerId:$semanticRoute:${kind.name.lowercase()}",
+                id = registrationId,
                 apiKind = kind,
                 calleeQualifiedName = callee,
                 ownerSymbolId = ownerId,
@@ -128,14 +142,209 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
                 routeExpression = routeExpression,
                 genericRouteType = genericRoute,
                 destinationCalls = destinationCalls,
-                location = SourceLocation(path, token.line, token.column),
+                functionReferences = functionReferences,
+                externalLambdaReference = externalLambdaReference,
+                arguments = argumentObservations,
+                location = SourceLocation(
+                    path, token.line, token.column,
+                    lambdaClose?.let { tokens[it].line } ?: tokens[close].line,
+                    lambdaClose?.let { tokens[it].column } ?: tokens[close].column,
+                ),
             )
             index = close + 1
         }
+        val rawGraphs = registrations.filter { it.apiKind == ComposeNavigationRegistrationKind.NAVIGATION }
+            .map { registration ->
+                ComposeNavigationGraphObservation(
+                    id = "compose-graph:${registration.id}",
+                    kind = ComposeNavigationGraphKind.NESTED_NAVIGATION_GRAPH,
+                    routeExpression = registration.routeExpression,
+                    startDestinationExpression = namedArgument(
+                        tokens, registration.location.lineStart, "startDestination",
+                    ),
+                    parentGraphId = null,
+                    ownerSymbolId = registration.ownerSymbolId,
+                    registrationId = registration.id,
+                    childRegistrationIds = registrations.filter { child ->
+                        child.id != registration.id && contains(registration.location, child.location)
+                    }.map { it.id }.sorted(),
+                    location = registration.location,
+                )
+            }.sortedBy { it.id }
+        val graphs = rawGraphs.map { graph ->
+            val parents = rawGraphs.filter {
+                it.id != graph.id && contains(it.location, graph.location)
+            }
+            graph.copy(parentGraphId = parents.minByOrNull { span(it.location) }?.id)
+        }.sortedBy { it.id }
+        val ownedRegistrations = registrations.map { registration ->
+            val owners = graphs.filter { contains(it.location, registration.location) && it.registrationId != registration.id }
+            registration.copy(ownerGraphId = owners.minByOrNull { span(it.location) }?.id)
+        }
         return ComposeNavigationSourceObservations(
             routes = routes,
-            registrations = registrations.distinctBy { it.id }.sortedBy { it.id },
+            registrations = ownedRegistrations.distinctBy { it.id }.sortedBy { it.id },
+            graphs = graphs,
+            routeArguments = typedRouteArguments(allSymbols, routes),
         )
+    }
+
+    private fun functionReferences(
+        path: String,
+        tokens: List<KotlinToken>,
+        start: Int,
+        end: Int,
+        registrationId: String,
+    ): List<ComposeFunctionReferenceObservation> = splitTopLevel(tokens, start, end, ",")
+        .mapIndexedNotNull { position, (from, to) ->
+            val equals = topLevelIndexOf(tokens, from, to, "=")
+            val valueStart = equals?.plus(1) ?: from
+            val separator = (valueStart until to).firstOrNull { tokens[it].text == "::" }
+                ?: return@mapIndexedNotNull null
+            val referenced = tokens.getOrNull(separator + 1)?.text ?: return@mapIndexedNotNull null
+            val receiver = render(tokens, valueStart, separator).takeIf(String::isNotBlank)
+            val argumentName = equals?.let { render(tokens, from, it).takeIf(String::isNotBlank) }
+            val expression = render(tokens, valueStart, to)
+            ComposeFunctionReferenceObservation(
+                id = "compose-function-reference:$registrationId:${argumentName ?: position}:$expression",
+                expression = expression,
+                referencedName = referenced,
+                receiverExpression = receiver,
+                argumentName = argumentName,
+                argumentPosition = if (argumentName == null) position else null,
+                kind = if (receiver == null) ComposeFunctionReferenceKind.TOP_LEVEL_FUNCTION
+                else ComposeFunctionReferenceKind.STATIC_OR_OBJECT_MEMBER,
+                ownerRegistrationId = registrationId,
+                location = SourceLocation(path, tokens[valueStart].line, tokens[valueStart].column,
+                    tokens[to - 1].line, tokens[to - 1].column),
+            )
+        }.sortedBy { it.id }
+
+    private fun namedIdentifierArgument(
+        tokens: List<KotlinToken>,
+        start: Int,
+        end: Int,
+        name: String,
+    ): String? = splitTopLevel(tokens, start, end, ",").mapNotNull { (from, to) ->
+        val equals = topLevelIndexOf(tokens, from, to, "=") ?: return@mapNotNull null
+        if (render(tokens, from, equals) != name) return@mapNotNull null
+        val value = tokens.subList(equals + 1, to).filter { it.type != KotlinTokenType.END_OF_FILE }
+        value.singleOrNull { it.type == KotlinTokenType.IDENTIFIER }
+            ?.takeIf { value.size == 1 }?.text
+    }.singleOrNull()
+
+    private fun routePlaceholders(
+        path: String,
+        expression: String,
+        registrationId: String,
+        line: Int,
+        column: Int,
+    ): List<ComposeNavigationArgumentObservation> {
+        val route = expression.trim().removeSurrounding("\"")
+        return PLACEHOLDER.findAll(route).map { match ->
+            val name = match.groupValues[1]
+            val query = route.substring(0, match.range.first).contains('?')
+            ComposeNavigationArgumentObservation(
+                id = "compose-argument:$registrationId:${if (query) "query" else "path"}:$name",
+                name = name,
+                sourceKind = if (query) ComposeNavigationArgumentSourceKind.ROUTE_QUERY_PLACEHOLDER
+                else ComposeNavigationArgumentSourceKind.ROUTE_PATH_PLACEHOLDER,
+                routePlaceholder = match.value,
+                ownerRegistrationId = registrationId,
+                location = SourceLocation(path, line, column),
+            )
+        }.toList().distinctBy { it.id }.sortedBy { it.id }
+    }
+
+    private fun navigationArgumentDeclarations(
+        path: String,
+        tokens: List<KotlinToken>,
+        start: Int,
+        end: Int,
+        registrationId: String,
+    ): List<ComposeNavigationArgumentObservation> {
+        val observations = mutableListOf<ComposeNavigationArgumentObservation>()
+        var index = start
+        while (index < end) {
+            if (tokens[index].text != "navArgument" || tokens.getOrNull(index + 1)?.text != "(") {
+                index++
+                continue
+            }
+            val close = matching(tokens, index + 1, "(", ")")
+            val name = tokens.subList(index + 2, close).firstOrNull {
+                it.type == KotlinTokenType.STRING_LITERAL
+            }?.text?.removeSurrounding("\"")
+            if (!name.isNullOrBlank()) {
+                val lambdaOpen = tokens.getOrNull(close + 1)?.takeIf { it.text == "{" }?.let { close + 1 }
+                val lambdaClose = lambdaOpen?.let { matching(tokens, it, "{", "}") }
+                val bodyEnd = lambdaClose ?: close
+                val body = if (lambdaOpen == null) "" else render(tokens, lambdaOpen + 1, bodyEnd)
+                observations += ComposeNavigationArgumentObservation(
+                    id = "compose-argument:$registrationId:nav-argument:$name",
+                    name = name,
+                    sourceKind = ComposeNavigationArgumentSourceKind.NAV_ARGUMENT_DECLARATION,
+                    declaredType = assignment(body, "type"),
+                    nullable = assignment(body, "nullable")?.toBooleanStrictOrNull(),
+                    defaultValueExpression = assignment(body, "defaultValue"),
+                    ownerRegistrationId = registrationId,
+                    location = SourceLocation(path, tokens[index].line, tokens[index].column,
+                        tokens[bodyEnd].line, tokens[bodyEnd].column),
+                )
+            }
+            index = close + 1
+        }
+        return observations.sortedBy { it.id }
+    }
+
+    private fun assignment(body: String, name: String): String? =
+        Regex("(?:^|\\s)$name\\s*=\\s*([^;]+?)(?=\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=|$)")
+            .find(body)?.groupValues?.get(1)?.trim()?.takeIf(String::isNotBlank)
+
+    private fun typedRouteArguments(
+        symbols: List<SourceSymbol>,
+        routes: List<ComposeRouteDeclarationObservation>,
+    ): List<ComposeNavigationArgumentObservation> {
+        val routeNames = routes.map { it.qualifiedName }.toSet()
+        return symbols.filter { it.qualifiedName in routeNames }.flatMap { route ->
+            route.parameters.map { parameter ->
+                ComposeNavigationArgumentObservation(
+                    id = "compose-argument:compose-route:${route.qualifiedName}:typed:${parameter.name}",
+                    name = parameter.name,
+                    sourceKind = ComposeNavigationArgumentSourceKind.TYPED_ROUTE_PROPERTY,
+                    declaredType = parameter.type,
+                    nullable = parameter.type?.trim()?.endsWith("?"),
+                    defaultValueExpression = if (parameter.hasDefaultValue) "<declared>" else null,
+                    ownerRouteId = "compose-route:${route.qualifiedName}",
+                    location = parameter.location ?: requireNotNull(route.location),
+                )
+            }
+        }.distinctBy { it.id }.sortedBy { it.id }
+    }
+
+    private fun contains(outer: SourceLocation, inner: SourceLocation): Boolean {
+        val start = outer.lineStart ?: return false
+        val end = outer.lineEnd ?: start
+        val innerStart = inner.lineStart ?: return false
+        val innerEnd = inner.lineEnd ?: innerStart
+        if (innerStart < start || innerEnd > end) return false
+        if (innerStart == start && (inner.columnStart ?: 1) < (outer.columnStart ?: 1)) return false
+        if (innerEnd == end && (inner.columnEnd ?: Int.MAX_VALUE) > (outer.columnEnd ?: Int.MAX_VALUE)) return false
+        return true
+    }
+
+    private fun span(location: SourceLocation): Int =
+        (location.lineEnd ?: location.lineStart ?: 0) - (location.lineStart ?: 0)
+
+    private fun namedArgument(tokens: List<KotlinToken>, line: Int?, name: String): String? {
+        if (line == null) return null
+        val call = tokens.indexOfFirst { it.line == line && it.type == KotlinTokenType.IDENTIFIER }
+        if (call < 0) return null
+        val open = (call until minOf(tokens.size, call + 16)).firstOrNull { tokens[it].text == "(" } ?: return null
+        val close = matching(tokens, open, "(", ")")
+        return splitTopLevel(tokens, open + 1, close, ",").mapNotNull { (from, to) ->
+            val equals = topLevelIndexOf(tokens, from, to, "=") ?: return@mapNotNull null
+            if (render(tokens, from, equals) == name) render(tokens, equals + 1, to) else null
+        }.singleOrNull()
     }
 
     private fun destinationCalls(
@@ -600,6 +809,7 @@ class SimpleKotlinSymbolExtractor : KotlinSymbolExtractor {
     }
 
     private companion object {
+        val PLACEHOLDER = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")
         val NAVIGATION_APIS = mapOf(
             "androidx.navigation.compose.composable" to ComposeNavigationRegistrationKind.COMPOSABLE,
             "androidx.navigation.compose.navigation" to ComposeNavigationRegistrationKind.NAVIGATION,

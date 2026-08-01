@@ -2,9 +2,9 @@
 
 ## Current milestone
 
-### v1.1 Product Capability — RFC-0058 implemented
+### v1.1 Product Capability — RFC-0062 implemented with validation limitations
 
-RFC-0057 established the canonical readiness baseline. RFC-0058 now implements runtime-only Documentation Profiles and deterministic Document Contracts while preserving the existing Artifact, Snapshot, Review, Reconciliation, and Evolution formats.
+RFC-0057 established the canonical readiness baseline. RFC-0058 introduced runtime-only Documentation Profiles; RFC-0059 through RFC-0062 now provide DIR 0.4 Feature contracts, deterministic discovery, Compose destination Evidence, function-reference resolution, nested graph ownership, and navigation argument Evidence while preserving established Artifact, Review, Reconciliation, and Evolution identities.
 
 The public v1.0 Product Validation decision remains `PRODUCT_VALIDATION_FAIL` / `NOT_APPROVED`. PV-009 remains `PENDING`. RFC-0058 does not alter the documented immutable `v1.0.0` technical baseline or declare a v1.1 Release Candidate.
 
@@ -33,6 +33,8 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 - RFC-0060 Evidence-bounded Android Entry Point, participant, and direct-call Scenario discovery
 - RFC-0061 deterministic Compose route, registration, destination, Entry Point, Feature,
   and Scenario Evidence
+- RFC-0062 Compose function-reference resolution, nested graph ownership, navigation argument
+  Evidence, and signature-backed argument links
 
 ## RFC status baseline
 
@@ -47,6 +49,7 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 | RFC-0059 | Implemented | Feature, Entry Point, and Scenario Specification Foundation |
 | RFC-0060 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Deterministic Feature Discovery; Compose routes remain unsupported |
 | RFC-0061 | `IMPLEMENTED_WITH_DOCUMENTED_LIMITATIONS` | Deterministic Compose Navigation Evidence and destination discovery |
+| RFC-0062 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Function references, nested graph ownership, and navigation argument Evidence; real-project repeat validation pending |
 
 ## Historical release milestones
 
@@ -67,10 +70,13 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 1. RFC-0057 — Canonical Baseline and Documentation Expansion Readiness — implemented.
 2. RFC-0058 — Documentation Profiles and Document Contracts — implemented with environment verification limitation.
 3. RFC-0059 — Feature, Entry Point, and Scenario Specification Foundation — implemented.
-4. RFC-0060 — deterministic Evidence-bounded DIR 0.4 projection — proposed next.
-4. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
+4. RFC-0060 — deterministic Evidence-bounded DIR 0.4 projection — implemented with validation limitations.
+5. RFC-0061 — deterministic Compose Navigation Evidence — implemented with documented limitations.
+6. RFC-0062 — function references, nested graph ownership, and navigation argument Evidence — implemented; real-project repeat validation pending.
+7. RFC-0063 — scope not approved. Complete RFC-0062 validation and approve Main Planning before selecting capability scope.
+8. Later RFCs — Contract extraction, Profile-aware rendering, Diagram IR and renderers, traceability, and structured AI enrichment after deterministic production models exist.
 
-RFC-0058 keeps Profiles and Resolutions runtime-only. It does not introduce DIR 0.4, change Snapshot format 1, or add Feature/Scenario production entities.
+Profiles and Resolutions remain runtime-only. RFC-0059 introduced DIR 0.4 and Snapshot format 2 while retaining format 1/DIR 0.3 compatibility; RFC-0060 through RFC-0062 extend deterministic discovery without changing those persisted formats.
 
 ## Unnumbered hardening candidates
 

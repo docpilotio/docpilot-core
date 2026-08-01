@@ -12,7 +12,18 @@ A Compose destination requires a resolved route, a known navigation registration
 one actual destination API. Plain composables and user-defined calls named `composable`
 are not promoted.
 
+RFC-0062 expands that stage with destination function-reference resolution, bounded immutable
+external lambdas, lexical nested-graph ownership, typed-route and placeholder arguments,
+`navArgument` declarations, and signature-backed argument links. The resulting Evidence is
+attached to the existing DIR 0.4 Compose Entry Point and Scenario; no new persisted schema or
+CLI command is introduced.
+
 ## 1. Analyze a project
+
+The command below is the legacy analysis entry point. Its base Builder and Snapshot rows
+remain DIR 0.3/format 1; the current official Feature workflow continues through the
+AI-independent discovery stages shown at the top of this document and persists DIR 0.4
+with Snapshot format 2.
 
 Command:
 
@@ -83,7 +94,7 @@ Artifact Catalog and Ownership Manifests
 → compatibility binding to RFC-0052 Artifacts
 ```
 
-RFC-0058 Profile Resolution is policy evaluation, not rendering. `kotlin-android@1` defines nine document contracts. Feature and Contract documents remain `DEFERRED` under DIR 0.3. User-owned or unknown path collisions are `BLOCKED`; shared-managed paths require RFC-0055 Reconciliation. Profile paths are not automatically written.
+RFC-0058 Profile Resolution is policy evaluation, not rendering. `kotlin-android@1` defines nine document contracts. Feature documents remain `DEFERRED` under DIR 0.3 and may become `READY` or `PARTIAL` with canonical DIR 0.4 Feature Evidence. Contract documents remain `DEFERRED`. User-owned or unknown path collisions are `BLOCKED`; shared-managed paths require RFC-0055 Reconciliation. Profile paths are not automatically written.
 
 ## 5. Selective documentation artifacts
 

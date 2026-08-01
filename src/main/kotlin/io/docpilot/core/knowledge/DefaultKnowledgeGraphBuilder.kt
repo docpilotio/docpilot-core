@@ -18,6 +18,7 @@ import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
 import io.docpilot.core.model.source.SourceSuperTypeKind
+import io.docpilot.core.model.source.ComposeNavigationArgumentObservation
 
 class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
 
@@ -337,7 +338,68 @@ class DefaultKnowledgeGraphBuilder : KnowledgeGraphBuilder {
                     "routeExpression" to registration.routeExpression,
                 ),
             )
+            registration.functionReferences.forEach { reference ->
+                addEvidence(
+                    evidence = evidence,
+                    type = EvidenceType.COMPOSE_FUNCTION_REFERENCE,
+                    relativePath = reference.location.relativePath,
+                    lineStart = reference.location.lineStart,
+                    columnStart = reference.location.columnStart,
+                    lineEnd = reference.location.lineEnd,
+                    columnEnd = reference.location.columnEnd,
+                    summary = "Compose destination function reference ${reference.expression} is declared.",
+                    attributes = mapOf(
+                        "referenceId" to reference.id,
+                        "ownerRegistrationId" to reference.ownerRegistrationId,
+                        "referenceKind" to reference.kind.name,
+                        "referencedName" to reference.referencedName,
+                    ),
+                )
+            }
+            registration.arguments.forEach { argument -> addComposeArgumentEvidence(argument, evidence) }
         }
+        file.composeNavigation.graphs.forEach { graph ->
+            addEvidence(
+                evidence = evidence,
+                type = EvidenceType.COMPOSE_NAVIGATION_GRAPH,
+                relativePath = graph.location.relativePath,
+                lineStart = graph.location.lineStart,
+                columnStart = graph.location.columnStart,
+                lineEnd = graph.location.lineEnd,
+                columnEnd = graph.location.columnEnd,
+                summary = "Compose navigation graph ${graph.routeExpression} is declared.",
+                attributes = mapOf(
+                    "graphId" to graph.id,
+                    "graphKind" to graph.kind.name,
+                    "registrationId" to graph.registrationId,
+                    "parentGraphId" to graph.parentGraphId.orEmpty(),
+                ),
+            )
+        }
+        file.composeNavigation.routeArguments.forEach { argument -> addComposeArgumentEvidence(argument, evidence) }
+    }
+
+    private fun addComposeArgumentEvidence(
+        argument: ComposeNavigationArgumentObservation,
+        evidence: MutableMap<EvidenceId, Evidence>,
+    ) {
+        addEvidence(
+            evidence = evidence,
+            type = EvidenceType.COMPOSE_NAVIGATION_ARGUMENT,
+            relativePath = argument.location.relativePath,
+            lineStart = argument.location.lineStart,
+            columnStart = argument.location.columnStart,
+            lineEnd = argument.location.lineEnd,
+            columnEnd = argument.location.columnEnd,
+            summary = "Compose navigation argument ${argument.name} is declared.",
+            attributes = mapOf(
+                "argumentId" to argument.id,
+                "argumentName" to argument.name,
+                "argumentSourceKind" to argument.sourceKind.name,
+                "declaredType" to argument.declaredType.orEmpty(),
+                "nullable" to argument.nullable?.toString().orEmpty(),
+            ),
+        )
     }
 
     private fun addImport(
