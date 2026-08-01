@@ -34,6 +34,7 @@ public class ProjectSpecificationMarkdownRenderer :
         RendererCapability.EVIDENCE_REFERENCE_RENDERING,
         RendererCapability.UNKNOWN_FINDING_RENDERING,
         RendererCapability.FEATURE_DOCUMENTATION_RENDERING,
+        RendererCapability.CONTRACT_DOCUMENTATION_RENDERING,
     )
 
     override fun describe(specification: ProjectSpecification): List<DocumentationArtifactDescriptor> {
@@ -129,8 +130,11 @@ public class ProjectSpecificationMarkdownRenderer :
             scopes = emptyList(),
             dependencies = listOf(overview.artifactId, architecture.artifactId),
         )
+        val contractDescriptors = if (specification.schemaVersion == "0.5") {
+            ContractDocumentationMarkdownRenderer().describe(specification)
+        } else emptyList()
         return (listOf(index, overview, architecture, featureCatalog) + featureDetails + moduleDescriptors +
-            packageDescriptors + componentDescriptors + relationship + evidence).sortedBy { it.artifactId.value }
+            packageDescriptors + componentDescriptors + relationship + evidence + contractDescriptors).sortedBy { it.artifactId.value }
     }
 
     override fun render(
@@ -231,6 +235,9 @@ public class ProjectSpecificationMarkdownRenderer :
             specification,
             specification.features.single { "feature:${it.id}" == descriptor.artifactId.value },
         )
+        DocumentationArtifactKind.CONTRACT_CATALOG,
+        DocumentationArtifactKind.CONTRACT_DETAIL,
+        -> ContractDocumentationMarkdownRenderer().render(specification, setOf(descriptor.artifactId)).single().content
     }
 
     private fun buildIndex(specification: ProjectSpecification): String = buildString {
@@ -267,6 +274,8 @@ public class ProjectSpecificationMarkdownRenderer :
         DocumentationArtifactKind.RELATIONSHIP -> "Relationships"
         DocumentationArtifactKind.EVIDENCE -> "Evidence and unresolved items"
         DocumentationArtifactKind.FEATURE_CATALOG -> "Feature catalog"
+        DocumentationArtifactKind.CONTRACT_CATALOG -> "Contract catalog"
+        DocumentationArtifactKind.CONTRACT_DETAIL -> "Contract detail"
         DocumentationArtifactKind.FEATURE_DETAIL -> "Feature — ${specification.features.single {
             "feature:${it.id}" == descriptor.artifactId.value
         }.name}"

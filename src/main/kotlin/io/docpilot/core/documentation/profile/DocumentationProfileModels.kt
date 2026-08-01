@@ -48,6 +48,8 @@ public enum class DocumentType {
     DOMAIN_MODEL,
     DATABASE_SCHEMA,
     EXTERNAL_API_CONTRACT,
+    CONTRACT_CATALOG,
+    CONTRACT_DETAIL,
     TEST_STRATEGY,
 }
 
@@ -68,6 +70,7 @@ public enum class DocumentMultiplicity {
     PER_COMPONENT,
     PER_FEATURE,
     PER_EXTERNAL_SYSTEM,
+    PER_CONTRACT,
 }
 
 public sealed interface DocumentPathPolicy {
@@ -86,6 +89,7 @@ public enum class RendererCapability {
     EVIDENCE_REFERENCE_RENDERING,
     UNKNOWN_FINDING_RENDERING,
     FEATURE_DOCUMENTATION_RENDERING,
+    CONTRACT_DOCUMENTATION_RENDERING,
 }
 
 public enum class EvidenceClass {

@@ -72,6 +72,9 @@ public class DefaultDocumentationProfileResolver(
         val missingModelFinding = missingModelFinding(profile, definition, specification)
         val scopes = scopes(definition.multiplicity, specification)
         if (scopes.isEmpty()) {
+            if (definition.multiplicity == DocumentMultiplicity.PER_CONTRACT && missingModelFinding == null) {
+                return emptyList()
+            }
             val kind = when (definition.multiplicity) {
                 DocumentMultiplicity.PER_FEATURE -> DocumentPlanningFindingKind.MISSING_FEATURE_MODEL
                 else -> DocumentPlanningFindingKind.MISSING_SPECIFICATION_ELEMENT
@@ -392,6 +395,9 @@ public class DefaultDocumentationProfileResolver(
             .filter { it.startsWith("external:") }.distinct().sorted().map {
                 Scope(it, it.removePrefix("external:"), listOf(it))
             }
+        DocumentMultiplicity.PER_CONTRACT -> specification.contracts.sortedBy { it.id }.map {
+            Scope(it.id, it.displayName.ifBlank { it.id }, contractScopeIds(it))
+        }
     }
 
     private fun allSourceIds(specification: ProjectSpecification): List<String> = buildList {
@@ -479,13 +485,14 @@ public class DefaultDocumentationProfileResolver(
             "No validated DIR 0.4 Feature production entities are available.",
             blocking = false,
         ) else null
-        DocumentationModelRequirement.CONTRACT_MODEL -> DocumentPlanningFinding(
-            DocumentPlanningFindingKind.MISSING_CONTRACT_MODEL,
-            documentStableId(profile, definition, "deferred"),
-            definition.stableKey.value,
-            "DIR 0.3 does not provide a canonical Contract production model.",
-            blocking = false,
-        )
+        DocumentationModelRequirement.CONTRACT_MODEL -> if (specification.schemaVersion == "0.5") null else
+            DocumentPlanningFinding(
+                DocumentPlanningFindingKind.MISSING_CONTRACT_MODEL,
+                documentStableId(profile, definition, "deferred"),
+                definition.stableKey.value,
+                "DIR ${specification.schemaVersion} does not provide the canonical Contract model required by this document.",
+                blocking = false,
+            )
     }
 
     private fun resolvePath(policy: DocumentPathPolicy, scope: Scope): String = when (policy) {
@@ -499,9 +506,22 @@ public class DefaultDocumentationProfileResolver(
                 .replace("{packageId}", safeScopeSegment(scope))
                 .replace("{componentId}", safeScopeSegment(scope))
                 .replace("{featureId}", safeScopeSegment(scope))
-                .replace("{externalSystemId}", safeScopeSegment(scope)),
+                .replace("{externalSystemId}", safeScopeSegment(scope))
+                .replace("{contractId}", safeScopeSegment(scope)),
         )
     }
+
+    private fun contractScopeIds(contract: io.docpilot.core.model.ContractSpecification): List<String> = buildList {
+        add(contract.id)
+        add(contract.owner.stableId)
+        addAll(contract.sourceEntityStableIds)
+        addAll(contract.inputs.map { it.id })
+        addAll(contract.outputs.map { it.id })
+        addAll(contract.members.map { it.id })
+        addAll(contract.relationships.map { it.id })
+        addAll(contract.evidenceRefs)
+        addAll(contract.unresolvedRefs)
+    }.distinct().sorted()
 
     private fun safeScopeSegment(scope: Scope): String =
         "${DocumentationProfileCanonicalizer.slug(scope.name)}-${DocumentationProfileCanonicalizer.scopeHash(scope.id).take(8)}"
