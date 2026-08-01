@@ -36,17 +36,13 @@ class CliBootstrap(
         OllamaAiProvider()
 
     private fun createOpenAiProvider(): AiProvider {
-        val apiKey = environment["OPENAI_API_KEY"]
-            ?.takeIf(String::isNotBlank)
-            ?: throw IllegalArgumentException(
-                "OPENAI_API_KEY environment variable is required " +
-                        "when --provider openai is selected.",
+        val configuration = try {
+            OpenAiConfiguration.fromEnvironment(environment)
+        } catch (exception: IllegalStateException) {
+            throw IllegalArgumentException(
+                "OPENAI_API_KEY environment variable is required when --provider openai is selected.",
             )
-
-        return OpenAiProvider(
-            configuration = OpenAiConfiguration(
-                apiKey = apiKey,
-            ),
-        )
+        }
+        return OpenAiProvider(configuration)
     }
 }

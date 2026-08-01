@@ -1,150 +1,54 @@
 package io.docpilot.provider.openai
 
-internal object OpenAiJson {
+internal sealed interface JsonValue {
+    data class Object(val fields: Map<String, JsonValue>) : JsonValue
+    data class Array(val values: List<JsonValue>) : JsonValue
+    data class StringValue(val value: String) : JsonValue
+    data class NumberValue(val value: String) : JsonValue
+    data class BooleanValue(val value: Boolean) : JsonValue
+    data object NullValue : JsonValue
+}
 
+internal object OpenAiJson {
     fun requestBody(
         model: String,
         messages: List<Pair<String, String>>,
         temperature: Double?,
         maxOutputTokens: Int?,
         jsonResponse: Boolean,
-    ): String = buildString {
-        append('{')
-        append("\"model\":")
-        append(string(model))
-        append(",\"input\":[")
-        messages.forEachIndexed { index, (role, content) ->
-            if (index > 0) append(',')
-            append('{')
-            append("\"role\":")
-            append(string(role))
-            append(",\"content\":")
-            append(string(content))
-            append('}')
-        }
-        append(']')
-        temperature?.let {
-            append(",\"temperature\":")
-            append(it)
-        }
-        maxOutputTokens?.let {
-            append(",\"max_output_tokens\":")
-            append(it)
-        }
+    ): String {
+        val fields = linkedMapOf<String, JsonValue>(
+            "model" to JsonValue.StringValue(model),
+            "input" to JsonValue.Array(messages.map { (role, content) ->
+                JsonValue.Object(linkedMapOf(
+                    "role" to JsonValue.StringValue(role),
+                    "content" to JsonValue.StringValue(content),
+                ))
+            }),
+        )
+        temperature?.let { fields["temperature"] = JsonValue.NumberValue(it.toString()) }
+        maxOutputTokens?.let { fields["max_output_tokens"] = JsonValue.NumberValue(it.toString()) }
         if (jsonResponse) {
-            append(",\"text\":{\"format\":{\"type\":\"json_object\"}}")
+            fields["text"] = JsonValue.Object(mapOf(
+                "format" to JsonValue.Object(mapOf(
+                    "type" to JsonValue.StringValue("json_object"),
+                )),
+            ))
         }
-        append('}')
+        return stringify(JsonValue.Object(fields))
     }
 
-    fun stringField(json: String, field: String): String? {
-        val key = "\"$field\""
-        var from = 0
-        while (true) {
-            val index = json.indexOf(key, from)
-            if (index < 0) return null
-            var position = skipWhitespace(json, index + key.length)
-            if (position < json.length && json[position] == ':') {
-                position = skipWhitespace(json, position + 1)
-                if (position < json.length && json[position] == '"') {
-                    return parseString(json, position).first
-                }
-            }
-            from = index + key.length
+    fun parse(json: String): JsonValue = Parser(json).parse()
+
+    fun stringify(value: JsonValue): String = when (value) {
+        is JsonValue.Object -> value.fields.entries.joinToString(",", "{", "}") {
+            "${string(it.key)}:${stringify(it.value)}"
         }
-    }
-
-    fun nestedStringField(json: String, objectField: String, field: String): String? =
-        objectValue(json, objectField)?.let { stringField(it, field) }
-
-    fun intField(json: String, field: String): Int? {
-        val key = "\"$field\""
-        val index = json.indexOf(key)
-        if (index < 0) return null
-        var position = skipWhitespace(json, index + key.length)
-        if (position >= json.length || json[position] != ':') return null
-        position = skipWhitespace(json, position + 1)
-        var end = position
-        if (end < json.length && json[end] == '-') end++
-        while (end < json.length && json[end].isDigit()) end++
-        return json.substring(position, end).toIntOrNull()
-    }
-
-    fun errorMessage(json: String): String? =
-        nestedStringField(json, "error", "message")
-
-    fun errorCode(json: String): String? =
-        nestedStringField(json, "error", "code")
-
-    private fun objectValue(json: String, field: String): String? {
-        val key = "\"$field\""
-        val index = json.indexOf(key)
-        if (index < 0) return null
-        var position = skipWhitespace(json, index + key.length)
-        if (position >= json.length || json[position] != ':') return null
-        position = skipWhitespace(json, position + 1)
-        if (position >= json.length || json[position] != '{') return null
-        var depth = 0
-        var inString = false
-        var escaped = false
-        for (i in position until json.length) {
-            val c = json[i]
-            if (inString) {
-                when {
-                    escaped -> escaped = false
-                    c == '\\' -> escaped = true
-                    c == '"' -> inString = false
-                }
-            } else {
-                when (c) {
-                    '"' -> inString = true
-                    '{' -> depth++
-                    '}' -> {
-                        depth--
-                        if (depth == 0) return json.substring(position, i + 1)
-                    }
-                }
-            }
-        }
-        return null
-    }
-
-    private fun skipWhitespace(text: String, start: Int): Int {
-        var index = start
-        while (index < text.length && text[index].isWhitespace()) index++
-        return index
-    }
-
-    private fun parseString(json: String, quotePosition: Int): Pair<String, Int> {
-        val result = StringBuilder()
-        var index = quotePosition + 1
-        while (index < json.length) {
-            val c = json[index++]
-            when (c) {
-                '"' -> return result.toString() to index
-                '\\' -> {
-                    require(index < json.length) { "Invalid JSON escape." }
-                    when (val escaped = json[index++]) {
-                        '"' -> result.append('"')
-                        '\\' -> result.append('\\')
-                        '/' -> result.append('/')
-                        'b' -> result.append('\b')
-                        'f' -> result.append('\u000C')
-                        'n' -> result.append('\n')
-                        'r' -> result.append('\r')
-                        't' -> result.append('\t')
-                        'u' -> {
-                            require(index + 4 <= json.length) { "Invalid unicode escape." }
-                            result.append(json.substring(index, index + 4).toInt(16).toChar())
-                            index += 4
-                        }
-                        else -> error("Unsupported JSON escape: $escaped")
-                    }
-                }
-                else -> result.append(c)
-            }
-        }
-        error("Unterminated JSON string.")
+        is JsonValue.Array -> value.values.joinToString(",", "[", "]", transform = ::stringify)
+        is JsonValue.StringValue -> string(value.value)
+        is JsonValue.NumberValue -> value.value
+        is JsonValue.BooleanValue -> value.value.toString()
+        JsonValue.NullValue -> "null"
     }
 
     private fun string(value: String): String = buildString {
@@ -163,4 +67,143 @@ internal object OpenAiJson {
         }
         append('"')
     }
+
+    private class Parser(private val source: String) {
+        private var index = 0
+
+        fun parse(): JsonValue {
+            val value = value()
+            whitespace()
+            require(index == source.length) { "Unexpected trailing JSON data." }
+            return value
+        }
+
+        private fun value(): JsonValue {
+            whitespace()
+            require(index < source.length) { "Unexpected end of JSON." }
+            return when (source[index]) {
+                '{' -> objectValue()
+                '[' -> arrayValue()
+                '"' -> JsonValue.StringValue(stringValue())
+                't' -> literal("true", JsonValue.BooleanValue(true))
+                'f' -> literal("false", JsonValue.BooleanValue(false))
+                'n' -> literal("null", JsonValue.NullValue)
+                '-', in '0'..'9' -> numberValue()
+                else -> error("Invalid JSON value at offset $index.")
+            }
+        }
+
+        private fun objectValue(): JsonValue.Object {
+            index++
+            whitespace()
+            val fields = linkedMapOf<String, JsonValue>()
+            if (consume('}')) return JsonValue.Object(fields)
+            while (true) {
+                whitespace()
+                require(index < source.length && source[index] == '"') { "Expected JSON object key." }
+                val key = stringValue()
+                whitespace()
+                require(consume(':')) { "Expected ':' after JSON object key." }
+                require(fields.put(key, value()) == null) { "Duplicate JSON object key: $key" }
+                whitespace()
+                if (consume('}')) return JsonValue.Object(fields)
+                require(consume(',')) { "Expected ',' in JSON object." }
+            }
+        }
+
+        private fun arrayValue(): JsonValue.Array {
+            index++
+            whitespace()
+            val values = mutableListOf<JsonValue>()
+            if (consume(']')) return JsonValue.Array(values)
+            while (true) {
+                values += value()
+                whitespace()
+                if (consume(']')) return JsonValue.Array(values)
+                require(consume(',')) { "Expected ',' in JSON array." }
+            }
+        }
+
+        private fun stringValue(): String {
+            require(consume('"'))
+            val result = StringBuilder()
+            while (index < source.length) {
+                when (val c = source[index++]) {
+                    '"' -> return result.toString()
+                    '\\' -> {
+                        require(index < source.length) { "Invalid JSON escape." }
+                        when (val escaped = source[index++]) {
+                            '"', '\\', '/' -> result.append(escaped)
+                            'b' -> result.append('\b')
+                            'f' -> result.append('\u000C')
+                            'n' -> result.append('\n')
+                            'r' -> result.append('\r')
+                            't' -> result.append('\t')
+                            'u' -> {
+                                require(index + 4 <= source.length) { "Invalid unicode escape." }
+                                result.append(source.substring(index, index + 4).toInt(16).toChar())
+                                index += 4
+                            }
+                            else -> error("Unsupported JSON escape: $escaped")
+                        }
+                    }
+                    else -> {
+                        require(c.code >= 0x20) { "Unescaped control character in JSON string." }
+                        result.append(c)
+                    }
+                }
+            }
+            error("Unterminated JSON string.")
+        }
+
+        private fun numberValue(): JsonValue.NumberValue {
+            val start = index
+            if (source[index] == '-') index++
+            require(index < source.length)
+            if (source[index] == '0') index++ else {
+                require(source[index] in '1'..'9') { "Invalid JSON number." }
+                while (index < source.length && source[index].isDigit()) index++
+            }
+            if (index < source.length && source[index] == '.') {
+                index++
+                require(index < source.length && source[index].isDigit()) { "Invalid JSON number fraction." }
+                while (index < source.length && source[index].isDigit()) index++
+            }
+            if (index < source.length && source[index] in "eE") {
+                index++
+                if (index < source.length && source[index] in "+-") index++
+                require(index < source.length && source[index].isDigit()) { "Invalid JSON number exponent." }
+                while (index < source.length && source[index].isDigit()) index++
+            }
+            return JsonValue.NumberValue(source.substring(start, index))
+        }
+
+        private fun <T : JsonValue> literal(text: String, value: T): T {
+            require(source.startsWith(text, index)) { "Invalid JSON literal." }
+            index += text.length
+            return value
+        }
+
+        private fun whitespace() {
+            while (index < source.length && source[index].isWhitespace()) index++
+        }
+
+        private fun consume(expected: Char): Boolean =
+            if (index < source.length && source[index] == expected) {
+                index++
+                true
+            } else false
+    }
 }
+
+internal fun JsonValue.Object.string(name: String): String? =
+    (fields[name] as? JsonValue.StringValue)?.value
+
+internal fun JsonValue.Object.objectValue(name: String): JsonValue.Object? =
+    fields[name] as? JsonValue.Object
+
+internal fun JsonValue.Object.array(name: String): List<JsonValue> =
+    (fields[name] as? JsonValue.Array)?.values.orEmpty()
+
+internal fun JsonValue.Object.int(name: String): Int? =
+    (fields[name] as? JsonValue.NumberValue)?.value?.toIntOrNull()
