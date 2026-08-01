@@ -215,6 +215,29 @@ internal class EvolutionChangeExtractor {
                 ),
             )
         }
+        specification.contracts.forEach { contract ->
+            values += subject(
+                EvolutionSubjectKind.CONTRACT,
+                contract.id,
+                contract.owner.stableId,
+                EvolutionCanonicalizer.contract(contract),
+                contract.evidenceRefs.toList(),
+                mapOf(
+                    "displayName" to contract.displayName,
+                    "semanticKey" to contract.semanticKey,
+                    "kind" to contract.kind.name,
+                    "role" to contract.role.name,
+                    "owner" to contract.owner.stableId,
+                    "sourceBindings" to contract.sourceEntityStableIds.sorted().joinToString(","),
+                    "inputs" to contract.inputs.joinToString(",") { it.id },
+                    "outputs" to contract.outputs.joinToString(",") { it.id },
+                    "members" to contract.members.joinToString(",") { it.id },
+                    "relationships" to contract.relationships.joinToString(",") { it.id },
+                    "evidence" to contract.evidenceRefs.sorted().joinToString(","),
+                    "unresolved" to contract.unresolvedRefs.sorted().joinToString(","),
+                ),
+            )
+        }
         require(values.map { "${it.kind.name}:${it.id}" }.distinct().size == values.size) {
             "Duplicate Evolution subject identity."
         }
@@ -244,6 +267,7 @@ internal class EvolutionChangeExtractor {
         EvolutionSubjectKind.API -> EvolutionChangeKind.API_CHANGED
         EvolutionSubjectKind.PROPERTY -> EvolutionChangeKind.PROPERTY_CHANGED
         EvolutionSubjectKind.RELATIONSHIP -> EvolutionChangeKind.RELATIONSHIP_ADDED
+        EvolutionSubjectKind.CONTRACT -> EvolutionChangeKind.CONTRACT_CHANGED
         else -> EvolutionChangeKind.ENTITY_ADDED
     }
 
@@ -251,6 +275,7 @@ internal class EvolutionChangeExtractor {
         EvolutionSubjectKind.API -> EvolutionChangeKind.API_CHANGED
         EvolutionSubjectKind.PROPERTY -> EvolutionChangeKind.PROPERTY_CHANGED
         EvolutionSubjectKind.RELATIONSHIP -> EvolutionChangeKind.RELATIONSHIP_REMOVED
+        EvolutionSubjectKind.CONTRACT -> EvolutionChangeKind.CONTRACT_CHANGED
         else -> EvolutionChangeKind.ENTITY_REMOVED
     }
 
@@ -258,6 +283,7 @@ internal class EvolutionChangeExtractor {
         EvolutionSubjectKind.API -> EvolutionChangeKind.API_CHANGED
         EvolutionSubjectKind.PROPERTY -> EvolutionChangeKind.PROPERTY_CHANGED
         EvolutionSubjectKind.RELATIONSHIP -> EvolutionChangeKind.RELATIONSHIP_MODIFIED
+        EvolutionSubjectKind.CONTRACT -> EvolutionChangeKind.CONTRACT_CHANGED
         else -> EvolutionChangeKind.ENTITY_MODIFIED
     }
 
@@ -276,6 +302,7 @@ internal class EvolutionChangeExtractor {
             EvolutionSubjectKind.MODULE,
             EvolutionSubjectKind.PACKAGE,
             EvolutionSubjectKind.COMPONENT,
+            EvolutionSubjectKind.CONTRACT,
         )
         val moveFields = setOf("path", "moduleId", "packageId", "qualifiedName")
     }

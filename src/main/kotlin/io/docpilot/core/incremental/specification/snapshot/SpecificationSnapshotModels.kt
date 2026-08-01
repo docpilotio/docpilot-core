@@ -7,9 +7,11 @@ public object SpecificationSnapshotFormat {
     public const val CURRENT_VERSION: Int = 1
     public const val LEGACY_VERSION: Int = 1
     public const val DIR_0_4_VERSION: Int = 2
+    public const val DIR_0_5_VERSION: Int = 3
     public const val SUPPORTED_DIR_SCHEMA_VERSION: String = "0.3"
     public const val LEGACY_DIR_SCHEMA_VERSION: String = "0.3"
     public const val DIR_0_4_SCHEMA_VERSION: String = "0.4"
+    public const val DIR_0_5_SCHEMA_VERSION: String = "0.5"
     public const val DEFAULT_RELATIVE_PATH: String = ".docpilot/snapshots/specification.json"
 }
 

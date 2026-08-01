@@ -8,6 +8,7 @@ public class JsonSpecificationSnapshotCodec {
         val formatVersion = when (specification.schemaVersion) {
             SpecificationSnapshotFormat.LEGACY_DIR_SCHEMA_VERSION -> SpecificationSnapshotFormat.LEGACY_VERSION
             SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION -> SpecificationSnapshotFormat.DIR_0_4_VERSION
+            SpecificationSnapshotFormat.DIR_0_5_SCHEMA_VERSION -> SpecificationSnapshotFormat.DIR_0_5_VERSION
             else -> require(false) { "Unsupported DIR schema version: ${specification.schemaVersion}" }
         }
         val payload = encodePayload(specification)
@@ -28,17 +29,17 @@ public class JsonSpecificationSnapshotCodec {
         return try {
         val root = JsonParser(value).parseRootObject()
         val version = root.requiredLong("snapshotFormatVersion").toIntExact("snapshotFormatVersion")
-        if (version !in setOf(SpecificationSnapshotFormat.LEGACY_VERSION, SpecificationSnapshotFormat.DIR_0_4_VERSION)) {
+        if (version !in setOf(SpecificationSnapshotFormat.LEGACY_VERSION, SpecificationSnapshotFormat.DIR_0_4_VERSION, SpecificationSnapshotFormat.DIR_0_5_VERSION)) {
             return SpecificationSnapshotLoadResult.Invalid(
                 SnapshotValidationFailure.UNSUPPORTED_VERSION,
                 "Unsupported specification snapshot format version: $version",
             )
         }
         val dirVersion = root.requiredString("dirSchemaVersion")
-        val expectedDirVersion = if (version == SpecificationSnapshotFormat.LEGACY_VERSION) {
-            SpecificationSnapshotFormat.LEGACY_DIR_SCHEMA_VERSION
-        } else {
-            SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION
+        val expectedDirVersion = when (version) {
+            SpecificationSnapshotFormat.LEGACY_VERSION -> SpecificationSnapshotFormat.LEGACY_DIR_SCHEMA_VERSION
+            SpecificationSnapshotFormat.DIR_0_4_VERSION -> SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION
+            else -> SpecificationSnapshotFormat.DIR_0_5_SCHEMA_VERSION
         }
         if (dirVersion != expectedDirVersion) {
             return SpecificationSnapshotLoadResult.Invalid(
@@ -119,7 +120,7 @@ public class JsonSpecificationSnapshotCodec {
         append(','); field("relationships", array(specification.relationships.sortedBy { it.id }.map(::encodeRelationship)), raw = true)
         append(','); field("evidence", array(specification.evidence.sortedBy { it.id }.map(::encodeEvidence)), raw = true)
         append(','); field("unresolved", array(specification.unresolved.sortedBy { it.id }.map(::encodeUnresolved)), raw = true)
-        if (specification.schemaVersion == SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION) {
+        if (specification.schemaVersion in setOf(SpecificationSnapshotFormat.DIR_0_4_SCHEMA_VERSION, SpecificationSnapshotFormat.DIR_0_5_SCHEMA_VERSION)) {
             append(','); field("features", array(specification.features.sortedBy { it.id }.map(::encodeFeature)), raw = true)
             append(','); field("entryPoints", array(specification.entryPoints.sortedBy { it.id }.map(::encodeEntryPoint)), raw = true)
             append(','); field(
@@ -127,6 +128,9 @@ public class JsonSpecificationSnapshotCodec {
                 array(specification.scenarios.sortedWith(compareBy({ it.featureId }, { it.id })).map(::encodeScenario)),
                 raw = true,
             )
+        }
+        if (specification.schemaVersion == SpecificationSnapshotFormat.DIR_0_5_SCHEMA_VERSION) {
+            append(','); field("contracts", array(specification.contracts.sortedBy { it.id }.map(::encodeContract)), raw = true)
         }
         append('}')
     }
@@ -201,6 +205,35 @@ public class JsonSpecificationSnapshotCodec {
         "apiId" to nullable(v.apiId), "evidenceRefs" to strings(v.evidenceRefs),
         "unresolvedRefs" to strings(v.unresolvedRefs),
     )
+    private fun encodeType(v: ContractTypeReference): String = obj(
+        "kind" to str(v.kind.name), "stableId" to nullable(v.stableId), "displayName" to str(v.displayName),
+        "nullable" to v.nullable.toString(), "arguments" to array(v.arguments.map { encodeType(it) }),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
+    private fun encodeValue(v: ContractValue) = obj(
+        "id" to str(v.id), "semanticKey" to str(v.semanticKey), "name" to str(v.name), "type" to encodeType(v.type),
+        "direction" to str(v.direction.name), "cardinality" to str(v.cardinality.name),
+        "sourceEntityStableIds" to strings(v.sourceEntityStableIds), "evidenceRefs" to strings(v.evidenceRefs),
+        "unresolvedRefs" to strings(v.unresolvedRefs), "semanticOrder" to nullableInt(v.semanticOrder),
+    )
+    private fun encodeMember(v: ContractMember) = obj(
+        "id" to str(v.id), "semanticKey" to str(v.semanticKey), "name" to str(v.name), "type" to encodeType(v.type),
+        "cardinality" to str(v.cardinality.name), "sourceEntityStableIds" to strings(v.sourceEntityStableIds),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+        "semanticOrder" to nullableInt(v.semanticOrder),
+    )
+    private fun encodeContractRelationship(v: ContractRelationship) = obj(
+        "id" to str(v.id), "kind" to str(v.kind.name), "targetStableId" to str(v.targetStableId),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
+    private fun encodeContract(v: ContractSpecification) = obj(
+        "id" to str(v.id), "semanticKey" to str(v.semanticKey), "displayName" to str(v.displayName), "kind" to str(v.kind.name), "role" to str(v.role.name),
+        "owner" to obj("kind" to str(v.owner.kind.name), "stableId" to str(v.owner.stableId)),
+        "sourceEntityStableIds" to strings(v.sourceEntityStableIds), "inputs" to array(v.inputs.map(::encodeValue)),
+        "outputs" to array(v.outputs.map(::encodeValue)), "members" to array(v.members.map(::encodeMember)),
+        "relationships" to array(v.relationships.sortedBy { it.id }.map(::encodeContractRelationship)),
+        "evidenceRefs" to strings(v.evidenceRefs), "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
 
     private fun decodeSpecification(o: JsonValue.ObjectValue): ProjectSpecification = ProjectSpecification(
         schemaVersion = o.requiredString("schemaVersion"),
@@ -214,6 +247,11 @@ public class JsonSpecificationSnapshotCodec {
         features = o.optionalArray("features").mapObject(::decodeFeature),
         entryPoints = o.optionalArray("entryPoints").mapObject(::decodeEntryPoint),
         scenarios = o.optionalArray("scenarios").mapObject(::decodeScenario),
+        contracts = if (o.requiredString("schemaVersion") == SpecificationSnapshotFormat.DIR_0_5_SCHEMA_VERSION) {
+            o.requiredArray("contracts").mapObject(::decodeContract)
+        } else {
+            o.optionalArray("contracts").mapObject(::decodeContract)
+        },
     )
     private fun decodeProject(o: JsonValue.ObjectValue) = ProjectDescriptor(
         o.requiredString("id"), o.requiredString("name"), o.optionalString("description"),
@@ -280,6 +318,37 @@ public class JsonSpecificationSnapshotCodec {
         id=o.requiredString("id"), order=o.requiredLong("order").toIntExact("order"), action=o.requiredString("action"),
         ownerComponentId=o.requiredString("ownerComponentId"), targetComponentId=o.optionalString("targetComponentId"),
         apiId=o.optionalString("apiId"), evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
+    private fun decodeType(o: JsonValue.ObjectValue): ContractTypeReference = ContractTypeReference(
+        kind=ContractTypeKind.valueOf(o.requiredString("kind")), stableId=o.optionalString("stableId"),
+        displayName=o.requiredString("displayName"), nullable=o.requiredBoolean("nullable"),
+        arguments=o.requiredArray("arguments").mapObject { decodeType(it) }, evidenceRefs=o.stringSet("evidenceRefs"),
+        unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
+    private fun decodeValue(o: JsonValue.ObjectValue) = ContractValue(
+        id=o.requiredString("id"), semanticKey=o.requiredString("semanticKey"), name=o.requiredString("name"),
+        type=decodeType(o.requiredObject("type")), direction=ContractDirection.valueOf(o.requiredString("direction")),
+        cardinality=ContractCardinality.valueOf(o.requiredString("cardinality")), sourceEntityStableIds=o.stringSet("sourceEntityStableIds"),
+        evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"), semanticOrder=o.optionalInt("semanticOrder"),
+    )
+    private fun decodeMember(o: JsonValue.ObjectValue) = ContractMember(
+        id=o.requiredString("id"), semanticKey=o.requiredString("semanticKey"), name=o.requiredString("name"),
+        type=decodeType(o.requiredObject("type")), cardinality=ContractCardinality.valueOf(o.requiredString("cardinality")),
+        sourceEntityStableIds=o.stringSet("sourceEntityStableIds"), evidenceRefs=o.stringSet("evidenceRefs"),
+        unresolvedRefs=o.stringSet("unresolvedRefs"), semanticOrder=o.optionalInt("semanticOrder"),
+    )
+    private fun decodeContractRelationship(o: JsonValue.ObjectValue) = ContractRelationship(
+        id=o.requiredString("id"), kind=ContractRelationshipKind.valueOf(o.requiredString("kind")),
+        targetStableId=o.requiredString("targetStableId"), evidenceRefs=o.stringSet("evidenceRefs"), unresolvedRefs=o.stringSet("unresolvedRefs"),
+    )
+    private fun decodeContract(o: JsonValue.ObjectValue) = ContractSpecification(
+        id=o.requiredString("id"), semanticKey=o.requiredString("semanticKey"), displayName=o.requiredString("displayName"), kind=ContractKind.valueOf(o.requiredString("kind")),
+        role=ContractRole.valueOf(o.requiredString("role")), owner=o.requiredObject("owner").let {
+            ContractOwner(ContractOwnerKind.valueOf(it.requiredString("kind")), it.requiredString("stableId"))
+        }, sourceEntityStableIds=o.stringSet("sourceEntityStableIds"), inputs=o.requiredArray("inputs").mapObject(::decodeValue),
+        outputs=o.requiredArray("outputs").mapObject(::decodeValue), members=o.requiredArray("members").mapObject(::decodeMember),
+        relationships=o.requiredArray("relationships").mapObject(::decodeContractRelationship), evidenceRefs=o.stringSet("evidenceRefs"),
+        unresolvedRefs=o.stringSet("unresolvedRefs"),
     )
 
     private fun StringBuilder.field(name: String, value: String, raw: Boolean = false) {
