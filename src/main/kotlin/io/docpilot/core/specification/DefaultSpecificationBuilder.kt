@@ -16,6 +16,7 @@ import io.docpilot.core.model.source.SourceIndex
 import io.docpilot.core.model.source.SourceSymbol
 import io.docpilot.core.model.source.SourceSymbolKind
 import io.docpilot.core.specification.discovery.DeterministicFeatureDiscoveryEngine
+import io.docpilot.core.specification.extraction.DeterministicContractExtractionEngine
 
 public class DefaultSpecificationBuilder : SpecificationBuilder {
     override fun build(request: SpecificationBuildRequest): ProjectSpecification =
@@ -175,13 +176,19 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
             baseSpecification = baseSpecification,
             sourceIndex = request.sourceIndex,
         )
-        val specification = baseSpecification.copy(
+        val featureSpecification = baseSpecification.copy(
             features = discovery.features,
             entryPoints = discovery.entryPoints,
             scenarios = discovery.scenarios,
             unresolved = (baseSpecification.unresolved + discovery.unresolved)
                 .distinctBy { it.id }
                 .sortedBy { it.id },
+        )
+        val extraction = DeterministicContractExtractionEngine().extract(request.sourceIndex, featureSpecification)
+        val specification = featureSpecification.copy(
+            schemaVersion = "0.5",
+            contracts = extraction.contracts,
+            unresolved = (featureSpecification.unresolved + extraction.unresolved).distinctBy { it.id }.sortedBy { it.id },
         )
         ProjectSpecificationValidator.validate(specification)
         return SpecificationBuildResult(specification, projection.report)
@@ -344,6 +351,6 @@ public class DefaultSpecificationBuilder : SpecificationBuilder {
     private fun packageId(moduleId: String, packageName: String?): String = "$moduleId:package:${packageName ?: "<default>"}"
 
     public companion object {
-        public const val CURRENT_SCHEMA_VERSION: String = "0.4"
+        public const val CURRENT_SCHEMA_VERSION: String = "0.5"
     }
 }

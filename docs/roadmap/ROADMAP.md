@@ -14,7 +14,7 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 
 - source loading, scanning, and Evidence indexing
 - knowledge construction
-- DIR 0.4 specification building with Stable IDs and deterministic Feature Discovery
+- DIR 0.5 specification building with Stable IDs, deterministic Feature Discovery, and Contract extraction
 - deterministic Markdown and multi-artifact selective rendering
 - specification Snapshot format 1 persistence
 - Stable-ID diff and incremental planning
@@ -51,6 +51,9 @@ The supplied source ZIP contains no `.git`; current branch, HEAD, origin diverge
 | RFC-0061 | `IMPLEMENTED_WITH_DOCUMENTED_LIMITATIONS` | Deterministic Compose Navigation Evidence and destination discovery |
 | RFC-0062 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Function references, nested graph ownership, and navigation argument Evidence; real-project repeat validation passed, syntax coverage absent |
 | RFC-0063 | Implemented | Standalone Core Release Evidence format 2 and removal of the temporary in-repository MCP implementation |
+| RFC-0064 | Implemented | Profile-aware Feature Documentation Rendering |
+| RFC-0065 | Implemented | DIR 0.5 Contract Specification Foundation and Snapshot format 3 |
+| RFC-0066 | `IMPLEMENTED_WITH_VALIDATION_LIMITATIONS` | Nine-role deterministic extraction; real-project Evidence covered public APIs and callbacks |
 
 ## Historical release milestones
 
@@ -75,10 +78,10 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 5. RFC-0061 — deterministic Compose Navigation Evidence — implemented with documented limitations.
 6. RFC-0062 — function references, nested graph ownership, and navigation argument Evidence — implemented; real-project repeat validation passed, syntax coverage absent.
 7. RFC-0063 — standalone Core Release Evidence format 2 and MCP removal — implemented.
-8. RFC-0064 — Profile-aware Feature Documentation Rendering — next; detailed design and Acceptance Criteria require start approval.
-9. RFC-0065 — Contract Specification Foundation.
-10. RFC-0066 — Deterministic Contract Extraction.
-11. RFC-0067 — Contract Documentation Rendering.
+8. RFC-0064 — Profile-aware Feature Documentation Rendering — implemented.
+9. RFC-0065 — Contract Specification Foundation — implemented.
+10. RFC-0066 — Deterministic Contract Extraction — implemented with real-project validation limitations.
+11. RFC-0067 — Contract Documentation Rendering — next; detailed design and Acceptance Criteria require start approval.
 12. RFC-0068 — Diagram IR and Mermaid Rendering.
 13. RFC-0069 — Documentation Claims and Traceability.
 14. RFC-0070 / RFC-0071 — official Reconciliation and Evolution CLI workflows after shared Core contracts stabilize.

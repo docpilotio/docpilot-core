@@ -2,10 +2,11 @@
 
 The default specification pipeline is:
 
-`SourceIndex → Knowledge Graph → base DIR → deterministic Feature Discovery → DIR 0.4 validation → Snapshot format 2`
+`SourceIndex → Knowledge Graph → base DIR → deterministic Feature Discovery → deterministic Contract Extraction → DIR 0.5 validation → Snapshot format 3`
 
 Feature Discovery is AI-independent and Evidence-bounded. Projects without proven Feature
-Evidence still emit valid DIR 0.4 with empty collections.
+Evidence still emit valid Feature collections. RFC-0066 then replaces the Contract collection
+with current Evidence-backed extraction results and emits DIR 0.5.
 
 RFC-0061 inserts structured Compose Navigation Evidence before Feature Discovery.
 A Compose destination requires a resolved route, a known navigation registration, and

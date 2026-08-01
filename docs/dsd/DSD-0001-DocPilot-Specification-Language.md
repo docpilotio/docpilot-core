@@ -1,9 +1,11 @@
 # DSD-0001 — DocPilot Specification Language
 
 Status: Active baseline through RFC-0062
-Version: 0.2 authoring baseline with DIR 0.3 and DIR 0.4 runtime extensions
+Version: 0.2 authoring baseline with DIR 0.3, DIR 0.4, and DIR 0.5 runtime extensions
 
 > Version policy: DIR 0.2 remains the legacy manual-construction baseline. `DefaultSpecificationBuilder` creates base DIR 0.3; AI-independent discovery emits DIR 0.4. Snapshot format 1 reads DIR 0.3 and format 2 stores DIR 0.4. Snapshot format and DIR schema remain independent version lines.
+
+RFC-0065 defines DIR 0.5 Contracts and Snapshot format 3. RFC-0066 makes the default pipeline emit DIR 0.5 by applying deterministic, Evidence-bounded Contract extraction after Feature Discovery. Formats 1/2 and DIR 0.3/0.4 readers remain supported; migration alone never infers Contracts.
 
 ## Purpose
 

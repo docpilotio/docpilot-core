@@ -193,6 +193,7 @@ Provider output is non-canonical until accepted through the relevant Core workfl
 - Scanner extracts observable source Evidence.
 - Knowledge Builder constructs structured knowledge.
 - Specification Builder creates canonical DIR entities.
+- Contract Extraction projects qualified source and Compose observations into Evidence-backed DIR 0.5 Contracts after Feature Discovery.
 - Snapshot persistence preserves exact specification identity.
 - Documentation Profile Resolver evaluates deterministic document readiness without creating Artifact operations.
 - Artifact Planner selects deterministic documentation work.
@@ -210,8 +211,8 @@ Provider output is non-canonical until accepted through the relevant Core workfl
 |---|---:|---|
 | Manual `ProjectSpecification` default | DIR 0.2 | Retain for source compatibility |
 | Base builder output | DIR 0.3 | Retained before discovery and for compatibility |
-| Default discovery output | DIR 0.4 | Canonical Feature/Compose workflow output |
-| Specification Snapshot | format 1 / format 2 | Format 1 reads DIR 0.3; format 2 stores DIR 0.4 |
+| Default discovery and extraction output | DIR 0.5 | Canonical Feature/Compose plus Contract workflow output |
+| Specification Snapshot | format 1 / format 2 / format 3 | Formats 1/2 retain DIR 0.3/0.4; format 3 stores DIR 0.5 |
 | Review Bundle | format 1 | Retain |
 | Evolution Report | format 1 | Retain |
 | Relationship Projection Report | format 1 | Retain |
@@ -221,7 +222,8 @@ RFC-0059 implements additive DIR 0.4 Feature, Entry Point, Scenario, and ordered
 Scenario Step entities. RFC-0060 projects deterministic Android Feature Evidence;
 RFC-0061 and RFC-0062 extend Compose navigation Evidence without changing DIR 0.4
 or Snapshot format 2. Format 1/DIR 0.3 remains supported, migration is explicit,
-and Feature Markdown and Evolution Report integration remain deferred.
+and Feature Markdown remains compatible. RFC-0065 adds the Contract foundation and RFC-0066
+adds deterministic Contract extraction without changing Evolution Report format 1.
 
 ## Verification boundary
 

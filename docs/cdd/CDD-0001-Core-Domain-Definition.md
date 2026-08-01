@@ -1,5 +1,9 @@
 # CDD-0001 — Core Domain Definition
-Status: Active domain baseline through RFC-0062
+Status: Active domain baseline through RFC-0066
+
+## DIR 0.5 Contract Extraction Domain
+
+RFC-0066 adds an AI-independent Contract Extraction Engine after Feature Discovery. It owns role selection, owner and type resolution, shape projection, Evidence and unresolved binding, duplicate policy, and Contract Stable IDs. Scanner observations remain syntax facts; generated prose is never an extraction input. The default pipeline emits DIR 0.5 and Snapshot format 3 while legacy DIR/Snapshot readers remain available.
 
 ## DIR 0.4 Feature and Navigation Domain
 

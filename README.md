@@ -102,10 +102,12 @@ AI Provider implementations remain adapters behind the Provider SPI. AI output i
 | PV-009 | `PENDING` |
 | Technical v1 baseline | Documentation reports immutable `v1.0.0`; Git identity is not verifiable from source ZIPs without `.git` |
 | Gradle artifact version | `0.1.0-SNAPSHOT` |
-| Next RFC | RFC-0066 Deterministic Contract Extraction; detailed start approval required |
+| Next RFC | RFC-0067 Deterministic Contract Rendering; detailed start approval required |
 | Primary validation target | `C:\WorkSpace\architecture-samples` |
 
-RFC-0065 adds the Evidence-backed canonical Contract foundation in DIR 0.5 and Snapshot format 3 while retaining DIR 0.3/0.4 readers. Deterministic source extraction and Contract rendering remain RFC-0066 and RFC-0067. The public v1.0 Product Validation decision and PV-009 state are unchanged.
+RFC-0065 adds the Evidence-backed canonical Contract foundation in DIR 0.5 and Snapshot format 3 while retaining DIR 0.3/0.4 readers. RFC-0066 now implements deterministic source extraction; Contract rendering remains RFC-0067. The public v1.0 Product Validation decision and PV-009 state are unchanged.
+
+RFC-0066 implements deterministic Evidence-bounded extraction for all nine Contract roles. The default builder now emits DIR 0.5 and Snapshot format 3; Contract rendering remains deferred to RFC-0067.
 
 ### Current technical formats
 

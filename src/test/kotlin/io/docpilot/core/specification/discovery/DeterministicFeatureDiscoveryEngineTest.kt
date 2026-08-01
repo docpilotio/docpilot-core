@@ -26,7 +26,7 @@ class DeterministicFeatureDiscoveryEngineTest {
     fun `discovers an evidence-backed Android entry point feature and direct call scenario`() {
         val specification = build(sampleIndex())
 
-        assertEquals("0.4", specification.schemaVersion)
+        assertEquals("0.5", specification.schemaVersion)
         val entryPoint = specification.entryPoints.single()
         assertEquals(EntryPointKind.ANDROID_ACTIVITY.name, entryPoint.kind)
         val feature = specification.features.single()
