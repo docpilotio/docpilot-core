@@ -14,3 +14,8 @@ Thumbs.db
 .gradle/
 **/build/
 local.properties
+
+# Local worktrees and runtime logs
+.worktrees/
+docpilot-cli/docpilot/
+.gradle-user-openai/
