@@ -83,13 +83,19 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 10. RFC-0066 — Deterministic Contract Extraction — implemented with real-project validation limitations.
 11. RFC-0067 — Contract Documentation Rendering — implemented.
 12. RFC-0068 — Official Documentation Generation CLI — implemented.
-13. RFC-0069 — Documentation Bundle and Manifest.
-14. RFC-0070 — Structured AI Documentation Enrichment.
-15. RFC-0071 — Diagram IR and Mermaid Rendering.
-16. RFC-0072 — Documentation Claims and Traceability.
+13. RFC-0069 — Documentation Bundle and Manifest — implemented.
+14. RFC-0070 — Structured AI Documentation Enrichment — implemented.
+15. RFC-0071 — Diagram IR and Mermaid Rendering — not implemented.
+16. RFC-0072 — Documentation Claims and Traceability — implemented; its RFC-0071 prerequisite was
+    explicitly skipped (Diagram IR is unrelated to Claim/Evidence/Contract binding), recorded in
+    `docs/rfc/RFC-0072-Documentation-Claims-and-Traceability.md`'s "Depends on" section.
 17. RFC-0073 / RFC-0074 — official Reconciliation and Evolution CLI workflows.
 18. RFC-0075 — Documentation Quality Gate.
 19. RFC-0076 — Product Validation Re-entry and independent PV-009 reassessment.
+
+RFC-0077 (Kotlin/Android Profile Document Coverage Completion) — implemented outside this fixed
+sequence; see `docs/rfc/RFC-0077-Kotlin-Android-Profile-Document-Coverage-Completion.md`. It and
+RFC-0078–0082 (Finding model, synthesis documents) are a separate, unblocked track.
 
 The Product Owner fixed this numbering, order, and scope boundary in
 `docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,
