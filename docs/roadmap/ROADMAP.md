@@ -93,9 +93,22 @@ RFC-0056 adds Documentation Evolution and Change Intelligence. RFC-0058 adds run
 18. RFC-0075 — Documentation Quality Gate.
 19. RFC-0076 — Product Validation Re-entry and independent PV-009 reassessment.
 
-RFC-0077 (Kotlin/Android Profile Document Coverage Completion) — implemented outside this fixed
-sequence; see `docs/rfc/RFC-0077-Kotlin-Android-Profile-Document-Coverage-Completion.md`. It and
-RFC-0078–0082 (Finding model, synthesis documents) are a separate, unblocked track.
+RFC-0077 (Kotlin/Android Profile Document Coverage Completion) and RFC-0078–0082 (Finding model,
+synthesis/Advisory documents, Productization Roadmap curation, AI-Proposed ADR workflow) are a
+separate, unblocked track from this fixed sequence — **all implemented** as of 2026-08-02:
+
+- RFC-0077 — Document Coverage Completion for `kotlin-android@1` Profile — implemented.
+- RFC-0078 — Evidence-Bound Finding and Severity Model — implemented (required building RFC-0072,
+  Documentation Claims and Traceability, first, since it did not previously exist).
+- RFC-0079 — Cross-Artifact Synthesis Request and Advisory Document Tier — implemented, core-library-only.
+- RFC-0080 — Executive Summary and Known Issues Register Document Types — implemented, core-library-only.
+- RFC-0081 — Productization Roadmap Document and Human Curation Step — implemented.
+- RFC-0082 — AI-Proposed Architecture Decision Record Workflow — implemented; closes out the track.
+
+See `docs/rfc/RFC-0077-...md` through `docs/rfc/RFC-0082-...md` for each RFC's doc. RFC-0071
+(Diagram IR/Mermaid) and RFC-0073 (Official Reconciliation CLI Workflow) remain not implemented and
+unaffected — both were explicit, approved dependency skips recorded in RFC-0072's and RFC-0082's
+"Depends on" sections respectively.
 
 The Product Owner fixed this numbering, order, and scope boundary in
 `docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,
