@@ -133,8 +133,10 @@ public class ProjectSpecificationMarkdownRenderer :
         val contractDescriptors = if (specification.schemaVersion == "0.5") {
             ContractDocumentationMarkdownRenderer().describe(specification)
         } else emptyList()
+        val profileCoverageDescriptors = ProfileDocumentCoverageMarkdownRenderer().describe(specification)
         return (listOf(index, overview, architecture, featureCatalog) + featureDetails + moduleDescriptors +
-            packageDescriptors + componentDescriptors + relationship + evidence + contractDescriptors).sortedBy { it.artifactId.value }
+            packageDescriptors + componentDescriptors + relationship + evidence + contractDescriptors +
+            profileCoverageDescriptors).sortedBy { it.artifactId.value }
     }
 
     override fun render(
@@ -238,6 +240,12 @@ public class ProjectSpecificationMarkdownRenderer :
         DocumentationArtifactKind.CONTRACT_CATALOG,
         DocumentationArtifactKind.CONTRACT_DETAIL,
         -> ContractDocumentationMarkdownRenderer().render(specification, setOf(descriptor.artifactId)).single().content
+        DocumentationArtifactKind.MODULE_ARCHITECTURE,
+        DocumentationArtifactKind.DOMAIN_MODEL,
+        DocumentationArtifactKind.DATABASE_SCHEMA,
+        DocumentationArtifactKind.EXTERNAL_API_CONTRACT,
+        DocumentationArtifactKind.TEST_STRATEGY,
+        -> ProfileDocumentCoverageMarkdownRenderer().render(specification, setOf(descriptor.artifactId)).single().content
     }
 
     private fun buildIndex(specification: ProjectSpecification): String = buildString {
@@ -279,6 +287,11 @@ public class ProjectSpecificationMarkdownRenderer :
         DocumentationArtifactKind.FEATURE_DETAIL -> "Feature — ${specification.features.single {
             "feature:${it.id}" == descriptor.artifactId.value
         }.name}"
+        DocumentationArtifactKind.MODULE_ARCHITECTURE -> "Module architecture"
+        DocumentationArtifactKind.DOMAIN_MODEL -> "Domain model"
+        DocumentationArtifactKind.DATABASE_SCHEMA -> "Database schema"
+        DocumentationArtifactKind.EXTERNAL_API_CONTRACT -> "External API contract"
+        DocumentationArtifactKind.TEST_STRATEGY -> "Test strategy"
         DocumentationArtifactKind.INDEX -> "Index"
     }
 

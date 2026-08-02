@@ -22,6 +22,11 @@ public enum class DocumentationArtifactKind {
     FEATURE_DETAIL,
     CONTRACT_CATALOG,
     CONTRACT_DETAIL,
+    MODULE_ARCHITECTURE,
+    DOMAIN_MODEL,
+    DATABASE_SCHEMA,
+    EXTERNAL_API_CONTRACT,
+    TEST_STRATEGY,
     INDEX,
 }
 
