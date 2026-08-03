@@ -374,10 +374,10 @@ internal class DefaultDocumentationGenerationWorkflow(
         else -> null
     }
 
-    private fun markdownItems(content: String, heading: String): List<String> {
+    internal fun markdownItems(content: String, heading: String): List<String> {
         val match = Regex("(?ms)^## ${Regex.escape(heading)}\\s*\\n(.*?)(?=^## |\\z)").find(content) ?: return emptyList()
-        return Regex("(?m)^-\\s+(.+)$").findAll(match.groupValues[1]).map { it.groupValues[1].trim() }
-            .filter { it != "None" }.take(50).toList()
+        return Regex("(?m)^-\\s+`+([^`\\n]+)`+").findAll(match.groupValues[1]).map { it.groupValues[1].trim() }
+            .distinct().take(50).toList()
     }
 
     internal fun canonicalNarrative(content: String): String {

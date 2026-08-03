@@ -178,7 +178,10 @@ public class ProjectSpecificationMarkdownRenderer :
     ): String = when (descriptor.kind) {
         DocumentationArtifactKind.INDEX -> buildIndex(specification)
         DocumentationArtifactKind.PROJECT_OVERVIEW -> buildMarkdown(
-            specification.copy(modules = emptyList(), packages = emptyList(), components = emptyList()),
+            specification.copy(
+                modules = emptyList(), packages = emptyList(), components = emptyList(),
+                evidence = emptyList(), unresolved = emptyList(),
+            ),
         )
         DocumentationArtifactKind.MODULE -> {
             val id = descriptor.scopeIds.single()

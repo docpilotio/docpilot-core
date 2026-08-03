@@ -14,6 +14,7 @@ import io.docpilot.core.model.RelationshipSpecification
 import io.docpilot.core.model.UnresolvedItem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ProjectSpecificationMarkdownRendererTest {
@@ -72,6 +73,21 @@ class ProjectSpecificationMarkdownRendererTest {
         assertTrue(content.contains("## Relationships\n\n- None"))
         assertTrue(content.contains("## Evidence\n\n- None"))
         assertTrue(content.contains("## Unresolved\n\n- None"))
+    }
+
+    @Test
+    fun `project overview does not duplicate the full Evidence and Unresolved catalog already in the Evidence artifact`() {
+        val artifacts = renderer.render(fullSpecification())
+        val projectOverview = artifacts.single { it.relativePath == "docs/specification/project.md" }
+        val evidenceArtifact = artifacts.single { it.relativePath == "docs/specification/evidence.md" }
+
+        assertTrue(projectOverview.content.contains("## Evidence\n\n- None"), projectOverview.content)
+        assertTrue(projectOverview.content.contains("## Unresolved\n\n- None"), projectOverview.content)
+        assertFalse(projectOverview.content.contains("evidence:type"), projectOverview.content)
+        assertFalse(projectOverview.content.contains("unresolved:role"), projectOverview.content)
+
+        assertTrue(evidenceArtifact.content.contains("evidence:type"), evidenceArtifact.content)
+        assertTrue(evidenceArtifact.content.contains("unresolved:role"), evidenceArtifact.content)
     }
 
     @Test

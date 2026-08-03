@@ -139,6 +139,20 @@ curation decision made in one CLI invocation is honored by a later one without r
 Verified with both automated tests (565 tests, 0 failures) and real-project smoke tests (Part A with
 a real Ollama model, Part B's persistence loop confirmed across separate CLI invocations).
 
+RFC-0085 (Evidence-Scoped Documentation Enrichment Prompts) fixes the prompt-size bug flagged (but not
+yet fully diagnosed) in RFC-0083/0084's real-model smoke testing — **implemented** as of 2026-08-03.
+Two remaining causes, on top of the `canonicalNarrative()` leak already fixed in commit `6e13bb2`:
+(1) `ProjectSpecificationMarkdownRenderer`'s `PROJECT_OVERVIEW` branch was the one renderer branch
+that did not clear `evidence`/`unresolved` from its `ProjectSpecification` copy, so `project.md`
+duplicated the project's entire Evidence catalog (1195 items on a real `architecture-samples` run)
+that already lives in the dedicated `evidence.md` artifact; (2) `markdownItems()` extracted full
+descriptive Evidence/Unresolved bullets (summary, type, confidence, file, line, symbol) into
+`evidenceRefs`/`unresolvedRefs` instead of just the stable-ID reference those fields are named for,
+which a small local model misread as directives rather than facts. Both fixed at the source; no DIR,
+Snapshot, Bundle, or CLI-surface change. See
+`docs/rfc/RFC-0085-Evidence-Scoped-Documentation-Enrichment-Prompts.md`.
+Verified with automated tests (573 tests, 0 failures).
+
 The Product Owner fixed this numbering, order, and scope boundary in
 `docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,
 data contracts, Acceptance Criteria, and verification methods are approved when each RFC starts.
