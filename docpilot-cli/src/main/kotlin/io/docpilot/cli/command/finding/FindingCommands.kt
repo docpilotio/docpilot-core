@@ -19,6 +19,9 @@ import io.docpilot.core.documentation.backlog.ProductizationRoadmapBuilder
 import io.docpilot.core.documentation.backlog.ProductizationRoadmapCurator
 import io.docpilot.core.documentation.backlog.ProductizationRoadmapMarkdownRenderer
 import io.docpilot.core.documentation.backlog.renderCuration
+import io.docpilot.core.documentation.finding.FindingProposalBuilder
+import io.docpilot.core.documentation.finding.FindingProposalRequestBuilder
+import io.docpilot.core.documentation.finding.ProposedFinding
 import io.docpilot.core.documentation.synthesis.SynthesisEngine
 import io.docpilot.core.documentation.synthesis.SynthesisSource
 import io.docpilot.core.incremental.specification.review.DocumentationReviewDecision
@@ -32,6 +35,7 @@ import io.docpilot.core.specification.finding.FindingSeverity
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 
 /**
  * RFC-0083: CLI wiring for RFC-0078 (Finding), RFC-0079 (Synthesis/Advisory tier), RFC-0080
@@ -69,6 +73,68 @@ internal class FindingCommands(
         }
         emit(FindingsJsonCodec.encodeFindings(findings), args.required("output"))
         log.info("Findings validation completed: ${findings.size} Finding(s) validated.")
+    }
+
+    fun proposeFindings(args: CliArguments) {
+        val project = Path.of(args.required("project"))
+        val log = ProjectLogSession.create(project)
+        log.info("Finding proposal drafting started for ${project.toAbsolutePath().normalize()}.")
+        val specification = specification(project)
+        val providerId = args.required("provider")
+        val model = args.required("model")
+        val limit = args.optional("limit")?.let {
+            it.toIntOrNull()?.takeIf { n -> n > 0 } ?: throw IllegalArgumentException("--limit must be a positive integer.")
+        } ?: DEFAULT_PROPOSAL_LIMIT
+        val requestedIds = args.optional("artifact")?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }?.toSet()
+        val byId = specification.components.associateBy { it.id }
+        val selected = if (requestedIds != null) {
+            val unknown = requestedIds - byId.keys
+            require(unknown.isEmpty()) { "Unknown component id(s): ${unknown.sorted().joinToString()}" }
+            requestedIds.map { byId.getValue(it) }.sortedBy { it.id }
+        } else {
+            specification.components.filter { it.evidenceRefs.isNotEmpty() }.sortedBy { it.id }.take(limit)
+        }
+        require(selected.size >= 2) {
+            "Finding proposal requires at least two components with Evidence; found ${selected.size}."
+        }
+
+        val sources = selected.map { component ->
+            SynthesisSource(
+                artifactId = component.id,
+                sourceKind = component.kind,
+                sourceModelStableIds = listOf(component.id),
+                evidenceRefs = component.evidenceRefs.sorted().take(MAX_EVIDENCE_REFS_PER_COMPONENT),
+            )
+        }
+        // Deliberately compact: id/kind/name/count only, never full raw Evidence text — see RFC-0084's
+        // "Part A" design notes on the oversized-prompt bug found while smoke-testing RFC-0083.
+        val canonicalFacts = selected.joinToString("\n") { "${it.id} | ${it.kind} | ${it.name} | evidenceCount=${it.evidenceRefs.size}" }
+
+        val engine = SynthesisEngine(log.logging(bootstrap.createProvider(providerId)))
+        val request = FindingProposalRequestBuilder.request(sources, canonicalFacts, providerId, model)
+        val result = engine.synthesize(specification, request)
+        val proposals = FindingProposalBuilder.build(result, allowedSubjectIds = selected.mapTo(mutableSetOf()) { it.id })
+            ?: throw IllegalStateException(
+                "Finding proposal drafting did not produce a usable batch (${result.record.status}${result.record.diagnostic?.let { ": $it" }.orEmpty()}).",
+            )
+
+        val byComponentId = selected.associateBy { it.id }
+        val usedKeys = mutableSetOf<String>()
+        val inputs = proposals.map { proposal ->
+            val component = byComponentId.getValue(proposal.subjectStableId)
+            FindingInput(
+                subjectStableId = proposal.subjectStableId,
+                semanticKey = uniqueSemanticKey(proposal, usedKeys),
+                category = proposal.category,
+                severity = proposal.severity.name,
+                summary = proposal.summary,
+                evidenceRefs = component.evidenceRefs,
+                unresolvedRefs = emptySet(),
+            )
+        }
+        emit(FindingsJsonCodec.encodeFindingInputs(inputs), args.required("output"))
+        printer.content("Proposed ${inputs.size} candidate Finding(s).")
+        log.info("Finding proposal drafting completed: ${inputs.size} candidate(s).")
     }
 
     fun knownIssues(args: CliArguments) {
@@ -190,5 +256,21 @@ internal class FindingCommands(
     private fun emit(content: String, output: String) {
         val path = writer.write(Path.of(output), content)
         printer.success("Generated $path")
+    }
+
+    private fun uniqueSemanticKey(proposal: ProposedFinding, used: MutableSet<String>): String {
+        val base = "${proposal.category.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')}-${sha256(proposal.summary).take(8)}"
+        var key = base
+        var suffix = 2
+        while (!used.add(key)) { key = "$base-$suffix"; suffix++ }
+        return key
+    }
+
+    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
+
+    private companion object {
+        const val DEFAULT_PROPOSAL_LIMIT = 20
+        const val MAX_EVIDENCE_REFS_PER_COMPONENT = 20
     }
 }

@@ -154,6 +154,62 @@ class FindingCommandsTest {
     }
 
     @Test
+    fun `propose-findings surfaces a rejection instead of writing partial output`() {
+        val project = realKotlinProject()
+        val output = project.resolve("out/candidates.json")
+
+        val exception = assertFailsWith<IllegalStateException> {
+            commands().proposeFindings(cliArgs(
+                "project" to project.toString(), "provider" to "fixture", "model" to "fixture-model",
+                "output" to output.toString(),
+            ))
+        }
+        assertTrue(exception.message!!.contains("did not produce a usable batch"), exception.message!!)
+        assertTrue(Files.notExists(output))
+    }
+
+    @Test
+    fun `propose-findings rejects an unknown --artifact id`() {
+        val project = realKotlinProject()
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            commands().proposeFindings(cliArgs(
+                "project" to project.toString(), "provider" to "fixture", "model" to "fixture-model",
+                "artifact" to "component:does-not-exist", "output" to project.resolve("out/candidates.json").toString(),
+            ))
+        }
+        assertTrue(exception.message!!.contains("Unknown component id"), exception.message!!)
+    }
+
+    @Test
+    fun `propose-findings rejects a non-positive --limit`() {
+        val project = realKotlinProject()
+
+        assertFailsWith<IllegalArgumentException> {
+            commands().proposeFindings(cliArgs(
+                "project" to project.toString(), "provider" to "fixture", "model" to "fixture-model",
+                "limit" to "0", "output" to project.resolve("out/candidates.json").toString(),
+            ))
+        }
+    }
+
+    @Test
+    fun `propose-findings requires at least two selected components`() {
+        val project = createTempDirectory("docpilot-finding-single-component")
+        val sourceFile = project.resolve("src/main/kotlin/com/example/Solo.kt")
+        Files.createDirectories(sourceFile.parent)
+        sourceFile.writeText("package com.example\n\nclass Solo\n")
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            commands().proposeFindings(cliArgs(
+                "project" to project.toString(), "provider" to "fixture", "model" to "fixture-model",
+                "output" to project.resolve("out/candidates.json").toString(),
+            ))
+        }
+        assertTrue(exception.message!!.contains("at least two components"), exception.message!!)
+    }
+
+    @Test
     fun `GenerateCommand dispatches known-issues to FindingCommands`() {
         val project = createTempDirectory("docpilot-finding-project")
         val findingsFile = tempFile(FindingsJsonCodec.encodeFindings(sampleFindings()))
@@ -182,6 +238,17 @@ class FindingCommandsTest {
 
     private fun realKotlinProject(): Path {
         val project = createTempDirectory("docpilot-finding-project")
+        val otherFile = project.resolve("src/main/kotlin/com/example/Other.kt")
+        Files.createDirectories(otherFile.parent)
+        otherFile.writeText(
+            """
+            package com.example
+
+            class Other {
+                fun greet(): String = "hi"
+            }
+            """.trimIndent(),
+        )
         val sourceFile = project.resolve("src/main/kotlin/com/example/Sample.kt")
         Files.createDirectories(sourceFile.parent)
         sourceFile.writeText(

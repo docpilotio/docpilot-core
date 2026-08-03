@@ -28,6 +28,8 @@ internal data class FindingInput(
  * shared/reused one.
  */
 internal object FindingsJsonCodec {
+    fun encodeFindingInputs(inputs: List<FindingInput>): String = array(inputs.map(::encodeFindingInput))
+
     fun decodeFindingInputs(json: String): List<FindingInput> =
         JsonParser(json).parseRootArray().mapIndexed { index, value ->
             val o = value.asObject("Finding input at index $index")
@@ -85,6 +87,16 @@ internal object FindingsJsonCodec {
             record = decodeRecord(o.requiredObject("record")),
         )
     }
+
+    private fun encodeFindingInput(v: FindingInput): String = obj(
+        "subjectStableId" to str(v.subjectStableId),
+        "semanticKey" to str(v.semanticKey),
+        "category" to str(v.category),
+        "severity" to str(v.severity),
+        "summary" to str(v.summary),
+        "evidenceRefs" to strings(v.evidenceRefs),
+        "unresolvedRefs" to strings(v.unresolvedRefs),
+    )
 
     private fun encodeFinding(v: Finding): String = obj(
         "formatVersion" to v.formatVersion.toString(),

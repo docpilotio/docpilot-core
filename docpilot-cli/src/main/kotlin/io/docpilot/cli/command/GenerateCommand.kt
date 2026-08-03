@@ -34,6 +34,7 @@ class GenerateCommand internal constructor(
                 "adr" -> adr(CliArguments.parse(args.drop(1)))
                 "specification" -> specification(CliArguments.parse(args.drop(1)))
                 "findings" -> findingCommands.findings(CliArguments.parse(args.drop(1)))
+                "propose-findings" -> findingCommands.proposeFindings(CliArguments.parse(args.drop(1)))
                 "known-issues" -> findingCommands.knownIssues(CliArguments.parse(args.drop(1)))
                 "roadmap" -> findingCommands.roadmap(CliArguments.parse(args.drop(1)))
                 "executive-summary" -> findingCommands.executiveSummary(CliArguments.parse(args.drop(1)))

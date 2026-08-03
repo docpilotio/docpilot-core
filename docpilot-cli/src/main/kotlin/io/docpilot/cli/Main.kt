@@ -40,6 +40,7 @@ private fun printUsage() {
             [--enrich --provider <id> --model <model> [--enrichment-target <artifact-or-section>]]
           docpilot bundle verify --bundle <bundle-root-or-manifest> [--strict] [--json]
           docpilot generate adr --project <path> --provider <id> --model <model> --title <title> --context <text> --decision <text> --consequences <text> [--alternatives <text>] [--status <status>] [--output <file>]
+          docpilot generate propose-findings --project <path> --provider <id> --model <model> [--artifact <id>[,<id>...]] [--limit <n>] --output <file>
           docpilot generate findings --project <path> --input <file> --output <file>
           docpilot generate known-issues --project <path> --findings <file> --output <file>
           docpilot generate roadmap --project <path> --findings <file> --output <file> [--decisions <file>]
