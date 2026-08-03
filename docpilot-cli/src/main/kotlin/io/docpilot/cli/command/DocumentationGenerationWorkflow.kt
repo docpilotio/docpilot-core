@@ -380,9 +380,11 @@ internal class DefaultDocumentationGenerationWorkflow(
             .filter { it != "None" }.take(50).toList()
     }
 
-    private fun canonicalNarrative(content: String): String = content.lineSequence()
-        .filterNot { it.startsWith("## Evidence") || it.startsWith("## Unresolved") }
-        .take(80).joinToString("\n").take(4_000)
+    internal fun canonicalNarrative(content: String): String {
+        val withoutEvidenceAndUnresolved = Regex("(?ms)^## (Evidence|Unresolved)\\s*\\n.*?(?=^## |\\z)").replace(content, "")
+        return withoutEvidenceAndUnresolved.lineSequence().filterNot { it.isBlank() }
+            .take(80).joinToString("\n").take(4_000)
+    }
 
     private fun loadCachedEnrichment(output: Path, relativePath: String,
         request: DocumentationEnrichmentRequest): DocumentationEnrichmentResult? {

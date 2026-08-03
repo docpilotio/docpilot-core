@@ -110,6 +110,19 @@ See `docs/rfc/RFC-0077-...md` through `docs/rfc/RFC-0082-...md` for each RFC's d
 unaffected — both were explicit, approved dependency skips recorded in RFC-0072's and RFC-0082's
 "Depends on" sections respectively.
 
+RFC-0083 (CLI Wiring for Findings, Advisory Documents, and Documentation Logging) is a follow-on
+to this track — **implemented** as of 2026-08-03. RFC-0078–0082 were deliberately core-library-only
+with no CLI entry point; RFC-0083 adds six `docpilot generate <noun>` subcommands (`findings`,
+`known-issues`, `roadmap`, `executive-summary`, `adr-propose`, `adr-adopt`) that wire those
+capabilities into the CLI as standalone commands (not folded into `generate docs`'s Bundle/Manifest
+pipeline), and gives `generate docs` the same `ProjectLogSession` AI-call logging that
+`architecture`/`adr`/`specification` already had. See
+`docs/rfc/RFC-0083-CLI-Wiring-for-Findings-Advisory-Documents-and-Documentation-Logging.md`.
+Verified against a real Ollama-backed run on an isolated `architecture-samples` copy in addition to
+the automated test suite (530 tests, 0 failures). Explicitly out of scope, left for a future RFC: a
+Finding auto-extraction pipeline (Findings are still hand-authored JSON, only validated by the CLI)
+and persistence of curation decisions/proposals outside caller-managed files.
+
 The Product Owner fixed this numbering, order, and scope boundary in
 `docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,
 data contracts, Acceptance Criteria, and verification methods are approved when each RFC starts.
