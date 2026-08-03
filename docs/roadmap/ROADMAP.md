@@ -123,6 +123,22 @@ the automated test suite (530 tests, 0 failures). Explicitly out of scope, left 
 Finding auto-extraction pipeline (Findings are still hand-authored JSON, only validated by the CLI)
 and persistence of curation decisions/proposals outside caller-managed files.
 
+RFC-0084 (AI-Proposed Finding Extraction and Persisted Finding/Curation Registry) closes both of
+those gaps — **implemented** as of 2026-08-03, in two parts. Part A adds `generate propose-findings`,
+which asks an AI model to propose candidate Findings for a batch of components (fail-closed parsed,
+hallucinated subject ids rejected, prompt deliberately compact to avoid a prompt-size bug found while
+smoke-testing RFC-0083) and emits them in the exact JSON shape `generate findings --input` already
+validates — no new "adopt" command, the existing validator is the human-gated safety net. Part B adds
+a core-library persisted Finding/curation registry (`.docpilot/findings/registry.json` +
+`decisions.json`), modeled on `FileReviewBundleRepository`'s file-handling shape but with new domain
+types (that repository's Markdown-patch domain types don't fit Finding-shaped data); `generate
+findings` now auto-merges into the registry, and `known-issues`/`roadmap`/`executive-summary`/
+`adr-propose` gain `--findings-registry` while `roadmap`/`adr-adopt` gain `--decisions-registry`, so a
+curation decision made in one CLI invocation is honored by a later one without re-supplying it. See
+`docs/rfc/RFC-0084-AI-Proposed-Finding-Extraction-and-Persisted-Finding-Curation-Registry.md`.
+Verified with both automated tests (565 tests, 0 failures) and real-project smoke tests (Part A with
+a real Ollama model, Part B's persistence loop confirmed across separate CLI invocations).
+
 The Product Owner fixed this numbering, order, and scope boundary in
 `docs/planning/RFC-0064-RFC-0074-FIRST-PRODUCT-DEVELOPMENT-ROADMAP.md`. Individual RFC design,
 data contracts, Acceptance Criteria, and verification methods are approved when each RFC starts.
