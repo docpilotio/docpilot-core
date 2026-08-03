@@ -1,6 +1,7 @@
 package io.docpilot.cli.command
 
 import io.docpilot.cli.bootstrap.ProjectKnowledgeLoader
+import io.docpilot.cli.logging.ProjectLogSession
 import io.docpilot.core.api.DocumentationArtifactDescriptor
 import io.docpilot.core.api.DocumentationArtifactId
 import io.docpilot.core.api.DocumentationArtifactKind
@@ -36,17 +37,24 @@ internal class DefaultDocumentationGenerationWorkflow(
     private val knowledgeLoader: ProjectKnowledgeLoader = ProjectKnowledgeLoader(),
     private val providerResolver: (String) -> AiProvider = { throw IllegalArgumentException("AI provider '$it' was not found.") },
 ) : DocumentationGenerationWorkflow {
-    override fun execute(options: DocumentationGenerationOptions): DocumentationGenerationResult = try {
-        prepareAndExecute(options)
-    } catch (e: DocumentationGenerationConflict) {
-        failure(options, DocumentationGenerationStatus.CONFLICT, e.message.orEmpty())
-    } catch (e: IllegalArgumentException) {
-        failure(options, DocumentationGenerationStatus.BLOCKED, e.message.orEmpty())
-    } catch (e: Exception) {
-        failure(options, DocumentationGenerationStatus.FAILED, e.message ?: "Documentation generation failed.")
+    override fun execute(options: DocumentationGenerationOptions): DocumentationGenerationResult {
+        val project = options.projectRoot.toAbsolutePath().normalize()
+        val log = if (Files.isDirectory(project)) ProjectLogSession.create(project) else null
+        log?.info("Documentation generation started for $project.")
+        val result = try {
+            prepareAndExecute(options, log)
+        } catch (e: DocumentationGenerationConflict) {
+            failure(options, DocumentationGenerationStatus.CONFLICT, e.message.orEmpty())
+        } catch (e: IllegalArgumentException) {
+            failure(options, DocumentationGenerationStatus.BLOCKED, e.message.orEmpty())
+        } catch (e: Exception) {
+            failure(options, DocumentationGenerationStatus.FAILED, e.message ?: "Documentation generation failed.")
+        }
+        log?.info("Documentation generation completed: ${result.status}.")
+        return result
     }
 
-    private fun prepareAndExecute(options: DocumentationGenerationOptions): DocumentationGenerationResult {
+    private fun prepareAndExecute(options: DocumentationGenerationOptions, log: ProjectLogSession?): DocumentationGenerationResult {
         val project = options.projectRoot.toAbsolutePath().normalize()
         val output = options.outputRoot.toAbsolutePath().normalize()
         require(Files.isDirectory(project)) { "Project path is not a directory: $project" }
@@ -89,7 +97,8 @@ internal class DefaultDocumentationGenerationWorkflow(
         if (options.enrich) {
             val providerId = requireNotNull(options.provider)
             val model = requireNotNull(options.model)
-            val engine = DocumentationEnrichmentEngine(providerResolver(providerId))
+            val provider = providerResolver(providerId)
+            val engine = DocumentationEnrichmentEngine(log?.logging(provider) ?: provider)
             rendered = rendered.map { artifact ->
                 val descriptor = selected.first { safeRelativePath(it.relativePath) == safeRelativePath(artifact.relativePath) }
                 val type = documentType(descriptor.kind)

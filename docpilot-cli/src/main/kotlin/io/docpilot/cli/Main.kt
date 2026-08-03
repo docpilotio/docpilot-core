@@ -40,6 +40,12 @@ private fun printUsage() {
             [--enrich --provider <id> --model <model> [--enrichment-target <artifact-or-section>]]
           docpilot bundle verify --bundle <bundle-root-or-manifest> [--strict] [--json]
           docpilot generate adr --project <path> --provider <id> --model <model> --title <title> --context <text> --decision <text> --consequences <text> [--alternatives <text>] [--status <status>] [--output <file>]
+          docpilot generate findings --project <path> --input <file> --output <file>
+          docpilot generate known-issues --project <path> --findings <file> --output <file>
+          docpilot generate roadmap --project <path> --findings <file> --output <file> [--decisions <file>]
+          docpilot generate executive-summary --project <path> --findings <file> --provider <id> --model <model> --output <file>
+          docpilot generate adr-propose --project <path> --findings <file> --provider <id> --model <model> --output <file>
+          docpilot generate adr-adopt --proposal <file> --decision accept|reject [--comment <text>] [--project <path>] --output <file>
           docpilot review prepare --project <path> --documentation <file> --provider <id> --model <model> [--bundle <file>] [--json]
           docpilot review inspect|status --project <path> (--proposal <id> | --bundle <file>) [--documentation <file>] [--json]
           docpilot review decide --project <path> (--proposal <id> | --bundle <file>) --target <id> (--accept | --reject) [--comment <text> | --comment-file <file>] [--payload-sha256 <sha>] [--json]

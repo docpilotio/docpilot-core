@@ -2,6 +2,7 @@ package io.docpilot.cli.command
 
 import io.docpilot.cli.bootstrap.CliBootstrap
 import io.docpilot.cli.bootstrap.ProjectKnowledgeLoader
+import io.docpilot.cli.command.finding.FindingCommands
 import io.docpilot.cli.io.ConsolePrinter
 import io.docpilot.cli.io.OutputWriter
 import io.docpilot.cli.logging.ProjectLogSession
@@ -22,6 +23,7 @@ class GenerateCommand internal constructor(
     private val documentationWorkflow: DocumentationGenerationWorkflow = DefaultDocumentationGenerationWorkflow(
         providerResolver = { bootstrap.createProvider(it) },
     ),
+    private val findingCommands: FindingCommands = FindingCommands(bootstrap, knowledgeLoader, writer, printer),
 ) {
     fun execute(args: List<String>): Int =
         try {
@@ -31,6 +33,12 @@ class GenerateCommand internal constructor(
                 "architecture" -> architecture(CliArguments.parse(args.drop(1)))
                 "adr" -> adr(CliArguments.parse(args.drop(1)))
                 "specification" -> specification(CliArguments.parse(args.drop(1)))
+                "findings" -> findingCommands.findings(CliArguments.parse(args.drop(1)))
+                "known-issues" -> findingCommands.knownIssues(CliArguments.parse(args.drop(1)))
+                "roadmap" -> findingCommands.roadmap(CliArguments.parse(args.drop(1)))
+                "executive-summary" -> findingCommands.executiveSummary(CliArguments.parse(args.drop(1)))
+                "adr-propose" -> findingCommands.adrPropose(CliArguments.parse(args.drop(1)))
+                "adr-adopt" -> findingCommands.adrAdopt(CliArguments.parse(args.drop(1)))
                 else -> throw IllegalArgumentException("Unknown generation type: ${args.first()}")
             }
             0
