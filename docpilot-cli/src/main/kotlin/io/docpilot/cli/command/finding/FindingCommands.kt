@@ -26,11 +26,15 @@ import io.docpilot.core.documentation.synthesis.SynthesisEngine
 import io.docpilot.core.documentation.synthesis.SynthesisSource
 import io.docpilot.core.incremental.specification.review.DocumentationReviewDecision
 import io.docpilot.core.incremental.specification.review.DocumentationReviewDisposition
+import io.docpilot.core.loader.LocalProjectLoader
 import io.docpilot.core.model.ProjectSpecification
 import io.docpilot.core.specification.DefaultSpecificationBuilder
 import io.docpilot.core.specification.SpecificationBuildRequest
+import io.docpilot.core.specification.finding.FileCurationDecisionRegistryRepository
+import io.docpilot.core.specification.finding.FileFindingRegistryRepository
 import io.docpilot.core.specification.finding.Finding
 import io.docpilot.core.specification.finding.FindingFactory
+import io.docpilot.core.specification.finding.FindingRegistryLoadResult
 import io.docpilot.core.specification.finding.FindingSeverity
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -71,8 +75,12 @@ internal class FindingCommands(
                 throw IllegalArgumentException("Finding input at index $index is invalid: ${exception.message}")
             }
         }
+        val outputPath = Path.of(args.required("output"))
         emit(FindingsJsonCodec.encodeFindings(findings), args.required("output"))
-        log.info("Findings validation completed: ${findings.size} Finding(s) validated.")
+        val registryRoot = requireNotNull(outputPath.toAbsolutePath().normalize().parent) { "--output must have a parent directory." }
+        val merged = FileFindingRegistryRepository(registryRoot).merge(specification.project.id, findings)
+        printer.content("Finding registry now holds ${merged.size} Finding(s) at $registryRoot.")
+        log.info("Findings validation completed: ${findings.size} Finding(s) validated, ${merged.size} in the registry.")
     }
 
     fun proposeFindings(args: CliArguments) {
@@ -141,7 +149,7 @@ internal class FindingCommands(
         val project = Path.of(args.required("project"))
         val log = ProjectLogSession.create(project)
         log.info("Known Issues Register generation started for ${project.toAbsolutePath().normalize()}.")
-        val findings = readFindings(args.required("findings"))
+        val findings = resolveFindings(args, projectId(project))
         val document = KnownIssuesRegisterBuilder.build(findings)
         emit(KnownIssuesRegisterMarkdownRenderer.render(document, findings), args.required("output"))
         log.info("Known Issues Register generation completed.")
@@ -151,12 +159,21 @@ internal class FindingCommands(
         val project = Path.of(args.required("project"))
         val log = ProjectLogSession.create(project)
         log.info("Productization Roadmap generation started for ${project.toAbsolutePath().normalize()}.")
-        val findings = readFindings(args.required("findings"))
+        val id = projectId(project)
+        val findings = resolveFindings(args, id)
         val document = ProductizationRoadmapBuilder.build(findings)
-        val rendered = args.optional("decisions")?.let { decisionsPath ->
-            val decisions = FindingsJsonCodec.decodeDecisions(readFile(decisionsPath))
+        val decisionsFromFile = args.optional("decisions")?.let { FindingsJsonCodec.decodeDecisions(readFile(it)) }
+        val decisionsRegistryRoot = args.optional("decisions-registry")
+        val rendered = if (decisionsFromFile != null || decisionsRegistryRoot != null) {
+            val decisions = if (decisionsRegistryRoot != null) {
+                FileCurationDecisionRegistryRepository(Path.of(decisionsRegistryRoot)).merge(id, decisionsFromFile.orEmpty())
+            } else {
+                decisionsFromFile!!
+            }
             ProductizationRoadmapMarkdownRenderer.renderCuration(ProductizationRoadmapCurator.apply(document, decisions))
-        } ?: ProductizationRoadmapMarkdownRenderer.render(document)
+        } else {
+            ProductizationRoadmapMarkdownRenderer.render(document)
+        }
         emit(rendered, args.required("output"))
         log.info("Productization Roadmap generation completed.")
     }
@@ -166,7 +183,7 @@ internal class FindingCommands(
         val log = ProjectLogSession.create(project)
         log.info("Executive Summary synthesis started for ${project.toAbsolutePath().normalize()}.")
         val specification = specification(project)
-        val findings = readFindings(args.required("findings"))
+        val findings = resolveFindings(args, specification.project.id)
         val providerId = args.required("provider")
         val model = args.required("model")
         val engine = SynthesisEngine(log.logging(bootstrap.createProvider(providerId)))
@@ -184,7 +201,7 @@ internal class FindingCommands(
         val log = ProjectLogSession.create(project)
         log.info("AI-Proposed ADR drafting started for ${project.toAbsolutePath().normalize()}.")
         val specification = specification(project)
-        val findings = readFindings(args.required("findings"))
+        val findings = resolveFindings(args, specification.project.id)
         val providerId = args.required("provider")
         val model = args.required("model")
         val engine = SynthesisEngine(log.logging(bootstrap.createProvider(providerId)))
@@ -209,6 +226,11 @@ internal class FindingCommands(
         val decision = DocumentationReviewDecision(
             targetId = proposal.proposalId, disposition = disposition, comment = args.optional("comment"),
         )
+        args.optional("decisions-registry")?.let { registryRoot ->
+            val project = args.optional("project")
+                ?: throw IllegalArgumentException("--decisions-registry requires --project.")
+            FileCurationDecisionRegistryRepository(Path.of(registryRoot)).merge(projectId(Path.of(project)), listOf(decision))
+        }
         log?.info("ADR proposal ${proposal.proposalId} decision recorded: $disposition.")
         if (disposition == DocumentationReviewDisposition.REJECTED) {
             printer.content("Proposal rejected; no document produced.")
@@ -223,10 +245,27 @@ internal class FindingCommands(
         return DefaultSpecificationBuilder().build(SpecificationBuildRequest(analysis.project, analysis.knowledge, analysis.sourceIndex))
     }
 
-    private fun readFindings(path: String): List<Finding> {
-        val decoded = FindingsJsonCodec.decodeFindings(readFile(path))
-        require(decoded.isNotEmpty()) { "Findings file must contain at least one Finding." }
-        return decoded
+    private fun projectId(project: Path): String = LocalProjectLoader().load(project).name.lowercase()
+
+    private fun resolveFindings(args: CliArguments, projectId: String): List<Finding> {
+        val filePath = args.optional("findings")
+        val registryRoot = args.optional("findings-registry")
+        require((filePath == null) != (registryRoot == null)) {
+            "Exactly one of --findings or --findings-registry is required."
+        }
+        val findings = if (filePath != null) {
+            FindingsJsonCodec.decodeFindings(readFile(filePath))
+        } else {
+            when (val loaded = FileFindingRegistryRepository(Path.of(registryRoot!!)).load(projectId)) {
+                is FindingRegistryLoadResult.Valid -> loaded.registry.findings
+                FindingRegistryLoadResult.NotFound ->
+                    throw IllegalArgumentException("No Finding registry found at $registryRoot for project '$projectId'.")
+                is FindingRegistryLoadResult.Invalid ->
+                    throw IllegalStateException("Finding registry is invalid: ${loaded.message}")
+            }
+        }
+        require(findings.isNotEmpty()) { "Findings must contain at least one Finding." }
+        return findings
     }
 
     private fun readFile(path: String): String = Files.readString(Path.of(path), StandardCharsets.UTF_8)

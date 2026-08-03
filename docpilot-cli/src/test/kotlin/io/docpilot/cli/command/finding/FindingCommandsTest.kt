@@ -6,12 +6,16 @@ import io.docpilot.cli.command.GenerateCommand
 import io.docpilot.cli.io.ConsolePrinter
 import io.docpilot.core.incremental.specification.review.DocumentationReviewDecision
 import io.docpilot.core.incremental.specification.review.DocumentationReviewDisposition
+import io.docpilot.core.loader.LocalProjectLoader
 import io.docpilot.core.model.EvidenceConfidence
 import io.docpilot.core.model.ProjectSpecification
 import io.docpilot.core.specification.DefaultSpecificationBuilder
 import io.docpilot.core.specification.SpecificationBuildRequest
+import io.docpilot.core.specification.finding.FileCurationDecisionRegistryRepository
+import io.docpilot.core.specification.finding.FileFindingRegistryRepository
 import io.docpilot.core.specification.finding.Finding
 import io.docpilot.core.specification.finding.FindingId
+import io.docpilot.core.specification.finding.FindingRegistryLoadResult
 import io.docpilot.core.specification.finding.FindingSeverity
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -22,6 +26,7 @@ import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FindingCommandsTest {
@@ -207,6 +212,130 @@ class FindingCommandsTest {
             ))
         }
         assertTrue(exception.message!!.contains("at least two components"), exception.message!!)
+    }
+
+    @Test
+    fun `findings persists validated findings into the registry and accumulates across runs`() {
+        val project = realKotlinProject()
+        val evidenceId = firstNonLowConfidenceEvidenceId(project)
+        val outputDir = createTempDirectory("docpilot-registry-out")
+        val output = outputDir.resolve("findings.json")
+
+        commands().findings(cliArgs(
+            "project" to project.toString(),
+            "input" to tempFile(
+                """[{"subjectStableId": "component:A", "semanticKey": "k1", "category": "reliability",
+                    "severity": "HIGH", "summary": "First issue found here.", "evidenceRefs": ["$evidenceId"]}]""",
+            ).toString(),
+            "output" to output.toString(),
+        ))
+        commands().findings(cliArgs(
+            "project" to project.toString(),
+            "input" to tempFile(
+                """[{"subjectStableId": "component:B", "semanticKey": "k2", "category": "reliability",
+                    "severity": "LOW", "summary": "Second issue found here.", "evidenceRefs": ["$evidenceId"]}]""",
+            ).toString(),
+            "output" to output.toString(),
+        ))
+
+        val projectId = LocalProjectLoader().load(project).name.lowercase()
+        val loaded = FileFindingRegistryRepository(outputDir).load(projectId)
+        assertIs<FindingRegistryLoadResult.Valid>(loaded)
+        assertEquals(2, loaded.registry.findings.size)
+    }
+
+    @Test
+    fun `known-issues reads from --findings-registry`() {
+        val project = createTempDirectory("docpilot-finding-project")
+        val registryRoot = createTempDirectory("docpilot-registry-out")
+        val projectId = LocalProjectLoader().load(project).name.lowercase()
+        FileFindingRegistryRepository(registryRoot).merge(projectId, sampleFindings())
+        val output = registryRoot.resolve("known-issues.md")
+
+        commands().knownIssues(cliArgs(
+            "project" to project.toString(), "findings-registry" to registryRoot.toString(), "output" to output.toString(),
+        ))
+
+        assertTrue(Files.readString(output).contains("critical summary"))
+    }
+
+    @Test
+    fun `requires exactly one of --findings or --findings-registry`() {
+        val project = createTempDirectory("docpilot-finding-project")
+        val output = project.resolve("out/known-issues.md")
+
+        assertFailsWith<IllegalArgumentException> {
+            commands().knownIssues(cliArgs("project" to project.toString(), "output" to output.toString()))
+        }
+
+        val findingsFile = tempFile(FindingsJsonCodec.encodeFindings(sampleFindings()))
+        val registryRoot = createTempDirectory("docpilot-registry-out")
+        FileFindingRegistryRepository(registryRoot).merge("x", sampleFindings())
+        assertFailsWith<IllegalArgumentException> {
+            commands().knownIssues(cliArgs(
+                "project" to project.toString(), "findings" to findingsFile.toString(),
+                "findings-registry" to registryRoot.toString(), "output" to output.toString(),
+            ))
+        }
+    }
+
+    @Test
+    fun `roadmap --decisions-registry persists decisions and a later run honors them without re-supplying --decisions`() {
+        val project = createTempDirectory("docpilot-finding-project")
+        val findings = sampleFindings()
+        val findingsFile = tempFile(FindingsJsonCodec.encodeFindings(findings))
+        val registryRoot = createTempDirectory("docpilot-registry-out")
+
+        commands().roadmap(cliArgs(
+            "project" to project.toString(), "findings" to findingsFile.toString(),
+            "decisions" to tempFile(FindingsJsonCodec.encodeDecisions(listOf(
+                DocumentationReviewDecision(findings[0].id.value, DocumentationReviewDisposition.ACCEPTED),
+            ))).toString(),
+            "decisions-registry" to registryRoot.toString(),
+            "output" to registryRoot.resolve("roadmap-1.md").toString(),
+        ))
+
+        val secondOutput = registryRoot.resolve("roadmap-2.md")
+        commands().roadmap(cliArgs(
+            "project" to project.toString(), "findings" to findingsFile.toString(),
+            "decisions-registry" to registryRoot.toString(), "output" to secondOutput.toString(),
+        ))
+
+        val text = Files.readString(secondOutput)
+        assertTrue(text.contains("Curation Outcome"))
+        assertTrue(text.contains("## Adopted"))
+    }
+
+    @Test
+    fun `adr-adopt --decisions-registry persists the decision`() {
+        val proposal = io.docpilot.core.documentation.adr.AiProposedAdr(
+            proposalId = "documentation-synthesis:registrytest",
+            title = "Title", context = "Context", decision = "Decision",
+            consequences = "Consequences", alternatives = "Alternatives",
+            citedFindingIds = listOf("component:A", "component:B"),
+            record = io.docpilot.core.documentation.synthesis.SynthesisRecord(
+                synthesisStableId = "documentation-synthesis:registrytest",
+                providerId = "fixture", model = "fixture-model",
+                canonicalInputIdentity = "hash1", promptTemplateIdentity = "template@1", promptTemplateVersion = 1,
+                documentType = "ARCHITECTURE_DECISION_RECORD", sourceArtifactIds = listOf("component:A", "component:B"),
+                evidenceRefs = listOf("evidence:e1"), unresolvedRefs = emptyList(), contentSha256 = "hash2",
+                status = io.docpilot.core.documentation.enrichment.DocumentationEnrichmentStatus.APPLIED,
+                providerInvoked = true, cached = false,
+            ),
+        )
+        val proposalFile = tempFile(FindingsJsonCodec.encodeProposal(proposal))
+        val project = createTempDirectory("docpilot-finding-project")
+        val registryRoot = createTempDirectory("docpilot-registry-out")
+
+        commands().adrAdopt(cliArgs(
+            "proposal" to proposalFile.toString(), "decision" to "accept", "project" to project.toString(),
+            "decisions-registry" to registryRoot.toString(), "output" to registryRoot.resolve("adopted.md").toString(),
+        ))
+
+        val projectId = LocalProjectLoader().load(project).name.lowercase()
+        val decisions = FileCurationDecisionRegistryRepository(registryRoot).load(projectId)
+        assertIs<io.docpilot.core.specification.finding.CurationDecisionRegistryLoadResult.Valid>(decisions)
+        assertEquals("documentation-synthesis:registrytest", decisions.registry.decisions.single().targetId)
     }
 
     @Test
